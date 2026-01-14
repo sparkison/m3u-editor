@@ -174,7 +174,21 @@ class NetworkResource extends Resource
                     Toggle::make('enabled')
                         ->label('Enabled')
                         ->helperText('Disable to stop generating schedule without deleting')
-                        ->default(true),
+                        ->default(true)
+                        ->live()
+                        ->afterStateUpdated(function ($state, $record) {
+                            // If network is being disabled and is currently broadcasting, stop it
+                            if ($state === false && $record && $record->isBroadcasting()) {
+                                $service = app(NetworkBroadcastService::class);
+                                $service->stop($record);
+
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Broadcast Stopped')
+                                    ->body("Network disabled - broadcast has been stopped for {$record->name}")
+                                    ->send();
+                            }
+                        }),
                 ]),
 
             ...self::getOutputSections(),
@@ -409,7 +423,20 @@ class NetworkResource extends Resource
                         ->label('Enable Broadcasting')
                         ->helperText('When enabled, this network will continuously broadcast content according to the schedule.')
                         ->default(false)
-                        ->live(),
+                        ->live()
+                        ->afterStateUpdated(function ($state, $record) {
+                            // If broadcast is being disabled and is currently running, stop it
+                            if ($state === false && $record && $record->isBroadcasting()) {
+                                $service = app(NetworkBroadcastService::class);
+                                $service->stop($record);
+
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Broadcast Stopped')
+                                    ->body("Broadcasting disabled - stream stopped for {$record->name}")
+                                    ->send();
+                            }
+                        }),
 
                     Grid::make(2)->schema([
                         Select::make('output_format')
@@ -530,7 +557,20 @@ class NetworkResource extends Resource
                     ->sortable(),
 
                 ToggleColumn::make('enabled')
-                    ->label('Enabled'),
+                    ->label('Enabled')
+                    ->afterStateUpdated(function ($record, $state) {
+                        // If network is being disabled and is currently broadcasting, stop it
+                        if ($state === false && $record->isBroadcasting()) {
+                            $service = app(NetworkBroadcastService::class);
+                            $service->stop($record);
+
+                            Notification::make()
+                                ->warning()
+                                ->title('Broadcast Stopped')
+                                ->body("Network disabled - broadcast has been stopped for {$record->name}")
+                                ->send();
+                        }
+                    }),
 
                 TextColumn::make('schedule_generated_at')
                     ->label('Schedule Generated')
@@ -580,14 +620,45 @@ class NetworkResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('generateSchedule')
+                        ->label('Generate Schedule')
+                        ->icon('heroicon-o-calendar')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Generate Schedule')
+                        ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
+                        ->disabled(fn (Network $record): bool => $record->network_playlist_id === null)
+                        ->tooltip(fn (Network $record): ?string => $record->network_playlist_id === null ? 'Assign to a playlist first' : null)
+                        ->action(function (Network $record) {
+                            $service = app(NetworkScheduleService::class);
+                            $service->generateSchedule($record);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Schedule Generated')
+                                ->body("Generated programme schedule for {$record->name}")
+                                ->send();
+                        }),
+
                     Action::make('startBroadcast')
                         ->label('Start Broadcast')
                         ->icon('heroicon-o-play')
-                        ->color('success')
+                        ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Start Broadcasting')
                         ->modalDescription('Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.')
                         ->visible(fn (Network $record): bool => $record->broadcast_enabled && ! $record->isBroadcasting())
+                        ->disabled(fn (Network $record): bool => $record->network_playlist_id === null || $record->programmes()->count() === 0)
+                        ->tooltip(function (Network $record): ?string {
+                            if ($record->network_playlist_id === null) {
+                                return 'Assign to a playlist first';
+                            }
+                            if ($record->programmes()->count() === 0) {
+                                return 'Generate schedule first';
+                            }
+
+                            return null;
+                        })
                         ->action(function (Network $record) {
                             $service = app(NetworkBroadcastService::class);
                             $result = $service->start($record);
@@ -623,24 +694,6 @@ class NetworkResource extends Resource
                                 ->warning()
                                 ->title('Broadcast Stopped')
                                 ->body("Broadcasting stopped for {$record->name}")
-                                ->send();
-                        }),
-
-                    Action::make('generateSchedule')
-                        ->label('Generate Schedule')
-                        ->icon('heroicon-o-calendar')
-                        ->color('info')
-                        ->requiresConfirmation()
-                        ->modalHeading('Generate Schedule')
-                        ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
-                        ->action(function (Network $record) {
-                            $service = app(NetworkScheduleService::class);
-                            $service->generateSchedule($record);
-
-                            Notification::make()
-                                ->success()
-                                ->title('Schedule Generated')
-                                ->body("Generated programme schedule for {$record->name}")
                                 ->send();
                         }),
 

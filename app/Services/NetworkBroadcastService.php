@@ -51,8 +51,13 @@ class NetworkBroadcastService
         $hlsPath = $network->getHlsStoragePath();
         File::ensureDirectoryExists($hlsPath);
 
-        // Get current programme
+        // Determine programme and seek position. Prefer persisted broadcast reference when available.
         $programme = $network->getCurrentProgramme();
+        if (! $programme && $network->broadcast_programme_id) {
+            // Try to load the persisted programme if current one not found
+            $programme = NetworkProgramme::find($network->broadcast_programme_id);
+        }
+
         if (! $programme) {
             Log::warning('No current programme to broadcast', [
                 'network_id' => $network->id,
@@ -61,8 +66,11 @@ class NetworkBroadcastService
             return false;
         }
 
+        // Compute seek position: if there is a persisted broadcast reference use it, otherwise use current programme seek
+        $seekPosition = $network->getPersistedBroadcastSeekForNow() ?? $network->getCurrentSeekPosition();
+
         // Build and start FFmpeg process
-        $command = $this->buildFfmpegCommand($network, $programme);
+        $command = $this->buildFfmpegCommand($network, $programme, $seekPosition);
         if (! $command) {
             Log::error('Failed to build FFmpeg command', [
                 'network_id' => $network->id,
@@ -71,7 +79,7 @@ class NetworkBroadcastService
             return false;
         }
 
-        return $this->executeCommand($network, $command);
+        return $this->executeCommand($network, $command, $programme, $seekPosition);
     }
 
     /**
@@ -101,14 +109,13 @@ class NetworkBroadcastService
 
             // Check if process is still running
             if (! $this->isProcessRunning($network)) {
-                Log::info('Broadcast stopped gracefully', [
-                    'network_id' => $network->id,
-                    'pid' => $pid,
-                ]);
+                Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
                 $network->update([
                     'broadcast_started_at' => null,
                     'broadcast_pid' => null,
+                    'broadcast_programme_id' => null,
+                    'broadcast_initial_offset_seconds' => null,
                 ]);
 
                 // Emit a structured metric/log for broadcast stop
@@ -125,10 +132,7 @@ class NetworkBroadcastService
             $this->signalProcess($pid, SIGKILL);
         }
 
-        Log::info('Broadcast force-stopped', [
-            'network_id' => $network->id,
-            'pid' => $pid,
-        ]);
+        Log::info("🔴 BROADCAST FORCE-STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
         $network->update([
             'broadcast_started_at' => null,
@@ -165,11 +169,24 @@ class NetworkBroadcastService
      *
      * @return array|null Command array or null on failure
      */
-    public function buildFfmpegCommand(Network $network, NetworkProgramme $programme): ?array
+    public function buildFfmpegCommand(Network $network, NetworkProgramme $programme, int $seekPosition = 0): ?array
     {
         $hlsPath = $network->getHlsStoragePath();
-        $seekPosition = $network->getCurrentSeekPosition();
+        // Use provided seek position (may come from persisted reference) or fall back to current seek
         $remainingDuration = $network->getCurrentRemainingDuration();
+
+        Log::info("📍 BROADCAST SEEK CALCULATION: {$network->name}", [
+            'network_id' => $network->id,
+            'programme_id' => $programme->id,
+            'programme_title' => $programme->title,
+            'programme_start' => $programme->start_time->toIso8601String(),
+            'programme_end' => $programme->end_time->toIso8601String(),
+            'now' => now()->toIso8601String(),
+            'seek_position_seconds' => $seekPosition,
+            'seek_position_formatted' => gmdate('H:i:s', $seekPosition),
+            'remaining_duration_seconds' => $remainingDuration,
+            'remaining_duration_formatted' => gmdate('H:i:s', $remainingDuration),
+        ]);
 
         // Get stream URL with seek position built-in (media server handles seeking)
         $streamUrl = $this->getStreamUrl($network, $programme, $seekPosition);
@@ -322,6 +339,13 @@ class NetworkBroadcastService
         if ($seekSeconds > 0) {
             // Jellyfin/Emby use ticks (100-nanosecond intervals)
             $params['StartTimeTicks'] = $seekSeconds * 10_000_000;
+            
+            Log::debug("📍 Media server seek applied", [
+                'network_id' => $network->id,
+                'item_id' => $itemId,
+                'seek_seconds' => $seekSeconds,
+                'seek_ticks' => $params['StartTimeTicks'],
+            ]);
         }
 
         return $url.'?'.http_build_query($params);
@@ -380,7 +404,7 @@ class NetworkBroadcastService
     /**
      * Execute the FFmpeg command as a background process.
      */
-    protected function executeCommand(Network $network, array $command): bool
+    protected function executeCommand(Network $network, array $command, ?NetworkProgramme $programme = null, int $initialOffsetSeconds = 0): bool
     {
         $commandString = implode(' ', array_map('escapeshellarg', $command));
 
@@ -424,16 +448,17 @@ class NetworkBroadcastService
             return false;
         }
 
-        // Update network with broadcast info
-        $network->update([
+        // Update network with broadcast info and persist broadcast reference
+        $update = [
             'broadcast_started_at' => Carbon::now(),
             'broadcast_pid' => $pid,
-        ]);
+            'broadcast_programme_id' => $programme?->id,
+            'broadcast_initial_offset_seconds' => $initialOffsetSeconds,
+        ];
 
-        Log::info('Broadcast started successfully', [
-            'network_id' => $network->id,
-            'pid' => $pid,
-        ]);
+        $network->update($update);
+
+        Log::info("🟢 BROADCAST STARTED: {$network->name} (Network ID: {$network->id}, PID: {$pid})", $update);
 
         // Emit a structured metric/log for broadcasting start
         Log::info('HLS_METRIC: broadcast_started', [
@@ -640,6 +665,19 @@ class NetworkBroadcastService
         $remaining = $network->getCurrentRemainingDuration();
         $result['action'] = 'monitoring';
         $result['remaining_seconds'] = $remaining;
+
+        // Periodically cleanup old HLS segments to prevent disk growth
+        try {
+            $deleted = $this->cleanupSegments($network);
+            if ($deleted > 0) {
+                $result['deleted_old_segments'] = $deleted;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to clean up HLS segments', [
+                'network_id' => $network->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $result;
     }

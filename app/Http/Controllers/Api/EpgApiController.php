@@ -648,6 +648,22 @@ class EpgApiController extends Controller
                 // Get network logo or placeholder
                 $icon = $network->logo ?? url('/placeholder.png');
 
+                // Calculate broadcast offset for EPG playhead alignment
+                $broadcastOffset = null;
+                if ($network->isBroadcasting() && $network->broadcast_started_at) {
+                    // Calculate how many seconds the broadcast has been running
+                    $broadcastElapsed = (int) $network->broadcast_started_at->diffInSeconds(now());
+                    // The actual media position is initial_offset + time since broadcast started
+                    $actualMediaPosition = ($network->broadcast_initial_offset ?? 0) + $broadcastElapsed;
+
+                    $broadcastOffset = [
+                        'started_at' => $network->broadcast_started_at->toIso8601String(),
+                        'initial_offset' => $network->broadcast_initial_offset ?? 0,
+                        'broadcast_elapsed' => $broadcastElapsed,
+                        'actual_media_position' => $actualMediaPosition,
+                    ];
+                }
+
                 // Build channel entry
                 $channels[$channelNo] = [
                     'id' => $channelNo,
@@ -666,6 +682,7 @@ class EpgApiController extends Controller
                     'sort_index' => $channelNo,
                     'is_network' => true, // Flag to identify network channels
                     'is_broadcasting' => $network->isBroadcasting(),
+                    'broadcast_offset' => $broadcastOffset, // For EPG playhead alignment
                 ];
 
                 // Get programmes for this network within the date range

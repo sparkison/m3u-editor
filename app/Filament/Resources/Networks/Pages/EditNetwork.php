@@ -23,6 +23,8 @@ class EditNetwork extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading('Generate Schedule')
                 ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
+                ->disabled(fn (): bool => $this->record->network_playlist_id === null)
+                ->tooltip(fn (): ?string => $this->record->network_playlist_id === null ? 'Assign to a playlist first' : null)
                 ->action(function () {
                     $service = app(NetworkScheduleService::class);
                     $service->generateSchedule($this->record);

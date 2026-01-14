@@ -31,6 +31,59 @@ class NetworkContent extends Model
     ];
 
     /**
+     * Boot the model.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // When content is deleted, check if network has any remaining content
+        static::deleted(function (NetworkContent $networkContent) {
+            $network = $networkContent->network;
+            
+            if (! $network) {
+                return;
+            }
+
+            // Check if this was the last content item
+            $remainingContent = $network->networkContent()->count();
+            
+            if ($remainingContent === 0) {
+                \Illuminate\Support\Facades\Log::info('Last content removed from network, triggering cleanup', [
+                    'network_id' => $network->id,
+                    'network_name' => $network->name,
+                ]);
+
+                // Stop any active broadcast
+                if ($network->broadcast_enabled && $network->broadcast_pid) {
+                    try {
+                        app(\App\Services\NetworkBroadcastService::class)->stop($network);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to stop broadcast after content removal', [
+                            'network_id' => $network->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Clear the schedule (will be empty now)
+                $network->programmes()->delete();
+                $network->update(['schedule_generated_at' => null]);
+
+                // Regenerate EPG (will be empty but keep structure valid)
+                try {
+                    app(\App\Services\NetworkEpgService::class)->generateEpg($network);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to regenerate EPG after content removal', [
+                        'network_id' => $network->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        });
+    }
+
+    /**
      * Get the network this content belongs to.
      */
     public function network(): BelongsTo
@@ -52,54 +105,48 @@ class NetworkContent extends Model
     public function getDurationSecondsAttribute(): int
     {
         $content = $this->contentable;
+        $seconds = 0;
 
         if (! $content) {
-            return 0;
+            return $seconds;
         }
 
         // For Episodes, duration is stored in info
         if ($content instanceof Episode) {
             // First try duration_secs (already in seconds)
             if (isset($content->info['duration_secs']) && is_numeric($content->info['duration_secs'])) {
-                return (int) $content->info['duration_secs'];
+                $seconds = (int) $content->info['duration_secs'];
+            } else {
+                // Try duration field - could be HH:MM:SS format or seconds
+                $duration = $content->info['duration'] ?? null;
+                if ($duration) {
+                    $seconds = $this->parseDuration($duration);
+                }
             }
-
-            // Try duration field - could be HH:MM:SS format or seconds
-            $duration = $content->info['duration'] ?? null;
-            if ($duration) {
-                return $this->parseDuration($duration);
-            }
-
-            return 0;
-        }
-
-        // For Channels (VOD), duration is in info.duration_secs or info.duration
-        if ($content instanceof Channel) {
+        } elseif ($content instanceof Channel) {
             // First check info directly on channel
             if (isset($content->info['duration_secs']) && is_numeric($content->info['duration_secs'])) {
-                return (int) $content->info['duration_secs'];
+                $seconds = (int) $content->info['duration_secs'];
+            } else {
+                $duration = $content->info['duration'] ?? null;
+                if ($duration) {
+                    $seconds = $this->parseDuration($duration);
+                } else {
+                    // Fallback to movie_data structure
+                    $secs = $content->movie_data['info']['duration_secs'] ?? null;
+                    if ($secs && is_numeric($secs)) {
+                        $seconds = (int) $secs;
+                    } else {
+                        $duration = $content->movie_data['info']['duration'] ?? null;
+                        if ($duration) {
+                            $seconds = $this->parseDuration($duration);
+                        }
+                    }
+                }
             }
-
-            $duration = $content->info['duration'] ?? null;
-            if ($duration) {
-                return $this->parseDuration($duration);
-            }
-
-            // Fallback to movie_data structure
-            $secs = $content->movie_data['info']['duration_secs'] ?? null;
-            if ($secs && is_numeric($secs)) {
-                return (int) $secs;
-            }
-
-            $duration = $content->movie_data['info']['duration'] ?? null;
-            if ($duration) {
-                return $this->parseDuration($duration);
-            }
-
-            return 0;
         }
 
-        return 0;
+        return $seconds;
     }
 
     /**
@@ -107,21 +154,20 @@ class NetworkContent extends Model
      */
     protected function parseDuration(mixed $duration): int
     {
-        if (is_numeric($duration)) {
-            return (int) $duration;
-        }
+        $seconds = 0;
 
-        if (is_string($duration)) {
+        if (is_numeric($duration)) {
+            $seconds = (int) $duration;
+        } elseif (is_string($duration)) {
             // Handle HH:MM:SS or MM:SS format
             if (preg_match('/^(\d+):(\d+):(\d+)$/', $duration, $matches)) {
-                return ((int) $matches[1] * 3600) + ((int) $matches[2] * 60) + (int) $matches[3];
-            }
-            if (preg_match('/^(\d+):(\d+)$/', $duration, $matches)) {
-                return ((int) $matches[1] * 60) + (int) $matches[2];
+                $seconds = ((int) $matches[1] * 3600) + ((int) $matches[2] * 60) + (int) $matches[3];
+            } elseif (preg_match('/^(\d+):(\d+)$/', $duration, $matches)) {
+                $seconds = ((int) $matches[1] * 60) + (int) $matches[2];
             }
         }
 
-        return 0;
+        return $seconds;
     }
 
     /**

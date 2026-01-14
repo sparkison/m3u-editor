@@ -34,7 +34,33 @@ class Network extends Model
         'audio_bitrate' => 'integer',
         'broadcast_started_at' => 'datetime',
         'broadcast_pid' => 'integer',
+        'broadcast_programme_id' => 'integer',
+        'broadcast_initial_offset_seconds' => 'integer',
     ];
+
+    /**
+     * If a broadcast reference exists (programme + initial offset), compute the
+     * effective seek position for 'now' taking into account time elapsed since
+     * the broadcast was originally started. Returns null if no persisted
+     * reference exists.
+     */
+    public function getPersistedBroadcastSeekForNow(): ?int
+    {
+        if (! $this->broadcast_programme_id || ! $this->broadcast_started_at || $this->broadcast_initial_offset_seconds === null) {
+            return null;
+        }
+
+        $programme = $this->programmes()->where('id', $this->broadcast_programme_id)->first();
+
+        // If the original programme still exists and is currently airing, continue from persisted offset + elapsed
+        if ($programme && now()->between($programme->start_time, $programme->end_time)) {
+            $elapsed = now()->diffInSeconds($this->broadcast_started_at);
+            return (int) max(0, $this->broadcast_initial_offset_seconds + $elapsed);
+        }
+
+        // Otherwise, fall back to current programme's seek position
+        return $this->getCurrentSeekPosition();
+    }
 
     /**
      * Boot the model.
@@ -56,6 +82,22 @@ class Network extends Model
 
         // Remove network channels when network is deleted
         static::deleting(function (Network $network) {
+            // Ensure any running broadcast is stopped and HLS files are removed
+            try {
+                app(\App\Services\NetworkBroadcastService::class)->stop($network);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to stop network broadcast during deletion', [
+                    'network_id' => $network->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Remove HLS storage directory to free disk space
+            $hlsPath = $network->getHlsStoragePath();
+            if (\Illuminate\Support\Facades\File::isDirectory($hlsPath)) {
+                \Illuminate\Support\Facades\File::deleteDirectory($hlsPath);
+            }
+
             \App\Models\Channel::where('network_id', $network->id)->delete();
         });
     }

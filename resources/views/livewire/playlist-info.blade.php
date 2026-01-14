@@ -49,7 +49,7 @@
                                     </div>
                                 </div>
                             @endif
-                            
+
                             @if(count($stats['networks']) > 0)
                                 <div class="space-y-2">
                                     @foreach($stats['networks'] as $network)
@@ -121,7 +121,7 @@
                                 </div>
                                 Proxy Usage
                             </h3>
-                            
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <!-- Stream Count -->
                                 <div class="bg-white ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 dark:bg-gray-900 rounded-md p-3">
@@ -134,7 +134,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 <!-- Max Streams Status -->
                                 <div class="bg-white ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 dark:bg-gray-900 rounded-md p-3">
                                     <div class="flex items-center justify-between">
@@ -161,7 +161,7 @@
                             </div>
                         </div>
                     @endif
-                    
+
                     @if(isset($stats['xtream_info']))
                         <!-- Xtream Info Section -->
                         <div class="pb-4">
@@ -171,7 +171,7 @@
                                 </div>
                                 Xtream Provider Details
                             </h3>
-                            
+
                             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                 <!-- Active Connections -->
                                 <div class="bg-white ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 dark:bg-gray-900 rounded-md p-3">
@@ -182,7 +182,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 <!-- Expiration Info -->
                                 <div class="bg-white ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 dark:bg-gray-900 rounded-md p-3">
                                     <div class="space-y-1">

@@ -27,13 +27,21 @@ class NetworkBroadcastHeal extends Command
 
                 if (! $dryRun) {
                     $old = $network->broadcast_pid;
+
+                    // Clear pid but preserve broadcast_started_at and persisted reference so restart can resume position
                     $network->update([
-                        'broadcast_started_at' => null,
                         'broadcast_pid' => null,
                     ]);
 
                     Log::warning('HLS_METRIC: broadcast_healed', ['network_id' => $network->id, 'uuid' => $network->uuid, 'old_pid' => $old]);
                     $this->info("Healed network {$network->id}");
+
+                    // Attempt to restart the broadcast using persisted reference where possible
+                    if ($service->start($network)) {
+                        $this->info("Restarted broadcast for network {$network->id}");
+                    } else {
+                        $this->warn("Failed to restart broadcast for network {$network->id}");
+                    }
                 }
             }
         }
