@@ -175,6 +175,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // Proxy API routes
     Route::get('proxy/status', [\App\Http\Controllers\ProxyController::class, 'status'])
         ->name('api.proxy.status');
+    Route::get('proxy/streams/active', [\App\Http\Controllers\ProxyController::class, 'streams'])
+        ->name('api.proxy.streams');
 });
 
 // Playlist API routes (public with UUID auth)
