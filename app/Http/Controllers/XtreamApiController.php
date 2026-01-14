@@ -164,7 +164,7 @@ class XtreamApiController extends Controller
      *     "tv_archive_duration": 24,
      *     "custom_sid": "cnn-hd",
      *     "thumbnail": "https://example.com/logos/cnn.png",
-     *     "direct_source": "https://example.com/api/m3u-proxy/channel/12345/playlist-uuid"
+     *     "direct_source": ""
      *   }
      * ]
      * @response 200 scenario="VOD streams response" [
@@ -185,7 +185,7 @@ class XtreamApiController extends Controller
      *     "tmdb_id": 603,
      *     "container_extension": "mkv",
      *     "custom_sid": "the-matrix",
-     *     "direct_source": "https://example.com/api/m3u-proxy/channel/67890/playlist-uuid"
+     *     "direct_source": ""
      *   }
      * ]
      * @response 200 scenario="Series response" [
@@ -247,7 +247,7 @@ class XtreamApiController extends Controller
      *         "added": "1640995200",
      *         "season": 1,
      *         "stream_id": "1001",
-     *         "direct_source": "https://example.com/xtream/uuid/series/user/pass/1001.mp4"
+     *         "direct_source": ""
      *       }
      *     ]
      *   },
@@ -627,16 +627,6 @@ class XtreamApiController extends Controller
                         $extension = $sourcePlaylist->xtream_config['output'] ?? 'ts'; // Default to 'ts' if not set
                     }
 
-                    // Build the direct_source URL based on proxy settings
-                    $directSource = $url; // Default to original URL
-                    if ($proxyEnabled) {
-                        // Use the proxy URL when proxy is enabled
-                        $directSource = ProxyFacade::getProxyUrlForChannel($channel->id, $playlist->uuid);
-                    } else {
-                        // Use the Xtream API style URL for direct access
-                        $directSource = $baseUrl."/live/{$urlSafeUser}/{$urlSafePass}/".$channel->id.'.'.$extension;
-                    }
-
                     // Use stream_icon as thumbnail (or a dedicated thumbnail if available)
                     $thumbnail = $streamIcon;
 
@@ -652,9 +642,9 @@ class XtreamApiController extends Controller
                         'category_ids' => [(int) $channelCategoryId],
                         'tv_archive' => $channel->catchup ? 1 : 0,
                         'tv_archive_duration' => $channel->shift ?? 0,
-                        'custom_sid' => $channel->stream_id_custom ?? $channel->stream_id ?? '',
+                        'custom_sid' => $channel->stream_id_custom ?? '',
                         'thumbnail' => $thumbnail,
-                        'direct_source' => $directSource,
+                        'direct_source' => '',
                     ];
                 }
             }
@@ -771,17 +761,6 @@ class XtreamApiController extends Controller
                     $extension = $channel->container_extension ?? 'mkv';
                     $tmdb = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? 0;
 
-                    // Build the direct_source URL based on proxy settings
-                    $proxyEnabled = $playlist->enable_proxy;
-                    $directSource = $channel->url_custom ?? $channel->url; // Default to original URL
-                    if ($proxyEnabled) {
-                        // Use the proxy URL when proxy is enabled
-                        $directSource = ProxyFacade::getProxyUrlForChannel($channel->id, $playlist->uuid);
-                    } else {
-                        // Use the Xtream API style URL for direct access
-                        $directSource = $baseUrl."/movie/{$urlSafeUser}/{$urlSafePass}/".$channel->id.'.'.$extension;
-                    }
-
                     $vodStreams[] = [
                         'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -798,8 +777,8 @@ class XtreamApiController extends Controller
                         'tmdb' => (string) $tmdb,
                         'tmdb_id' => (int) $tmdb,
                         'container_extension' => $channel->container_extension ?? 'mkv',
-                        'custom_sid' => $channel->stream_id_custom ?? $channel->stream_id ?? '',
-                        'direct_source' => $directSource,
+                        'custom_sid' => $channel->stream_id_custom ?? '',
+                        'direct_source' => '',
                     ];
                 }
             }
@@ -1030,7 +1009,7 @@ class XtreamApiController extends Controller
                                 'season' => $episode->season,
                                 'custom_sid' => $episode->custom_sid ?? '',
                                 'stream_id' => $episode->id,
-                                'direct_source' => '', // $baseUrl . "/series/{$urlSafeUser}/{$urlSafePass}/" . $episode->id . ".{$containerExtension}"
+                                'direct_source' => '',
                             ];
                         }
                     }
@@ -1428,7 +1407,7 @@ class XtreamApiController extends Controller
                 'category_ids' => ($channel->group_id ? [(int) $channel->group_id] : []),
                 'container_extension' => $extension,
                 'custom_sid' => $movieData['custom_sid'] ?? '',
-                'direct_source' => '', // $baseUrl . "/movie/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . '.' . $extension,
+                'direct_source' => '',
             ];
 
             // Return response with metadata at BOTH root level (for compatibility with buggy players
