@@ -612,6 +612,7 @@ class AppServiceProvider extends ServiceProvider
                     'epg/',
                     'user/',
                     'channel/',
+                    'proxy/',
                     'player_api.php',
                 ]);
             })

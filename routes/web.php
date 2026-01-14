@@ -145,6 +145,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         ->name('api.channels.healthcheck');
     Route::get('channel/playlist/{uuid}/health/{search}', [\App\Http\Controllers\ChannelController::class, 'healthcheckByPlaylist'])
         ->name('api.channels.healthcheck.search');
+
+    // M3U Proxy API routes
+    Route::get('proxy/streams/active', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'activeStreams'])
+        ->name('api.m3u-proxy.streams.active');
 });
 
 // Playlist API routes
