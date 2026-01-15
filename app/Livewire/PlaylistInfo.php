@@ -37,8 +37,8 @@ class PlaylistInfo extends Component
         if ($playlist->is_network_playlist) {
             $networks = $playlist->networks()->with('mediaServerIntegration')->get();
 
-            // Check if the broadcast service is enabled (from Docker env or .env)
-            $broadcastServiceEnabled = filter_var(getenv('NETWORK_BROADCAST_ENABLED') ?: env('NETWORK_BROADCAST_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+            // Check if the broadcast service is enabled (from config)
+            $broadcastServiceEnabled = (bool) config('app.network_broadcast_enabled', false);
 
             return [
                 'is_network_playlist' => true,
