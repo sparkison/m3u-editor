@@ -197,6 +197,20 @@ class NetworkBroadcastService
         // Base FFmpeg command
         $command = ['ffmpeg', '-y'];
 
+        // SEEK FIRST: Use FFmpeg's -ss for input-level seeking BEFORE -i
+        // This is the most reliable way to start at the correct position.
+        // Placing -ss before -i makes FFmpeg seek at the demuxer level (fast, accurate for most formats)
+        if ($seekPosition > 0) {
+            $command[] = '-ss';
+            $command[] = (string) $seekPosition;
+
+            Log::info("📍 FFmpeg INPUT SEEK: Starting at {$seekPosition} seconds", [
+                'network_id' => $network->id,
+                'seek_seconds' => $seekPosition,
+                'seek_formatted' => gmdate('H:i:s', $seekPosition),
+            ]);
+        }
+
         // Real-time pacing: -re flag makes FFmpeg read input at native framerate
         // This prevents FFmpeg from processing content at 70x+ speed when stream-copying
         // Critical for live broadcasting to maintain real-time playback
@@ -339,7 +353,7 @@ class NetworkBroadcastService
         if ($seekSeconds > 0) {
             // Jellyfin/Emby use ticks (100-nanosecond intervals)
             $params['StartTimeTicks'] = $seekSeconds * 10_000_000;
-            
+
             Log::debug("📍 Media server seek applied", [
                 'network_id' => $network->id,
                 'item_id' => $itemId,
