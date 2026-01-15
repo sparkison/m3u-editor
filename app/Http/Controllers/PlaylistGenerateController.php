@@ -194,13 +194,6 @@ class PlaylistGenerateController extends Controller
                             $extension = $channel->container_extension ?? 'mkv';
                         }
                         $url = $baseUrl."/{$urlPath}/{$username}/{$password}/".$channel->id.'.'.$extension;
-                    } elseif ($proxyEnabled) {
-                        // Get the proxy URL
-                        // Pass the playlist UUID for merged/custom playlists so the correct context is used
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            $channel->id,
-                            $playlist->uuid
-                        );
                     }
                     $url = rtrim($url, '.');
 

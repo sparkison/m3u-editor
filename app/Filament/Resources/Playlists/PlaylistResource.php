@@ -15,6 +15,7 @@ use App\Jobs\DuplicatePlaylist;
 use App\Jobs\ProcessM3uImport;
 use App\Jobs\ProcessM3uImportSeries;
 use App\Jobs\ProcessVodChannels;
+use App\Jobs\SyncMediaServer;
 use App\Livewire\EpgViewer;
 use App\Livewire\MediaFlowProxyUrl;
 use App\Livewire\PlaylistEpgUrl;
@@ -307,7 +308,8 @@ class PlaylistResource extends Resource
                             if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
                                 $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
                                 if ($integration) {
-                                    \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                    app('Illuminate\Contracts\Bus\Dispatcher')
+                                        ->dispatch(new SyncMediaServer($integration->id));
 
                                     return;
                                 }
@@ -458,6 +460,7 @@ class PlaylistResource extends Resource
                                 ->duration(3000)
                                 ->send();
                         })
+                        ->hidden(fn ($record): bool => $record->source_type !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-document-duplicate')
                         ->modalIcon('heroicon-o-document-duplicate')
@@ -559,6 +562,7 @@ class PlaylistResource extends Resource
                                 ->duration(3000)
                                 ->send();
                         })
+                        ->hidden(fn ($record): bool => $record->source_type !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-clipboard-document')
                         ->modalIcon('heroicon-o-clipboard-document')
@@ -621,7 +625,9 @@ class PlaylistResource extends Resource
                         ->modalDescription('This action will permanently delete all series associated with the playlist. Proceed with caution.')
                         ->modalSubmitActionLabel('Purge now')
                         ->hidden(fn ($record): bool => ! $record->xtream),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
+                        ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
                 ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
                 ViewAction::make()
@@ -637,7 +643,8 @@ class PlaylistResource extends Resource
                                 if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
                                     $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
                                     if ($integration) {
-                                        \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                        app('Illuminate\Contracts\Bus\Dispatcher')
+                                            ->dispatch(new SyncMediaServer($integration->id));
 
                                         continue;
                                     }
@@ -702,7 +709,7 @@ class PlaylistResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
-                fn ($record): bool => $record->status !== Status::Processing,
+                fn ($record): bool => $record->status !== Status::Processing && $record->source_type === null,
             );
     }
 
@@ -737,7 +744,8 @@ class PlaylistResource extends Resource
                         if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
                             $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
                             if ($integration) {
-                                \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new SyncMediaServer($integration->id));
 
                                 return;
                             }
@@ -880,6 +888,7 @@ class PlaylistResource extends Resource
                             ->duration(3000)
                             ->send();
                     })
+                    ->hidden(fn ($record): bool => $record->source_type !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-document-duplicate')
                     ->modalIcon('heroicon-o-document-duplicate')
@@ -917,7 +926,9 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-arrow-uturn-left')
                     ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                     ->modalSubmitActionLabel('Yes, reset now'),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
+                    ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
             ])->button(),
         ];
     }

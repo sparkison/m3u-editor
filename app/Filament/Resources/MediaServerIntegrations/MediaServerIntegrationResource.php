@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class MediaServerIntegrationResource extends Resource
 {
@@ -81,12 +82,14 @@ class MediaServerIntegrationResource extends Resource
                                     'jellyfin' => 'Jellyfin',
                                 ])
                                 ->required()
+                                ->default('emby')
                                 ->native(false),
                         ]),
 
                         Grid::make(3)->schema([
                             TextInput::make('host')
                                 ->label('Host / IP Address')
+                                ->prefix(fn (callable $get) => $get('ssl') ? 'https://' : 'http://')
                                 ->placeholder('192.168.1.100 or media.example.com')
                                 ->required()
                                 ->maxLength(255),
@@ -100,6 +103,8 @@ class MediaServerIntegrationResource extends Resource
                                 ->maxValue(65535),
 
                             Toggle::make('ssl')
+                                ->live()
+                                ->inline(false)
                                 ->label('Use HTTPS')
                                 ->helperText('Enable if your server uses SSL/TLS')
                                 ->default(false),
@@ -257,11 +262,17 @@ class MediaServerIntegrationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
             ->columns([
                 TextColumn::make('name')
                     ->label('Name')
                     ->searchable()
                     ->sortable(),
+
+                ToggleColumn::make('enabled')
+                    ->label('Enabled'),
 
                 TextColumn::make('type')
                     ->label('Type')
@@ -273,20 +284,6 @@ class MediaServerIntegrationResource extends Resource
                         default => 'gray',
                     }),
 
-                TextColumn::make('host')
-                    ->label('Server')
-                    ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
-                    ->copyable(),
-
-                ToggleColumn::make('enabled')
-                    ->label('Enabled'),
-
-                TextColumn::make('last_synced_at')
-                    ->label('Last Synced')
-                    ->dateTime()
-                    ->since()
-                    ->sortable(),
-
                 TextColumn::make('playlist.name')
                     ->label('Playlist')
                     ->url(fn ($record) => $record->playlist_id
@@ -294,6 +291,40 @@ class MediaServerIntegrationResource extends Resource
                         : null
                     )
                     ->placeholder('Not synced yet'),
+
+                TextColumn::make('host')
+                    ->label('Server')
+                    ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
+                    ->copyable(),
+
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->color(fn (string $state): string => match ($state) {
+                        'processing' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+
+                ProgressColumn::make('movie_progress')
+                    ->label('Movie Sync')
+                    ->poll(fn ($record) => $record->status !== 'completed' && $record->status !== 'failed' ? '3s' : null)
+                    ->toggleable(),
+
+                ProgressColumn::make('series_progress')
+                    ->label('Series Sync')
+                    ->poll(fn ($record) => $record->status !== 'completed' && $record->status !== 'failed' ? '3s' : null)
+                    ->toggleable(),
+
+                TextColumn::make('last_synced_at')
+                    ->label('Last Synced')
+                    ->dateTime()
+                    ->since()
+                    ->sortable(),
+
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
@@ -306,10 +337,34 @@ class MediaServerIntegrationResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('sync')
+                        ->disabled(fn ($record) => $record->status === 'processing')
+                        ->label('Sync Now')
+                        ->icon('heroicon-o-arrow-path')
+                        ->requiresConfirmation()
+                        ->modalHeading('Sync Media Server')
+                        ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
+                        ->action(function (MediaServerIntegration $record) {
+                            // Update status to processing
+                            $record->update([
+                                'status' => 'processing',
+                                'progress' => 0,
+                                'movie_progress' => 0,
+                                'series_progress' => 0,
+                            ]);
+
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new SyncMediaServer($record->id));
+
+                            Notification::make()
+                                ->success()
+                                ->title('Sync Started')
+                                ->body("Syncing content from {$record->name}. You'll be notified when complete.")
+                                ->send();
+                        }),
                     Action::make('test')
                         ->label('Test Connection')
                         ->icon('heroicon-o-signal')
-                        ->color('info')
                         ->action(function (MediaServerIntegration $record) {
                             $service = MediaServerService::make($record);
                             $result = $service->testConnection();
@@ -329,22 +384,14 @@ class MediaServerIntegrationResource extends Resource
                             }
                         }),
 
-                    Action::make('sync')
-                        ->label('Sync Now')
-                        ->icon('heroicon-o-arrow-path')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Sync Media Server')
-                        ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
-                        ->action(function (MediaServerIntegration $record) {
-                            dispatch(new SyncMediaServer($record->id));
-
-                            Notification::make()
-                                ->success()
-                                ->title('Sync Started')
-                                ->body("Syncing content from {$record->name}. You'll be notified when complete.")
-                                ->send();
-                        }),
+                    Action::make('viewPlaylist')
+                        ->label('View Playlist')
+                        ->icon('heroicon-o-queue-list')
+                        ->url(fn ($record) => $record->playlist_id
+                            ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
+                            : null
+                        )
+                        ->visible(fn ($record) => $record->playlist_id !== null),
 
                     Action::make('cleanupDuplicates')
                         ->label('Cleanup Duplicates')
@@ -372,23 +419,14 @@ class MediaServerIntegrationResource extends Resource
                         })
                         ->visible(fn ($record) => $record->playlist_id !== null),
 
-                    EditAction::make(),
-
-                    Action::make('viewPlaylist')
-                        ->label('View Playlist')
-                        ->icon('heroicon-o-queue-list')
-                        ->url(fn ($record) => $record->playlist_id
-                            ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
-                            : null
-                        )
-                        ->visible(fn ($record) => $record->playlist_id !== null),
-
                     DeleteAction::make()
                         ->before(function (MediaServerIntegration $record) {
                             // Optionally delete the associated playlist
                             // For now, we leave the playlist intact (sidecar philosophy)
                         }),
                 ])->button()->hiddenLabel()->size('sm'),
+                EditAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -398,7 +436,8 @@ class MediaServerIntegrationResource extends Resource
                         ->requiresConfirmation()
                         ->action(function ($records) {
                             foreach ($records as $record) {
-                                dispatch(new SyncMediaServer($record->id));
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new SyncMediaServer($record->id));
                             }
 
                             Notification::make()

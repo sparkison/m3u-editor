@@ -91,15 +91,17 @@ class SyncMediaServer implements ShouldQueue
             'type' => $integration->type,
         ]);
 
+        // Set initial status
+        $integration->update([
+            'status' => 'processing',
+            'progress' => 0,
+            'movie_progress' => 0,
+            'series_progress' => 0,
+        ]);
+
         try {
             // Ensure playlist exists for this integration
             $playlist = $this->ensurePlaylist($integration);
-
-            // Update playlist status
-            $playlist->update([
-                'status' => Status::Processing,
-                'processing' => ['syncing' => true],
-            ]);
 
             // Create the service
             $service = MediaServerService::make($integration);
@@ -110,9 +112,12 @@ class SyncMediaServer implements ShouldQueue
                 throw new Exception('Connection failed: '.$connectionTest['message']);
             }
 
+            $integration->update(['progress' => 10]);
+
             // Sync movies (as VOD channels)
             if ($integration->import_movies) {
                 $this->syncMovies($integration, $playlist, $service);
+                $integration->update(['progress' => 50]);
             }
 
             // Sync series and episodes
@@ -122,6 +127,10 @@ class SyncMediaServer implements ShouldQueue
 
             // Update integration with sync stats
             $integration->update([
+                'status' => 'completed',
+                'progress' => 100,
+                'movie_progress' => 100,
+                'series_progress' => 100,
                 'last_synced_at' => now(),
                 'sync_stats' => $this->stats,
             ]);
@@ -151,6 +160,7 @@ class SyncMediaServer implements ShouldQueue
 
             // Update integration with error
             $integration->update([
+                'status' => 'failed',
                 'sync_stats' => $this->stats,
             ]);
 
@@ -194,13 +204,15 @@ class SyncMediaServer implements ShouldQueue
             : PlaylistSourceType::Jellyfin;
 
         // Create a new playlist for this integration
-        $playlist = Playlist::create([
+        $playlist = Playlist::createQuietly([
+            'uuid' => Str::orderedUuid()->toString(),
             'name' => $integration->name,
             'url' => $integration->base_url, // Store the server URL for reference
             'user_id' => $integration->user_id,
             'source_type' => $sourceType,
-            'status' => Status::Pending,
+            'status' => Status::Processing,
             'auto_sync' => false, // Sync is managed by the integration, not the playlist
+            'user_agent' => 'M3U-Editor-MediaServer-Sync/1.0', // required value for playlist, set to something meaningful
         ]);
 
         // Link the playlist to the integration
@@ -224,10 +236,19 @@ class SyncMediaServer implements ShouldQueue
             'count' => $movies->count(),
         ]);
 
-        foreach ($movies as $movie) {
+        $totalMovies = $movies->count();
+        $integration->update(['total_movies' => $totalMovies]);
+
+        foreach ($movies as $index => $movie) {
             try {
                 $this->syncMovie($integration, $playlist, $service, $movie);
                 $this->stats['movies_synced']++;
+
+                // Update progress every 10 movies or on last movie
+                if (($index + 1) % 10 === 0 || ($index + 1) === $totalMovies) {
+                    $progress = $totalMovies > 0 ? (int) ((($index + 1) / $totalMovies) * 100) : 100;
+                    $integration->update(['movie_progress' => $progress]);
+                }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Movie '{$movie['Name']}': {$e->getMessage()}";
                 Log::warning('SyncMediaServer: Failed to sync movie', [
@@ -370,10 +391,19 @@ class SyncMediaServer implements ShouldQueue
             'count' => $seriesList->count(),
         ]);
 
-        foreach ($seriesList as $seriesData) {
+        $totalSeries = $seriesList->count();
+        $integration->update(['total_series' => $totalSeries]);
+
+        foreach ($seriesList as $index => $seriesData) {
             try {
                 $this->syncOneSeries($integration, $playlist, $service, $seriesData);
                 $this->stats['series_synced']++;
+
+                // Update progress every 5 series or on last series
+                if (($index + 1) % 5 === 0 || ($index + 1) === $totalSeries) {
+                    $progress = $totalSeries > 0 ? (int) ((($index + 1) / $totalSeries) * 100) : 100;
+                    $integration->update(['series_progress' => $progress]);
+                }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Series '{$seriesData['Name']}': {$e->getMessage()}";
                 Log::warning('SyncMediaServer: Failed to sync series', [
@@ -516,6 +546,8 @@ class SyncMediaServer implements ShouldQueue
                     'media_server_type' => $integration->type,
                     'duration_secs' => $runtimeSeconds,
                     'duration' => gmdate('H:i:s', $runtimeSeconds),
+                    'movie_image' => $imageUrl, // Store image in info for UI compatibility
+                    'cover_big' => $imageUrl, // Also store as cover_big for fallback
                 ],
             ]
         );
@@ -541,5 +573,29 @@ class SyncMediaServer implements ShouldQueue
         }
 
         return $category;
+    }
+
+    public function failed(Exception $exception): void
+    {
+        $integration = MediaServerIntegration::find($this->integrationId);
+        if ($integration) {
+            $integration->update([
+                'status' => 'failed',
+                'progress' => 0,
+                'movie_progress' => 0,
+                'series_progress' => 0,
+            ]);
+            Notification::make()
+                ->danger()
+                ->title('Media Server Sync Failed')
+                ->body("Sync job for {$integration->name} failed unexpectedly: {$exception->getMessage()}")
+                ->broadcast($integration->user)
+                ->sendToDatabase($integration->user);
+        }
+        Log::error('SyncMediaServer: Job failed unexpectedly', [
+            'integration_id' => $this->integrationId,
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
     }
 }

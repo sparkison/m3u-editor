@@ -11,6 +11,34 @@ class MediaServerIntegration extends Model
     use HasFactory;
 
     /**
+     * The attributes that aren't mass assignable.
+     *
+     * @var array
+     */
+    protected $guarded = [];
+
+    /**
+     * The attributes that should have default values.
+     *
+     * @var array
+     */
+    protected $attributes = [
+        'port' => 8096,
+        'enabled' => true,
+        'ssl' => false,
+        'genre_handling' => 'primary',
+        'import_movies' => true,
+        'import_series' => true,
+        'auto_sync' => true,
+        'status' => 'idle',
+        'progress' => 0,
+        'movie_progress' => 0,
+        'series_progress' => 0,
+        'total_movies' => 0,
+        'total_series' => 0,
+    ];
+
+    /**
      * The attributes that should be cast to native types.
      *
      * @var array
@@ -27,6 +55,11 @@ class MediaServerIntegration extends Model
         'sync_stats' => 'array',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
+        'progress' => 'integer',
+        'movie_progress' => 'integer',
+        'series_progress' => 'integer',
+        'total_movies' => 'integer',
+        'total_series' => 'integer',
     ];
 
     /**

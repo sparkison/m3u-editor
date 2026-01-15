@@ -13,6 +13,7 @@ class CreateMediaServerIntegration extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = Auth::id();
+        $data['status'] = 'processing'; // Set initial status to processing
 
         return $data;
     }
