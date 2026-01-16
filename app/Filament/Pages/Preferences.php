@@ -530,6 +530,21 @@ class Preferences extends SettingsPage
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->columnSpan(2),
                                     ]),
+                                Section::make('Network Broadcasting')
+                                    ->description('Configure settings for network broadcast HLS streaming')
+                                    ->columnSpan('full')
+                                    ->collapsible()
+                                    ->collapsed(true)
+                                    ->schema([
+                                        TextInput::make('broadcast_segment_cleanup_interval')
+                                            ->label('Segment cleanup interval (minutes)')
+                                            ->numeric()
+                                            ->minValue(1)
+                                            ->maxValue(60)
+                                            ->default(5)
+                                            ->helperText('How often to remove old HLS segment files from disk. Lower values use less disk space but may impact performance.')
+                                            ->suffix('minutes'),
+                                    ]),
                             ]),
 
                         Tab::make('Sync Options')

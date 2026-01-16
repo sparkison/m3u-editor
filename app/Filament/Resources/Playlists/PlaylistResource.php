@@ -135,7 +135,8 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn (Playlist $record): string => $record->is_network_playlist ? '📺 Network Playlist' : ''),
                 TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -198,8 +199,8 @@ class PlaylistResource extends Resource
                 //     ->sortable(),
                 TextColumn::make('live_channels_count')
                     ->label('Live')
-                    ->counts('live_channels')
-                    ->description(fn (Playlist $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->formatStateUsing(fn (Playlist $record): int => $record->is_network_playlist ? $record->networks()->count() : $record->live_channels_count)
+                    ->description(fn (Playlist $record): string => $record->is_network_playlist ? 'Enabled: '.($record->networks()->get()->filter(fn($n) => $n->isBroadcasting())->count()) : "Enabled: {$record->enabled_live_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 TextColumn::make('vod_channels_count')
@@ -346,7 +347,8 @@ class PlaylistResource extends Resource
                                 ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
                                 : 'Process playlist now?';
                         })
-                        ->modalSubmitActionLabel('Yes, sync now'),
+                        ->modalSubmitActionLabel('Yes, sync now')
+                        ->hidden(fn ($record): bool => $record->is_network_playlist),
                     Action::make('reset_processing')
                         ->label('Reset Processing State')
                         ->icon('heroicon-o-arrow-path')
@@ -371,7 +373,7 @@ class PlaylistResource extends Resource
                                 ->body('The playlist is no longer processing. You can now run new syncs.')
                                 ->send();
                         })
-                        ->visible(fn (Playlist $record) => $record->isProcessing()),
+                        ->visible(fn (Playlist $record) => $record->isProcessing() && ! $record->is_network_playlist),
                     Action::make('process_series')
                         ->label('Fetch Series Metadata')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -391,7 +393,7 @@ class PlaylistResource extends Resource
                                 ->send();
                         })
                         ->disabled(fn ($record): bool => $record->isProcessing())
-                        ->hidden(fn ($record): bool => ! $record->xtream)
+                        ->hidden(fn ($record): bool => ! $record->xtream || $record->is_network_playlist)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -416,7 +418,7 @@ class PlaylistResource extends Resource
                                 ->send();
                         })
                         ->disabled(fn ($record): bool => $record->isProcessing())
-                        ->hidden(fn ($record): bool => ! $record->xtream)
+                        ->hidden(fn ($record): bool => ! $record->xtream || $record->is_network_playlist)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -432,7 +434,8 @@ class PlaylistResource extends Resource
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->url(fn ($record) => PlaylistFacade::getUrls($record)['hdhr'])
-                        ->openUrlInNewTab(),
+                        ->openUrlInNewTab()
+                        ->hidden(fn ($record): bool => $record->is_network_playlist),
                     Action::make('Public URL')
                         ->label('Public URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
@@ -462,7 +465,8 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-document-duplicate')
                         ->modalIcon('heroicon-o-document-duplicate')
                         ->modalDescription('Duplicate playlist now?')
-                        ->modalSubmitActionLabel('Yes, duplicate now'),
+                        ->modalSubmitActionLabel('Yes, duplicate now')
+                        ->hidden(fn ($record): bool => $record->is_network_playlist),
 
                     Action::make('Copy Changes')
                         ->label('Copy Changes')
@@ -563,7 +567,8 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-clipboard-document')
                         ->modalIcon('heroicon-o-clipboard-document')
                         ->modalDescription('Select the target playlist and channel attributes to copy')
-                        ->modalSubmitActionLabel('Copy now'),
+                        ->modalSubmitActionLabel('Copy now')
+                        ->hidden(fn ($record): bool => $record->is_network_playlist),
 
                     Action::make('view_sync_logs')
                         ->label('View Sync Logs')
@@ -572,7 +577,8 @@ class PlaylistResource extends Resource
                         ->url(function (Playlist $record): string {
                             return "/playlists/{$record->id}/playlist-sync-statuses";
                         })
-                        ->openUrlInNewTab(false),
+                        ->openUrlInNewTab(false)
+                        ->hidden(fn (Playlist $record): bool => $record->is_network_playlist),
                     Action::make('reset')
                         ->label('Reset status')
                         ->icon('heroicon-o-arrow-uturn-left')
@@ -604,7 +610,8 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->modalIcon('heroicon-o-arrow-uturn-left')
                         ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
-                        ->modalSubmitActionLabel('Yes, reset now'),
+                        ->modalSubmitActionLabel('Yes, reset now')
+                        ->hidden(fn ($record): bool => $record->is_network_playlist),
                     Action::make('purge_series')
                         ->label('Purge Series')
                         ->icon('heroicon-s-trash')
@@ -2146,6 +2153,8 @@ class PlaylistResource extends Resource
                         ->default(120)
                         ->hidden(fn (Get $get): bool => ! $get('dummy_epg')),
                 ]),
+
+
         ];
 
         $authFields = [

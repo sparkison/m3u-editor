@@ -391,6 +391,9 @@ class XtreamApiController extends Controller
             $tagUuid = $playlist->customPlaylist->uuid; // PlaylistAlias case, get the attached CustomPlaylist UUID
         }
 
+        // Check if this is a network playlist (pseudo-TV channels from media server content)
+        $isNetworkPlaylist = $playlist instanceof Playlist && $playlist->is_network_playlist;
+
         $baseUrl = ProxyFacade::getBaseUrl();
         $action = $request->input('action', 'panel');
         if (
@@ -481,6 +484,11 @@ class XtreamApiController extends Controller
                 'server_info' => $serverInfo,
             ]);
         } elseif ($action === 'get_live_streams') {
+            // Handle network playlists - return networks as live streams
+            if ($isNetworkPlaylist) {
+                return $this->getNetworkLiveStreams($playlist, $baseUrl);
+            }
+
             $categoryId = $request->input('category_id');
 
             $channelsQuery = $playlist->channels()
@@ -654,6 +662,11 @@ class XtreamApiController extends Controller
 
             return response()->json($liveStreams);
         } elseif ($action === 'get_vod_streams') {
+            // Network playlists don't have VOD streams
+            if ($isNetworkPlaylist) {
+                return response()->json([]);
+            }
+
             $categoryId = $request->input('category_id');
 
             $channelsQuery = $playlist->channels()
@@ -788,6 +801,11 @@ class XtreamApiController extends Controller
 
             return response()->json($vodStreams);
         } elseif ($action === 'get_series') {
+            // Network playlists don't have series
+            if ($isNetworkPlaylist) {
+                return response()->json([]);
+            }
+
             $categoryId = $request->input('category_id');
 
             $seriesQuery = $playlist->series()
@@ -1028,6 +1046,11 @@ class XtreamApiController extends Controller
                 'seasons' => $seasons,
             ]);
         } elseif ($action === 'get_live_categories') {
+            // Handle network playlists - return a single "Networks" category
+            if ($isNetworkPlaylist) {
+                return $this->getNetworkLiveCategories($playlist);
+            }
+
             $liveCategories = [];
 
             if ($isCustomPlaylist) {
@@ -1129,6 +1152,11 @@ class XtreamApiController extends Controller
 
             return response()->json($liveCategories);
         } elseif ($action === 'get_vod_categories') {
+            // Network playlists don't have VOD categories
+            if ($isNetworkPlaylist) {
+                return response()->json([]);
+            }
+
             $vodCategories = [];
 
             if ($isCustomPlaylist) {
@@ -1231,6 +1259,11 @@ class XtreamApiController extends Controller
 
             return response()->json($vodCategories);
         } elseif ($action === 'get_series_categories') {
+            // Network playlists don't have series categories
+            if ($isNetworkPlaylist) {
+                return response()->json([]);
+            }
+
             $seriesCategories = [];
 
             if ($isCustomPlaylist) {
@@ -1421,6 +1454,11 @@ class XtreamApiController extends Controller
                 'movie_data' => $defaultMovieData,
             ]));
         } elseif ($action === 'get_short_epg') {
+            // Handle network playlists - return EPG from network schedule
+            if ($isNetworkPlaylist) {
+                return $this->getNetworkShortEpg($playlist, $request);
+            }
+
             $streamId = $request->input('stream_id');
             $limit = $request->input('limit');
             $limit = (int) ($limit ?? 4);
@@ -1508,6 +1546,11 @@ class XtreamApiController extends Controller
 
             return response()->json(['epg_listings' => $epgListings]);
         } elseif ($action === 'get_simple_data_table') {
+            // Handle network playlists - return EPG from network schedule
+            if ($isNetworkPlaylist) {
+                return $this->getNetworkSimpleDataTable($playlist, $request);
+            }
+
             $streamId = $request->input('stream_id');
 
             if (! $streamId) {
@@ -1619,6 +1662,168 @@ class XtreamApiController extends Controller
 
         // If here, user is authenticated
         return redirect()->to(route('epg.generate', ['uuid' => $playlist->uuid]));
+    }
+
+    /**
+     * Get live streams for a network playlist.
+     * Each network becomes a "channel" in the Xtream API response.
+     */
+    private function getNetworkLiveStreams(Playlist $playlist, string $baseUrl): \Illuminate\Http\JsonResponse
+    {
+        $networks = $playlist->networks()
+            ->where('enabled', true)
+            ->orderBy('channel_number')
+            ->get();
+
+        $liveStreams = [];
+        foreach ($networks as $network) {
+            $streamIcon = $network->logo ?: $baseUrl.'/placeholder.png';
+
+            // Use network ID as stream_id, channel_number as epg_channel_id
+            $liveStreams[] = [
+                'num' => $network->channel_number ?? $network->id,
+                'name' => $network->name,
+                'stream_type' => 'live',
+                'stream_id' => $network->id,
+                'stream_icon' => $streamIcon,
+                'epg_channel_id' => 'network-'.($network->channel_number ?? $network->id),
+                'added' => (string) $network->created_at->timestamp,
+                'category_id' => 'networks',
+                'category_ids' => [1],
+                'tv_archive' => 0,
+                'tv_archive_duration' => 0,
+                'custom_sid' => '',
+                'thumbnail' => '',
+                'direct_source' => '',
+            ];
+        }
+
+        return response()->json($liveStreams);
+    }
+
+    /**
+     * Get live categories for a network playlist.
+     * Returns a single "Networks" category.
+     */
+    private function getNetworkLiveCategories(Playlist $playlist): \Illuminate\Http\JsonResponse
+    {
+        $networkCount = $playlist->networks()->where('enabled', true)->count();
+
+        if ($networkCount === 0) {
+            return response()->json([]);
+        }
+
+        return response()->json([
+            [
+                'category_id' => 'networks',
+                'category_name' => 'Networks',
+                'parent_id' => 0,
+            ],
+        ]);
+    }
+
+    /**
+     * Get short EPG for a network (from the generated programme schedule).
+     */
+    private function getNetworkShortEpg(Playlist $playlist, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $streamId = $request->input('stream_id');
+        $limit = (int) ($request->input('limit') ?? 4);
+
+        if (! $streamId) {
+            return response()->json(['error' => 'stream_id parameter is required for get_short_epg action'], 400);
+        }
+
+        $network = $playlist->networks()
+            ->where('enabled', true)
+            ->where('id', $streamId)
+            ->first();
+
+        if (! $network) {
+            return response()->json(['error' => 'Network not found'], 404);
+        }
+
+        $now = Carbon::now();
+        $programmes = $network->programmes()
+            ->where('end_time', '>', $now)
+            ->orderBy('start_time')
+            ->limit($limit)
+            ->get();
+
+        $epgListings = [];
+        foreach ($programmes as $index => $programme) {
+            $isCurrentProgramme = $programme->start_time->lte($now) && $programme->end_time->gt($now);
+
+            $epgListings[] = [
+                'id' => (string) $programme->id,
+                'epg_id' => (string) $network->id,
+                'title' => base64_encode($programme->title),
+                'lang' => 'en',
+                'start' => $programme->start_time->format('Y-m-d H:i:s'),
+                'end' => $programme->end_time->format('Y-m-d H:i:s'),
+                'description' => base64_encode($programme->description ?? ''),
+                'channel_id' => 'network-'.($network->channel_number ?? $network->id),
+                'start_timestamp' => (string) $programme->start_time->timestamp,
+                'stop_timestamp' => (string) $programme->end_time->timestamp,
+                'now_playing' => $isCurrentProgramme ? 1 : 0,
+                'has_archive' => 0,
+            ];
+        }
+
+        return response()->json(['epg_listings' => $epgListings]);
+    }
+
+    /**
+     * Get simple data table EPG for a network (full day schedule).
+     */
+    private function getNetworkSimpleDataTable(Playlist $playlist, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $streamId = $request->input('stream_id');
+
+        if (! $streamId) {
+            return response()->json(['error' => 'stream_id parameter is required for get_simple_data_table action'], 400);
+        }
+
+        $network = $playlist->networks()
+            ->where('enabled', true)
+            ->where('id', $streamId)
+            ->first();
+
+        if (! $network) {
+            return response()->json(['error' => 'Network not found'], 404);
+        }
+
+        $today = Carbon::now()->startOfDay();
+        $tomorrow = $today->copy()->addDay();
+
+        $programmes = $network->programmes()
+            ->where('start_time', '>=', $today)
+            ->where('start_time', '<', $tomorrow)
+            ->orderBy('start_time')
+            ->get();
+
+        $now = Carbon::now();
+        $epgListings = [];
+        foreach ($programmes as $programme) {
+            $isCurrentProgramme = $programme->start_time->lte($now) && $programme->end_time->gt($now);
+
+            $epgListings[] = [
+                'id' => (string) $programme->id,
+                'epg_id' => (string) $network->id,
+                'title' => base64_encode($programme->title),
+                'lang' => 'en',
+                'start' => $programme->start_time->format('Y-m-d H:i:s'),
+                'end' => $programme->end_time->format('Y-m-d H:i:s'),
+                'description' => base64_encode($programme->description ?? ''),
+                'channel_id' => 'network-'.($network->channel_number ?? $network->id),
+                'start_timestamp' => (string) $programme->start_time->timestamp,
+                'stop_timestamp' => (string) $programme->end_time->timestamp,
+                'now_playing' => $isCurrentProgramme ? 1 : 0,
+                'has_archive' => 0,
+            ];
+        }
+
+        return response()->json(['epg_listings' => $epgListings]);
     }
 
     /**

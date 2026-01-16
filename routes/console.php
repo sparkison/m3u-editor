@@ -48,6 +48,17 @@ Schedule::command('app:logo-cleanup --force')
 Schedule::command('queue:prune-failed --hours=48')
     ->daily();
 
+// Cleanup old HLS segments from network broadcasts
+Schedule::command('network:cleanup-segments')
+    ->cron(function () {
+        try {
+            $interval = app(\App\Settings\GeneralSettings::class)->broadcast_segment_cleanup_interval ?? 5;
+            return "*/{$interval} * * * *";
+        } catch (\Throwable $e) {
+            return '*/5 * * * *'; // Fallback to 5 minutes if settings unavailable
+        }
+    });
+
 // Prune old notifications
 Schedule::command('app:prune-old-notifications --days=7')
     ->daily();
@@ -60,4 +71,9 @@ Schedule::command('profiles:reconcile')
 // Refresh provider profile info (every 15 minutes)
 Schedule::job(new \App\Jobs\RefreshPlaylistProfiles)
     ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+// Regenerate network schedules (hourly check, regenerates when needed)
+Schedule::command('networks:regenerate-schedules')
+    ->hourly()
     ->withoutOverlapping();

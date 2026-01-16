@@ -3,6 +3,9 @@
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\LogoProxyController;
+use App\Http\Controllers\NetworkEpgController;
+use App\Http\Controllers\NetworkPlaylistController;
+use App\Http\Controllers\NetworkStreamController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
 use App\Services\ExternalIpService;
@@ -84,6 +87,40 @@ Route::get('/{uuid}/epg.xml.gz', [EpgGenerateController::class, 'compressed'])
 // Serve the EPG file
 Route::get('epgs/{uuid}/epg.xml', EpgFileController::class)
     ->name('epg.file');
+
+// Network EPG routes
+Route::get('/network/{network}/epg.xml', [NetworkEpgController::class, 'show'])
+    ->name('network.epg');
+Route::get('/network/{network}/epg.xml.gz', [NetworkEpgController::class, 'compressed'])
+    ->name('network.epg.compressed');
+
+// Network stream routes
+Route::get('/network/{network}/stream.{container}', [NetworkStreamController::class, 'stream'])
+    ->name('network.stream')
+    ->where('container', 'ts|mp4|mkv|avi|webm|mov');
+Route::get('/network/{network}/now-playing', [NetworkStreamController::class, 'nowPlaying'])
+    ->name('network.now-playing');
+Route::get('/network/{network}/playlist.m3u', [NetworkPlaylistController::class, 'single'])
+    ->name('network.playlist');
+
+// Networks (plural) playlist routes - all user's networks
+Route::get('/networks/{user}/playlist.m3u', NetworkPlaylistController::class)
+    ->name('networks.playlist');
+Route::get('/networks/{user}/epg.xml', [NetworkPlaylistController::class, 'epg'])
+    ->name('networks.epg');
+
+// Media Integration Networks playlist - networks for a specific media server integration
+Route::get('/media-integration/{integration}/networks/playlist.m3u', [NetworkPlaylistController::class, 'forIntegration'])
+    ->name('media-integration.networks.playlist');
+Route::get('/media-integration/{integration}/networks/epg.xml', [NetworkPlaylistController::class, 'epgForIntegration'])
+    ->name('media-integration.networks.epg');
+
+// Network HLS broadcast routes (for continuous live broadcasting)
+Route::get('/network/{network}/live.m3u8', [\App\Http\Controllers\NetworkHlsController::class, 'playlist'])
+    ->name('network.hls.playlist');
+Route::get('/network/{network}/{segment}.ts', [\App\Http\Controllers\NetworkHlsController::class, 'segment'])
+    ->name('network.hls.segment')
+    ->where('segment', 'live[0-9]+');
 
 /*
  * DEBUG routes

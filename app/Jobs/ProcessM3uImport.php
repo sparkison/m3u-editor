@@ -129,6 +129,17 @@ class ProcessM3uImport implements ShouldQueue
      */
     public function handle(): void
     {
+        // Network playlists don't have M3U files - they get content from assigned networks
+        if ($this->playlist->is_network_playlist) {
+            Log::info('ProcessM3uImport: Network playlist, skipping M3U import', [
+                'playlist_id' => $this->playlist->id,
+                'name' => $this->playlist->name,
+            ]);
+            $this->playlist->update(['status' => Status::Completed]);
+
+            return;
+        }
+
         // Check if this is a media server playlist - these should not be processed via M3U import
         // Media server playlists should be synced via SyncMediaServer job instead
         if (in_array($this->playlist->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {

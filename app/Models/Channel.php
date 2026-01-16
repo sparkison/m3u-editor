@@ -37,6 +37,7 @@ class Channel extends Model
         'shift' => 'integer',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
+        'network_id' => 'integer',
         'group_id' => 'integer',
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
@@ -57,6 +58,22 @@ class Channel extends Model
     public function playlist(): BelongsTo
     {
         return $this->belongsTo(Playlist::class);
+    }
+
+    /**
+     * Get the network this channel represents (if any).
+     */
+    public function network(): BelongsTo
+    {
+        return $this->belongsTo(Network::class);
+    }
+
+    /**
+     * Check if this channel is a network channel.
+     */
+    public function isNetworkChannel(): bool
+    {
+        return $this->network_id !== null;
     }
 
     /**
