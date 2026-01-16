@@ -593,18 +593,23 @@ class NetworkResource extends Resource
                         if ($record->isBroadcasting()) {
                             return 'Live';
                         }
+                        if (! $record->broadcast_requested) {
+                            return 'Stopped';
+                        }
 
-                        return 'Ready';
+                        return 'Starting';
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'Live' => 'success',
-                        'Ready' => 'info',
+                        'Starting' => 'info',
+                        'Stopped' => 'warning',
                         'Disabled' => 'gray',
                         default => 'gray',
                     })
                     ->icon(fn (string $state): string => match ($state) {
                         'Live' => 'heroicon-o-signal',
-                        'Ready' => 'heroicon-o-play',
+                        'Starting' => 'heroicon-o-arrow-path',
+                        'Stopped' => 'heroicon-o-stop',
                         'Disabled' => 'heroicon-o-no-symbol',
                         default => 'heroicon-o-question-mark-circle',
                     }),

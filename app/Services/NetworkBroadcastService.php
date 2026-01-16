@@ -100,6 +100,7 @@ class NetworkBroadcastService
                 'broadcast_pid' => null,
                 'broadcast_programme_id' => null,
                 'broadcast_initial_offset_seconds' => null,
+                'broadcast_requested' => false,
             ]);
 
             // Remove lingering playlist and segment files to prevent stale content from being served
@@ -159,6 +160,7 @@ class NetworkBroadcastService
                     'broadcast_pid' => null,
                     'broadcast_programme_id' => null,
                     'broadcast_initial_offset_seconds' => null,
+                    'broadcast_requested' => false,
                 ]);
 
                 // Remove any HLS files and promoter loop
@@ -183,6 +185,7 @@ class NetworkBroadcastService
         $network->update([
             'broadcast_started_at' => null,
             'broadcast_pid' => null,
+            'broadcast_requested' => false,
         ]);
 
         // Ensure HLS files and promoter loop are removed on force-stop as well
@@ -517,6 +520,7 @@ class NetworkBroadcastService
             'broadcast_pid' => $pid,
             'broadcast_programme_id' => $programme?->id,
             'broadcast_initial_offset_seconds' => $initialOffsetSeconds,
+            'broadcast_requested' => true,
         ];
 
         $network->update($update);
@@ -821,12 +825,19 @@ class NetworkBroadcastService
             return $result;
         }
 
-        // Should be running but isn't - start it
-        if ($network->broadcast_pid === null) {
+        // Should be running but isn't - start it (only if user requested it)
+        if ($network->broadcast_pid === null && $network->broadcast_requested) {
             $success = $this->start($network);
             $result['action'] = 'started';
             $result['success'] = $success;
             $result['programme'] = $programme->title;
+
+            return $result;
+        }
+
+        // broadcast_requested is false and not running - just report idle
+        if ($network->broadcast_pid === null) {
+            $result['action'] = 'idle';
 
             return $result;
         }

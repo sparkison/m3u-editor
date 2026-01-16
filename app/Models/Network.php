@@ -27,6 +27,7 @@ class Network extends Model
         'schedule_generated_at' => 'datetime',
         // Broadcast settings
         'broadcast_enabled' => 'boolean',
+        'broadcast_requested' => 'boolean',
         'segment_duration' => 'integer',
         'hls_list_size' => 'integer',
         'transcode_on_server' => 'boolean',
