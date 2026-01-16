@@ -67,6 +67,7 @@ class SyncListener
             $config = $playlist->auto_merge_config ?? [];
             $useResolution = $config['check_resolution'] ?? false;
             $forceCompleteRemerge = $config['force_complete_remerge'] ?? false;
+            $preferCatchupAsPrimary = $config['prefer_catchup_as_primary'] ?? false;
             $deactivateFailover = $playlist->auto_merge_deactivate_failover;
 
             // Create a collection containing only the current playlist for merging within itself
@@ -79,7 +80,8 @@ class SyncListener
                 playlistId: $playlist->id,
                 checkResolution: $useResolution,
                 deactivateFailoverChannels: $deactivateFailover,
-                forceCompleteRemerge: $forceCompleteRemerge
+                forceCompleteRemerge: $forceCompleteRemerge,
+                preferCatchupAsPrimary: $preferCatchupAsPrimary
             ));
         } catch (Throwable $e) {
             // Log error and send notification
