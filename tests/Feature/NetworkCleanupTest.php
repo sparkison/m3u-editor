@@ -44,6 +44,61 @@ it('removes HLS storage directory when network is deleted', function () {
     $this->assertDatabaseMissing('networks', ['id' => $network->id]);
 });
 
+it('stop removes lingering HLS files even when pid is null', function () {
+    $network = Network::factory()->activeBroadcast()->create();
+
+    $hlsPath = $network->getHlsStoragePath();
+    File::ensureDirectoryExists($hlsPath);
+    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live000001.ts", "segment");
+
+    // Simulate broadcast already stopped (no pid)
+    $network->update(['broadcast_pid' => null, 'broadcast_started_at' => null]);
+
+    $service = app(NetworkBroadcastService::class);
+    $service->stop($network);
+
+    expect(File::exists("{$hlsPath}/live.m3u8"))->toBeFalse();
+    expect(File::exists("{$hlsPath}/live000001.ts"))->toBeFalse();
+});
+
+it('stop removes lingering HLS files when pid exists but process not running', function () {
+    $network = Network::factory()->activeBroadcast()->create();
+
+    $hlsPath = $network->getHlsStoragePath();
+    File::ensureDirectoryExists($hlsPath);
+    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live000001.ts", "segment");
+
+    // Simulate PID set but process not running
+    $network->update(['broadcast_pid' => 999999, 'broadcast_started_at' => now()]);
+
+    $service = app(NetworkBroadcastService::class);
+    $service->stop($network);
+
+    expect(File::exists("{$hlsPath}/live.m3u8"))->toBeFalse();
+    expect(File::exists("{$hlsPath}/live000001.ts"))->toBeFalse();
+});
+
+it('deleted network endpoints return 404', function () {
+    $network = Network::factory()->activeBroadcast()->create();
+    $hlsPath = $network->getHlsStoragePath();
+
+    File::ensureDirectoryExists($hlsPath);
+    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+
+    $uuid = $network->uuid;
+
+    $network->delete();
+
+    // Playlist and stream endpoints should now return 404
+    $playlistResponse = $this->get(route('network.hls.playlist', ['network' => $uuid]));
+    $streamResponse = $this->get(url("/network/{$uuid}/stream.ts"));
+
+    $playlistResponse->assertNotFound();
+    $streamResponse->assertNotFound();
+});
+
 it('cleanupSegments removes old .ts segments', function () {
     $network = Network::factory()->create();
     $hlsPath = $network->getHlsStoragePath();
@@ -69,7 +124,7 @@ it('cleanupSegments removes old .ts segments', function () {
 it('stops broadcast and clears schedule when last content is removed', function () {
     $network = Network::factory()->activeBroadcast()->create();
     $channel = \App\Models\Channel::factory()->create();
-    
+
     // Add content to the network
     $networkContent = \App\Models\NetworkContent::create([
         'network_id' => $network->id,

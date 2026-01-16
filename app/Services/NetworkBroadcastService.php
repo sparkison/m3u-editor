@@ -94,10 +94,53 @@ class NetworkBroadcastService
                 'network_id' => $network->id,
             ]);
 
+            // Clear any persisted broadcast reference and remove HLS files if they exist.
             $network->update([
                 'broadcast_started_at' => null,
                 'broadcast_pid' => null,
+                'broadcast_programme_id' => null,
+                'broadcast_initial_offset_seconds' => null,
             ]);
+
+            // Remove lingering playlist and segment files to prevent stale content from being served
+            try {
+                $hlsPath = $network->getHlsStoragePath();
+                if (File::isDirectory($hlsPath)) {
+                    foreach (File::glob("{$hlsPath}/*.m3u8") as $file) {
+                        File::delete($file);
+                    }
+                    foreach (File::glob("{$hlsPath}/*.m3u8.tmp") as $file) {
+                        File::delete($file);
+                    }
+                    foreach (File::glob("{$hlsPath}/*.ts") as $file) {
+                        File::delete($file);
+                    }
+
+                    // Kill promoter loop if it was started
+                    $promotePidFile = "{$hlsPath}/promote_pid";
+                    if (File::exists($promotePidFile)) {
+                        try {
+                            $promotePid = (int) File::get($promotePidFile);
+                            if ($promotePid > 0 && file_exists("/proc/{$promotePid}")) {
+                                posix_kill($promotePid, SIGKILL);
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to kill playlist promoter process', ['network_id' => $network->id, 'error' => $e->getMessage()]);
+                        }
+
+                        try {
+                            File::delete($promotePidFile);
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to remove HLS files while stopping broadcast', [
+                    'network_id' => $network->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return true;
         }
@@ -109,7 +152,7 @@ class NetworkBroadcastService
 
             // Check if process is still running
             if (! $this->isProcessRunning($network)) {
-                Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
+                    Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
                 $network->update([
                     'broadcast_started_at' => null,
@@ -117,6 +160,9 @@ class NetworkBroadcastService
                     'broadcast_programme_id' => null,
                     'broadcast_initial_offset_seconds' => null,
                 ]);
+
+                // Remove any HLS files and promoter loop
+                $this->cleanupHlsForNetwork($network);
 
                 // Emit a structured metric/log for broadcast stop
                 Log::info('HLS_METRIC: broadcast_stopped', [
@@ -138,6 +184,9 @@ class NetworkBroadcastService
             'broadcast_started_at' => null,
             'broadcast_pid' => null,
         ]);
+
+        // Ensure HLS files and promoter loop are removed on force-stop as well
+        $this->cleanupHlsForNetwork($network);
 
         return true;
     }
@@ -481,6 +530,24 @@ class NetworkBroadcastService
             'pid' => $pid,
         ]);
 
+        // Start a small promoter loop to atomically promote temporary playlists
+        try {
+            $hlsPath = $network->getHlsStoragePath();
+            $promotePidCmd = "nohup sh -c 'while sleep 1; do php /var/www/html/artisan network:promote-tmp-playlist {$network->uuid} >/dev/null 2>&1; done' >/dev/null 2>&1 & echo $!";
+            $output = [];
+            $rc = 0;
+            exec($promotePidCmd, $output, $rc);
+            if ($rc === 0 && ! empty($output[0])) {
+                $promotePid = (int) $output[0];
+                // persist promote PID in a file inside HLS path so we can kill it on stop
+                File::ensureDirectoryExists($hlsPath);
+                File::put("{$hlsPath}/promote_pid", (string) $promotePid);
+                Log::info('Started playlist promoter loop', ['network_id' => $network->id, 'promote_pid' => $promotePid]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to start playlist promoter loop', ['network_id' => $network->id, 'error' => $e->getMessage()]);
+        }
+
         return true;
     }
 
@@ -494,6 +561,60 @@ class NetworkBroadcastService
         }
 
         return posix_kill($pid, $signal);
+    }
+
+    /**
+     * Remove HLS files and kill promoter loop for a network.
+     */
+    protected function cleanupHlsForNetwork(Network $network): void
+    {
+        $hlsPath = $network->getHlsStoragePath();
+
+        if (! File::isDirectory($hlsPath)) {
+            return;
+        }
+
+        foreach (File::glob("{$hlsPath}/*.m3u8") as $file) {
+            try {
+                File::delete($file);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to delete m3u8', ['file' => $file, 'error' => $e->getMessage()]);
+            }
+        }
+
+        foreach (File::glob("{$hlsPath}/*.m3u8.tmp") as $file) {
+            try {
+                File::delete($file);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to delete tmp m3u8', ['file' => $file, 'error' => $e->getMessage()]);
+            }
+        }
+
+        foreach (File::glob("{$hlsPath}/*.ts") as $file) {
+            try {
+                File::delete($file);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to delete segment', ['file' => $file, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $promotePidFile = "{$hlsPath}/promote_pid";
+        if (File::exists($promotePidFile)) {
+            try {
+                $promotePid = (int) File::get($promotePidFile);
+                if ($promotePid > 0 && file_exists("/proc/{$promotePid}")) {
+                    posix_kill($promotePid, SIGKILL);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to kill promoter on cleanup', ['network_id' => $network->id, 'error' => $e->getMessage()]);
+            }
+
+            try {
+                File::delete($promotePidFile);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
     }
 
     /**
@@ -522,6 +643,41 @@ class NetworkBroadcastService
         }
 
         return $deleted;
+    }
+
+    /**
+     * Promote a temporary playlist to the live playlist if it appears stable.
+     * Returns true if promotion occurred.
+     */
+    public function promoteTmpPlaylistIfStable(Network $network, int $stableSeconds = 1): bool
+    {
+        $hlsPath = $network->getHlsStoragePath();
+        $tmp = "{$hlsPath}/live.m3u8.tmp";
+        $target = "{$hlsPath}/live.m3u8";
+
+        if (! File::exists($tmp)) {
+            return false;
+        }
+
+        try {
+            $mtime = File::lastModified($tmp);
+            $stableCutoff = time() - $stableSeconds;
+
+            if ($mtime > $stableCutoff) {
+                // Not yet stable
+                return false;
+            }
+
+            // Copy atomically
+            File::copy($tmp, $target);
+            // Ensure target has same permissions
+            @chmod($target, 0644);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Failed to promote tmp playlist', ['network_id' => $network->id, 'error' => $e->getMessage()]);
+            return false;
+        }
     }
 
     /**
