@@ -13,6 +13,38 @@ use Illuminate\Support\Collection;
 class NetworkEpgService
 {
     /**
+     * Resolve a URL to use the current request's host instead of localhost.
+     * This ensures EPG image URLs are accessible from external clients like Emby/Jellyfin.
+     */
+    protected function resolveUrl(?string $url): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+
+        // Check if URL contains localhost or 127.0.0.1
+        if (! preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?/#i', $url)) {
+            return $url; // Not a localhost URL, return as-is
+        }
+
+        // Try to get the current request's host
+        if (! app()->runningInConsole()) {
+            try {
+                $request = request();
+                if ($request) {
+                    $externalHost = $request->getSchemeAndHttpHost();
+                    // Replace localhost with the request host
+                    $url = preg_replace('#^https?://(localhost|127\.0\.0\.1)(:\d+)?#i', $externalHost, $url);
+                }
+            } catch (\Throwable $e) {
+                // Ignore and return original URL
+            }
+        }
+
+        return $url;
+    }
+
+    /**
      * Generate XMLTV output for a single network.
      */
     public function generateXmltvForNetwork(Network $network): string
@@ -118,7 +150,8 @@ class NetworkEpgService
     {
         $channelId = $this->getChannelId($network);
         $name = htmlspecialchars($network->name, ENT_XML1);
-        $logo = $network->logo ? htmlspecialchars($network->logo, ENT_XML1) : null;
+        $logoUrl = $this->resolveUrl($network->logo);
+        $logo = $logoUrl ? htmlspecialchars($logoUrl, ENT_XML1) : null;
 
         $xml = '  <channel id="'.$channelId.'">'.PHP_EOL;
         $xml .= '    <display-name>'.$name.'</display-name>'.PHP_EOL;
@@ -239,6 +272,9 @@ class NetworkEpgService
                 $imageUrl = $content->series->cover ?? null;
             }
         }
+
+        // Resolve localhost URLs to external-facing URLs
+        $imageUrl = $this->resolveUrl($imageUrl);
 
         if (! empty($imageUrl)) {
             $image = htmlspecialchars($imageUrl, ENT_XML1);
