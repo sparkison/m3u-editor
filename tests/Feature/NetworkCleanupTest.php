@@ -5,6 +5,8 @@ use App\Services\NetworkBroadcastService;
 use Illuminate\Support\Facades\File;
 use function Pest\Laravel\mock;
 
+const M3U_HEADER = "#EXTM3U\n";
+
 beforeEach(function () {
     // Ensure storage area is clean
     File::deleteDirectory(storage_path('app/networks'));
@@ -33,7 +35,7 @@ it('removes HLS storage directory when network is deleted', function () {
     $hlsPath = $network->getHlsStoragePath();
 
     File::ensureDirectoryExists($hlsPath);
-    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
     File::put("{$hlsPath}/live000001.ts", "segment");
 
     expect(File::isDirectory($hlsPath))->toBeTrue();
@@ -49,7 +51,7 @@ it('stop removes lingering HLS files even when pid is null', function () {
 
     $hlsPath = $network->getHlsStoragePath();
     File::ensureDirectoryExists($hlsPath);
-    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
     File::put("{$hlsPath}/live000001.ts", "segment");
 
     // Simulate broadcast already stopped (no pid)
@@ -67,7 +69,7 @@ it('stop removes lingering HLS files when pid exists but process not running', f
 
     $hlsPath = $network->getHlsStoragePath();
     File::ensureDirectoryExists($hlsPath);
-    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
     File::put("{$hlsPath}/live000001.ts", "segment");
 
     // Simulate PID set but process not running
@@ -85,7 +87,7 @@ it('deleted network endpoints return 404', function () {
     $hlsPath = $network->getHlsStoragePath();
 
     File::ensureDirectoryExists($hlsPath);
-    File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
 
     $uuid = $network->uuid;
 
