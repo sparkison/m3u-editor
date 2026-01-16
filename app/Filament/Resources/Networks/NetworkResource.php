@@ -702,6 +702,13 @@ class NetworkResource extends Resource
                                 ->send();
                         }),
 
+                    Action::make('viewPlaylist')
+                        ->label('View Playlist')
+                        ->icon('heroicon-o-eye')
+                        ->color('secondary')
+                        ->visible(fn (Network $record): bool => $record->network_playlist_id !== null)
+                        ->url(fn (Network $record): string => \App\Filament\Resources\Playlists\PlaylistResource::getUrl('view', ['record' => $record->network_playlist_id])),
+
                     EditAction::make(),
 
                     DeleteAction::make(),
