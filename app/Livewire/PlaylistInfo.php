@@ -40,10 +40,19 @@ class PlaylistInfo extends Component
             // Check if the broadcast service is enabled (from config)
             $broadcastServiceEnabled = (bool) config('app.network_broadcast_enabled', false);
 
+            // Count totals for display in Playlist view tiles
+            $totalNetworks = $networks->count();
+            $broadcastingCount = $networks->filter(fn($n) => $n->isBroadcasting())->count();
+
             return [
                 'is_network_playlist' => true,
                 'broadcast_service_enabled' => $broadcastServiceEnabled,
-                'network_count' => $networks->count(),
+                'network_count' => $totalNetworks,
+
+                // For the channel tiles: show total networks as "Live" and the number broadcasting as "Enabled"
+                'channel_count' => $totalNetworks,
+                'enabled_channel_count' => $broadcastingCount,
+
                 'networks' => $networks->map(fn ($n) => [
                     'id' => $n->id,
                     'name' => $n->name,
