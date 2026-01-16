@@ -376,7 +376,7 @@ class AppServiceProvider extends ServiceProvider
                     $epg->user_id = auth()->id();
                 }
                 if (! $epg->sync_interval) {
-                    $epg->sync_interval = '0 0 * * *';
+                    $epg->sync_interval = '0 */6 * * *';
                 }
                 $epg->uuid = Str::orderedUuid()->toString();
 

@@ -1579,6 +1579,7 @@ class PlaylistResource extends Resource
                         ->suffix(config('app.timezone'))
                         ->rules([new Cron])
                         ->live()
+                        ->placeholder('0 0 * * *')
                         ->columnSpanFull()
                         ->hintAction(
                             Action::make('view_cron_example')

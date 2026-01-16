@@ -723,6 +723,7 @@ class EpgResource extends Resource
                         ->suffix(config('app.timezone'))
                         ->rules([new Cron])
                         ->live()
+                        ->placeholder('0 */6 * * *')
                         ->hintAction(
                             Action::make('view_cron_example')
                                 ->label('CRON Example')
@@ -734,7 +735,7 @@ class EpgResource extends Resource
                         )
                         ->helperText(fn ($get) => $get('sync_interval') && CronExpression::isValidExpression($get('sync_interval'))
                             ? 'Next scheduled sync: '.(new CronExpression($get('sync_interval')))->getNextRunDate()->format('Y-m-d H:i:s')
-                            : 'Specify the CRON schedule for automatic sync, e.g. "0 3 * * *".')
+                            : 'Specify the CRON schedule for automatic sync, e.g. "0 */6 * * *".')
                         ->hidden(fn (Get $get): bool => ! $get('auto_sync')),
                     DateTimePicker::make('synced')
                         ->columnSpanFull()
