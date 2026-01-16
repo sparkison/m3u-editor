@@ -153,11 +153,14 @@ This section summarizes what has already been implemented for the Network → HL
 - **Stop cleanup**: `NetworkBroadcastService::stop()` clears persisted broadcast refs, kills promoter (if running), and deletes `live.m3u8`, `*.m3u8.tmp`, and `*.ts` files to prevent stale playback.
 - **Playlist promotion**: `promoteTmpPlaylistIfStable()` + `php artisan network:promote-tmp-playlist {network}` command added; a small promoter loop is started on broadcast `start()` and its PID is stored in `{hlsPath}/promote_pid`.
 - **Non-cache headers**: segment and stream responses include `Cache-Control: no-cache, no-store, must-revalidate` (and related headers) to avoid proxies/browsers replaying stopped content.
+- **EPG programme images**: `NetworkScheduleService::getContentImage()` now tries multiple fallback sources (episode cover → info fields → series cover; channel logo → movie_data → info) to maximize image availability in generated EPG.
+- **EPG XMLTV icon fallback**: `NetworkEpgService::formatProgrammeXml()` falls back to contentable's image fields when `programme->image` is empty, ensuring programmes display icons even if they weren't stored during schedule generation.
 - **Tests added / updated**:
   - `NetworkCleanupTest` (cleanup behavior)
   - `NetworkBroadcastPromotionTest` (tmp → live promotion)
   - `NetworkReconnectAfterStopTest` (reconnect cannot resume playback)
   - `NetworkHlsControllerTest` (assertions tightened / relaxed where necessary)
+  - `NetworkEpgServiceTest` (EPG icon output and fallback logic)
 - **Container test runs**: Composer & dev deps installed in container; tests run and relevant new tests pass locally in the container.
 - **Logging / metrics**: `HLS_METRIC` events emitted on broadcast lifecycle events (`broadcast_started`, `broadcast_stopped`, `broadcast_crashed`).
 
@@ -180,6 +183,8 @@ This section summarizes what has already been implemented for the Network → HL
 - [x] Stop cleanup (delete playlists/segments & clear persisted refs) implemented
 - [x] Playlist promotion command & service logic implemented
 - [x] Segment/stream no-cache headers set
+- [x] EPG programme image fallbacks in schedule generation
+- [x] EPG XMLTV icon fallback to contentable images
 - [x] Tests added and passing (local container)
 - [ ] Replace promoter loop with managed worker
 - [ ] Make FFmpeg write atomically via `.tmp` then rename
