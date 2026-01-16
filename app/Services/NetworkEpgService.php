@@ -224,8 +224,24 @@ class NetworkEpgService
             }
         }
 
-        if ($programme->image) {
-            $image = htmlspecialchars($programme->image, ENT_XML1);
+        // Programme icon - try stored image first, then fallback to contentable's image
+        $imageUrl = $programme->image;
+        if (empty($imageUrl) && $content) {
+            // Fallback to contentable's cover/logo fields
+            $imageUrl = $content->cover
+                ?? $content->logo
+                ?? $info['movie_image'] ?? null
+                ?? $info['cover_big'] ?? null
+                ?? $info['stream_icon'] ?? null;
+
+            // For episodes, try series cover as last resort
+            if (empty($imageUrl) && $content instanceof \App\Models\Episode && $content->series) {
+                $imageUrl = $content->series->cover ?? null;
+            }
+        }
+
+        if (! empty($imageUrl)) {
+            $image = htmlspecialchars($imageUrl, ENT_XML1);
             $xml .= '    <icon src="'.$image.'"/>'.PHP_EOL;
         }
 

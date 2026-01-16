@@ -242,15 +242,33 @@ class NetworkScheduleService
 
     /**
      * Get the image URL for a content item.
+     * Uses LogoService where applicable to ensure proper proxying.
      */
     protected function getContentImage(Episode|Channel $content): ?string
     {
         if ($content instanceof Episode) {
-            return $content->cover ?? $content->info['movie_image'] ?? null;
+            // Try multiple sources for episode images
+            $imageUrl = $content->cover
+                ?? $content->info['movie_image'] ?? null
+                ?? $content->info['cover_big'] ?? null
+                ?? $content->info['stream_icon'] ?? null;
+
+            // If still empty, try series cover as fallback
+            if (empty($imageUrl) && $content->series) {
+                $imageUrl = $content->series->cover ?? null;
+            }
+
+            return $imageUrl;
         }
 
         if ($content instanceof Channel) {
-            return $content->logo ?? $content->movie_data['info']['cover_big'] ?? null;
+            // Try multiple sources for channel/VOD images
+            return $content->logo
+                ?? $content->logo_internal
+                ?? $content->movie_data['info']['cover_big'] ?? null
+                ?? $content->movie_data['info']['movie_image'] ?? null
+                ?? $content->info['cover_big'] ?? null
+                ?? $content->info['movie_image'] ?? null;
         }
 
         return null;
