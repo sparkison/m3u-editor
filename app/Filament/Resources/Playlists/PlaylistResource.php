@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Playlists;
 
+use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
 use App\Facades\PlaylistFacade;
 use App\Filament\Resources\Playlists\Pages\CreatePlaylist;
@@ -22,6 +23,7 @@ use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
+use App\Models\MediaServerIntegration;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use App\Models\PlaylistProfile;
@@ -135,6 +137,21 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 TextColumn::make('name')
                     ->searchable()
+                    ->description(function ($record) {
+                        if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                            $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
+                            $integrationLink = route('filament.admin.resources.media-server-integrations.edit', $integration->id);
+
+                            return new HtmlString('
+                            <div class="flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
+                                    <path d="M4.464 3.162A2 2 0 0 1 6.28 2h7.44a2 2 0 0 1 1.816 1.162l1.154 2.5c.067.145.115.291.145.438A3.508 3.508 0 0 0 16 6H4c-.288 0-.568.035-.835.1.03-.147.078-.293.145-.438l1.154-2.5Z" />
+                                    <path fill-rule="evenodd" d="M2 9.5a2 2 0 0 1 2-2h12a2 2 0 1 1 0 4H4a2 2 0 0 1-2-2Zm13.24 0a.75.75 0 0 1 .75-.75H16a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-.75.75h-.01a.75.75 0 0 1-.75-.75V9.5Zm-2.25-.75a.75.75 0 0 0-.75.75v.01c0 .414.336.75.75.75H13a.75.75 0 0 0 .75-.75V9.5a.75.75 0 0 0-.75-.75h-.01ZM2 15a2 2 0 0 1 2-2h12a2 2 0 1 1 0 4H4a2 2 0 0 1-2-2Zm13.24 0a.75.75 0 0 1 .75-.75H16a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-.75.75h-.01a.75.75 0 0 1-.75-.75V15Zm-2.25-.75a.75.75 0 0 0-.75.75v.01c0 .414.336.75.75.75H13a.75.75 0 0 0 .75-.75V15a.75.75 0 0 0-.75-.75h-.01Z" clip-rule="evenodd" />
+                                </svg>
+                                <a class="inline m-0 p-0 hover:underline" href="'.$integrationLink.'">Integration: '.$integration->name.'</a>
+                            </div>');
+                        }
+                    })
                     ->sortable(),
                 TextColumn::make('url')
                     ->label('Playlist URL')
@@ -304,8 +321,8 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             // For media server playlists, dispatch the media server sync job
-                            if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
-                                $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                            if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                                $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
                                 if ($integration) {
                                     app('Illuminate\Contracts\Bus\Dispatcher')
                                         ->dispatch(new SyncMediaServer($integration->id));
@@ -323,7 +340,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessM3uImport($record, force: true));
                         })->after(function ($record) {
-                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            $isMediaServer = in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin]);
                             $message = $isMediaServer
                                 ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
                                 : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
@@ -340,7 +357,7 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription(function ($record) {
-                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            $isMediaServer = in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin]);
 
                             return $isMediaServer
                                 ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
@@ -633,8 +650,8 @@ class PlaylistResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 // For media server playlists, dispatch the media server sync job
-                                if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
-                                    $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                                if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                                    $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
                                     if ($integration) {
                                         app('Illuminate\Contracts\Bus\Dispatcher')
                                             ->dispatch(new SyncMediaServer($integration->id));
@@ -734,8 +751,8 @@ class PlaylistResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
                         // For media server playlists, dispatch the media server sync job
-                        if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
-                            $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                        if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                            $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
                             if ($integration) {
                                 app('Illuminate\Contracts\Bus\Dispatcher')
                                     ->dispatch(new SyncMediaServer($integration->id));
@@ -752,7 +769,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessM3uImport($record, force: true));
                     })->after(function ($record) {
-                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        $isMediaServer = in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin]);
                         $message = $isMediaServer
                             ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
                             : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
@@ -769,7 +786,7 @@ class PlaylistResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription(function ($record) {
-                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        $isMediaServer = in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin]);
 
                         return $isMediaServer
                             ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
