@@ -199,8 +199,8 @@ class PlaylistResource extends Resource
                 //     ->sortable(),
                 TextColumn::make('live_channels_count')
                     ->label('Live')
-                    ->counts('live_channels')
-                    ->description(fn (Playlist $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->formatStateUsing(fn (Playlist $record): int => $record->is_network_playlist ? $record->networks()->count() : $record->live_channels_count)
+                    ->description(fn (Playlist $record): string => $record->is_network_playlist ? 'Enabled: '.($record->networks()->get()->filter(fn($n) => $n->isBroadcasting())->count()) : "Enabled: {$record->enabled_live_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 TextColumn::make('vod_channels_count')
