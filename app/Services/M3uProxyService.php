@@ -473,7 +473,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $service->apiBaseUrl.'/streams/oldest-by-metadata';
+            // Build query parameters for DELETE request
             $params = [
                 'field' => 'playlist_uuid',
                 'value' => $playlistUuid,
@@ -483,11 +483,15 @@ class M3uProxyService
                 $params['exclude_channel_id'] = (string) $excludeChannelId;
             }
 
+            // Laravel's Http::delete() doesn't support query params as second argument
+            // We need to append them to the URL
+            $endpoint = $service->apiBaseUrl.'/streams/oldest-by-metadata?'.http_build_query($params);
+
             $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
-                ->delete($endpoint, $params);
+                ->delete($endpoint);
 
             if ($response->successful()) {
                 $data = $response->json();
