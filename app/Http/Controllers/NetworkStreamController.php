@@ -32,6 +32,11 @@ class NetworkStreamController extends Controller
             abort(404, 'Network is disabled');
         }
 
+        // If there's no active broadcast, do not stream content
+        if (! $network->isBroadcasting()) {
+            abort(503, 'No active broadcast');
+        }
+
         // Find the currently-airing programme
         $now = Carbon::now();
         $programme = NetworkProgramme::where('network_id', $network->id)
@@ -122,6 +127,9 @@ class NetworkStreamController extends Controller
             $responseHeaders = [
                 'Content-Type' => $contentType,
                 'Accept-Ranges' => 'bytes',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
                 'X-Network-Name' => $network->name,
                 'X-Programme-Title' => $programme->title ?? 'Unknown',
             ];

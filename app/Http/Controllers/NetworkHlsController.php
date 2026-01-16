@@ -19,10 +19,16 @@ class NetworkHlsController extends Controller
             return response('Broadcast not enabled for this network', 404);
         }
 
+        // If the network is not actively broadcasting we should not serve HLS content
+        if (! $network->isBroadcasting()) {
+            return response('Broadcast not active', 503)
+                ->header('Retry-After', '5');
+        }
+
         $playlistPath = $network->getHlsStoragePath().'/live.m3u8';
 
         if (! File::exists($playlistPath)) {
-            // Broadcast is enabled but not yet started or no segments yet
+            // Broadcast is enabled and actively broadcasting but playlist may not yet exist
             return response('Broadcast not started or no segments available', 503)
                 ->header('Retry-After', '5');
         }
@@ -30,7 +36,7 @@ class NetworkHlsController extends Controller
         $content = File::get($playlistPath);
 
         return response($content, 200)
-            ->header('Content-Type', 'application/vnd.apple.mpegurl')
+            ->header('Content-Type', 'application/vnd.apple.mpegurl; charset=UTF-8')
             ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0')
@@ -48,13 +54,21 @@ class NetworkHlsController extends Controller
 
         $segmentPath = $network->getHlsStoragePath()."/{$segment}.ts";
 
+        // If the network is not actively broadcasting we should not serve segments
+        if (! $network->isBroadcasting()) {
+            return response('Broadcast not active', 503);
+        }
+
+        // If the segment does not exist, return 404
         if (! File::exists($segmentPath)) {
             return response('Segment not found', 404);
         }
 
         return response()->file($segmentPath, [
             'Content-Type' => 'video/MP2T',
-            'Cache-Control' => 'public, max-age=86400', // Segments can be cached
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
             'Access-Control-Allow-Origin' => '*',
         ]);
     }

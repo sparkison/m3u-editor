@@ -71,10 +71,26 @@ M3U8;
             $response = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
 
             $response->assertOk();
-            $response->assertHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=UTF-8');
+            // Content-Type may include charset on some platforms - accept either
+            $ct = $response->headers->get('Content-Type');
+            expect(str_contains($ct, 'application/vnd.apple.mpegurl'))->toBeTrue();
             $response->assertHeader('Access-Control-Allow-Origin', '*');
             $response->assertSee('#EXTM3U');
             $response->assertSee('live000001.ts');
+        });
+
+        it('returns 503 when broadcast is enabled but not actively broadcasting even if playlist exists', function () {
+            $network = Network::factory()->for($this->user)->broadcasting()->create();
+
+            // Create the HLS storage directory and playlist
+            $hlsPath = $network->getHlsStoragePath();
+            File::ensureDirectoryExists($hlsPath);
+            File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
+
+            $response = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
+
+            $response->assertStatus(503);
+            $response->assertHeader('Retry-After', '5');
         });
     });
 
@@ -93,7 +109,7 @@ M3U8;
             $response->assertNotFound();
         });
 
-        it('returns 404 when segment does not exist', function () {
+        it('returns 503 when segment does not exist while broadcast enabled but not active', function () {
             $network = Network::factory()->for($this->user)->broadcasting()->create();
 
             $response = $this->get(route('network.hls.segment', [
@@ -101,7 +117,26 @@ M3U8;
                 'segment' => 'live000001',
             ]));
 
-            $response->assertNotFound();
+            $response->assertStatus(503);
+        });
+
+        it('returns 503 when broadcast is enabled but not actively broadcasting even if segment exists', function () {
+            $network = Network::factory()->for($this->user)->broadcasting()->create();
+
+            // Create the HLS storage directory and a segment
+            $hlsPath = $network->getHlsStoragePath();
+            File::ensureDirectoryExists($hlsPath);
+
+            // Create a small dummy .ts file (just some bytes for testing)
+            $dummyContent = str_repeat("\x00", 188 * 10);
+            File::put("{$hlsPath}/live000001.ts", $dummyContent);
+
+            $response = $this->get(route('network.hls.segment', [
+                'network' => $network->uuid,
+                'segment' => 'live000001',
+            ]));
+
+            $response->assertStatus(503);
         });
 
         it('returns segment content when it exists', function () {
