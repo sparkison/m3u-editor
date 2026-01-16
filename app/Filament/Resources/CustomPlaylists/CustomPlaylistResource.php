@@ -277,7 +277,8 @@ class CustomPlaylistResource extends Resource
                         ->helperText('How you would like to ID your channels in the EPG.')
                         ->options([
                             'stream_id' => 'TVG ID/Stream ID (default)',
-                            'channel_id' => 'Channel Number (recommended for HDHR)',
+                            'channel_id' => 'Channel ID (recommended for HDHR)',
+                            'number' => 'Channel Number',
                             'name' => 'Channel Name',
                             'title' => 'Channel Title',
                         ])

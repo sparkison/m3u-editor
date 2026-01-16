@@ -591,7 +591,7 @@ class XtreamApiController extends Controller
 
                     $idChannelBy = $playlist->id_channel_by;
                     $channelNo = $channel->channel;
-                    if (! $channelNo && $playlist->auto_channel_increment) {
+                    if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                         $channelNo = ++$channelNumber;
                     }
 
@@ -599,6 +599,9 @@ class XtreamApiController extends Controller
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
                             $tvgId = $channel->id;
+                            break;
+                        case PlaylistChannelId::Number:
+                            $tvgId = $channelNumber;
                             break;
                         case PlaylistChannelId::Name:
                             $tvgId = $channel->name_custom ?? $channel->name;

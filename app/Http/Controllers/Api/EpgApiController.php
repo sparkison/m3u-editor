@@ -251,7 +251,7 @@ class EpgApiController extends Controller
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
                 $channelNo = $channel->channel;
-                if (! $channelNo) {
+                if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                     $channelNo = ++$channelNumber;
                 }
                 if ($epgData) {
@@ -317,6 +317,9 @@ class EpgApiController extends Controller
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
                         $tvgId = $channel->id;
+                        break;
+                    case PlaylistChannelId::Number:
+                        $tvgId = $channelNumber;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;

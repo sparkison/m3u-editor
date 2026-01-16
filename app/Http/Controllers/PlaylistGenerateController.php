@@ -119,7 +119,7 @@ class PlaylistGenerateController extends Controller
                     $stationId = $channel->station_id ?? '';
                     $epgShift = $channel->tvg_shift ?? 0;
                     $group = $channel->group ?? '';
-                    if (! $channelNo && $playlist->auto_channel_increment) {
+                    if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                         $channelNo = ++$channelNumber;
                     }
                     if ($type === 'custom') {
@@ -135,6 +135,9 @@ class PlaylistGenerateController extends Controller
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
                             $tvgId = $channel->id;
+                            break;
+                        case PlaylistChannelId::Number:
+                            $tvgId = $channelNumber;
                             break;
                         case PlaylistChannelId::Name:
                             $tvgId = $channel->name_custom ?? $channel->name;
@@ -275,6 +278,9 @@ class PlaylistGenerateController extends Controller
                             switch ($idChannelBy) {
                                 case PlaylistChannelId::ChannelId:
                                     $tvgId = $episode->id;
+                                    break;
+                                case PlaylistChannelId::Number:
+                                    $tvgId = $channelNumber;
                                     break;
                                 case PlaylistChannelId::Name:
                                     $tvgId = $name;
@@ -422,7 +428,7 @@ class PlaylistGenerateController extends Controller
                 }
                 $url = rtrim($baseUrl."/{$urlPath}/{$username}/{$password}/".$channel->id.'.'.$extension, '.');
                 $channelNo = $channel->channel;
-                if (! $channelNo && $autoIncrement) {
+                if (! $channelNo && ($autoIncrement || $idChannelBy === PlaylistChannelId::Number)) {
                     $channelNo = ++$channelNumber;
                 }
 
@@ -430,6 +436,9 @@ class PlaylistGenerateController extends Controller
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
                         $tvgId = $channel->id;
+                        break;
+                    case PlaylistChannelId::Number:
+                        $tvgId = $channelNumber;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;

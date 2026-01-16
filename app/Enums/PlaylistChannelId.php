@@ -7,6 +7,7 @@ enum PlaylistChannelId: string
     case TvgId = 'stream_id';
     case ChannelId = 'channel_id';
     case Name = 'name';
+    case Number = 'number';
     case Title = 'title';
 
     public function getColor(): string
@@ -15,6 +16,7 @@ enum PlaylistChannelId: string
             self::TvgId => 'success',
             self::ChannelId => 'gray',
             self::Name => 'gray',
+            self::Number => 'gray',
             self::Title => 'gray',
         };
     }
@@ -23,8 +25,9 @@ enum PlaylistChannelId: string
     {
         return match ($this) {
             self::TvgId => 'TVG ID/Stream ID (default)',
-            self::ChannelId => 'Channel Number',
+            self::ChannelId => 'Channel ID',
             self::Name => 'Channel Name',
+            self::Number => 'Channel Number',
             self::Title => 'Channel Title',
         };
     }
