@@ -32,8 +32,18 @@ The `M3uProxyService` now checks for existing pooled streams before creating new
 ```php
 // In getChannelStream() method
 if ($profile) {
-    // Check for existing pooled stream
-    $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid);
+    // Select provider profile if profiles are enabled
+    if ($playlist instanceof Playlist && $playlist->profiles_enabled) {
+        $selectedProfile = ProfileService::selectProfile($playlist);
+    }
+    
+    // Check for existing pooled stream (including provider profile)
+    $existingStreamId = $this->findExistingPooledStream(
+        $id, 
+        $playlist->uuid, 
+        $profile->id,
+        $selectedProfile?->id  // Provider profile ID for accurate matching
+    );
     
     if ($existingStreamId) {
         // Reuse existing stream
@@ -50,8 +60,12 @@ if ($profile) {
 The `findExistingPooledStream()` method queries m3u-proxy's `/streams/by-metadata` endpoint:
 
 ```php
-protected function findExistingPooledStream(int $channelId, string $playlistUuid): ?string
-{
+protected function findExistingPooledStream(
+    int $channelId, 
+    string $playlistUuid, 
+    ?int $profileId = null,
+    ?int $providerProfileId = null
+): ?string {
     // Query m3u-proxy for active streams with matching metadata
     $response = Http::get($endpoint, [
         'field' => 'id',
@@ -59,12 +73,19 @@ protected function findExistingPooledStream(int $channelId, string $playlistUuid
         'active_only' => true,
     ]);
     
-    // Find stream matching: channel ID + playlist UUID + transcoding enabled
+    // Find stream matching all criteria:
+    // 1. Channel ID
+    // 2. Playlist UUID
+    // 3. Transcoding enabled
+    // 4. StreamProfile ID (transcoding profile)
+    // 5. PlaylistProfile ID (provider profile) - NEW!
     foreach ($matchingStreams as $stream) {
         if (
             $metadata['id'] == $channelId &&
             $metadata['playlist_uuid'] === $playlistUuid &&
-            $metadata['transcoding'] === 'true'
+            $metadata['transcoding'] === 'true' &&
+            ($profileId === null || $metadata['profile_id'] == $profileId) &&
+            ($providerProfileId === null || $metadata['provider_profile_id'] == $providerProfileId)
         ) {
             return $stream['stream_id'];
         }
@@ -83,7 +104,8 @@ The m3u-proxy handles the actual stream pooling:
      "type": "channel",
      "playlist_uuid": "abc-def-123",
      "transcoding": "true",
-     "profile": "default"
+     "profile_id": "5",
+     "provider_profile_id": "2"
    }
    ```
 
@@ -143,7 +165,9 @@ Provider limits are respected automatically:
 1. **Transcoding must be enabled** (profile parameter provided)
 2. **Same channel** (same channel ID)
 3. **Same playlist** (same playlist UUID)
-4. **Stream still active** (has at least one connected client)
+4. **Same transcoding profile** (StreamProfile ID)
+5. **Same provider profile** (PlaylistProfile ID, if using pooled provider profiles)
+6. **Stream still active** (has at least one connected client)
 
 ### Direct Streams (Non-Transcoded)
 
@@ -200,12 +224,16 @@ Look for these log messages:
   stream_id: abc123...
   channel_id: 12345
   playlist_uuid: xyz789...
+  profile_id: 5
+  provider_profile_id: 2
   client_count: 3
 
-[INFO] Reusing existing pooled transcoded stream
+[INFO] Reusing existing pooled transcoded stream (bypassing capacity check)
   stream_id: abc123...
   channel_id: 12345
   playlist_uuid: xyz789...
+  profile_id: 5
+  provider_profile_id: 2
 ```
 
 ### m3u-proxy Logs
@@ -245,8 +273,10 @@ curl -H "X-API-Token: your-token" \
 
 **Common Issues**:
 - Different playlists (playlist_uuid doesn't match)
-- Different profiles (streams have different transcoding profiles)
+- Different transcoding profiles (profile_id doesn't match)
+- Different provider profiles (provider_profile_id doesn't match)
 - Stream expired (no active clients when new user tries to connect)
+- Failover sources not matching (fixed in v1.x - now properly matches provider_profile_id)
 
 ### Stream Quality Issues
 
