@@ -77,6 +77,12 @@ ffmpeg -y -ss 3600 -re -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 1
 ### Automated cleanup & scheduling
 
 - **`hls:gc`** - cleans `storage/app/networks/*` and a temp HLS path. Use `--dry-run` to validate.
+
+#### tmpfs (/dev/shm) — performance vs persistence
+- Using a tmpfs (for example mounting the host's `/dev/shm` into the container) gives the best I/O for HLS segment writes (lower latency and higher throughput).
+- **Important:** tmpfs is RAM-backed and **non‑persistent** — contents are lost on reboot/container restart. Do **not** rely on tmpfs if you need segments to survive restarts.
+- **Sizing & GC guidance:** pick tmpfs size >= (segments_per_stream × avg_segment_size × concurrent_streams × safety_factor). Example: 20 segments × 1.5MB × 100 streams ≈ 3GB; add ×2 headroom. If using tmpfs, make GC more aggressive (e.g. `HLS_GC_INTERVAL=60`, `HLS_GC_AGE_THRESHOLD=180`) to avoid memory exhaustion.
+- **Recommendation:** for ephemeral/high‑performance staging use tmpfs; for production use a host directory (or host tmpfs) mapped into the container and tune `HLS_GC_*`. See `docs/hls-storage-config.md` for full examples and verification steps.
 - **Per-network cleanup** - `NetworkBroadcastService::cleanupSegments()` deletes segments older than the retention window.
 - **Hourly schedule** - `networks:regenerate-schedules` is scheduled to ensure daily EPG schedules are kept fresh.
 
