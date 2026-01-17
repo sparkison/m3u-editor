@@ -1097,7 +1097,7 @@ class ChannelController extends Controller
      *     "url": "https://example.com/stream.m3u8",
      *     "live": true,
      *     "stable": true,
-     *     "quality": "✅ Online",
+     *     "quality": "online",
      *     "connect_time_ms": 245,
      *     "checks_passed": 3,
      *     "checks_failed": 0,
@@ -1209,10 +1209,10 @@ class ChannelController extends Controller
 
         $live = $stableChecks > 0;
         $stable = $failedChecks === 0;
-        $quality = '❌ Offline';
+        $quality = 'offline';
 
         if ($live) {
-            $quality = $stable ? '✅ Online' : '⚠️ Instabil';
+            $quality = $stable ? 'online' : 'unstable';
         }
 
         return response()->json([
