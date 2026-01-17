@@ -462,7 +462,7 @@ class ProcessM3uImport implements ShouldQueue
                         $localChannelNo++;
 
                         // Get the category
-                        $category = $liveCategories->firstWhere('category_id', $item->category_id);
+                        $category = $liveCategories->firstWhere('category_id', $item->category_id ?? null);
 
                         // Determine if the channel should be included
                         if ($this->preprocess && ! $this->shouldIncludeChannel($category['category_name'] ?? '')) {
@@ -511,7 +511,7 @@ class ProcessM3uImport implements ShouldQueue
                         $localChannelNo++;
 
                         // Get the category
-                        $category = $vodCategories->firstWhere('category_id', $item->category_id);
+                        $category = $vodCategories->firstWhere('category_id', $item->category_id ?? null);
 
                         // Determine if the channel should be included
                         if ($this->preprocess && ! $this->shouldIncludeVod($category['category_name'] ?? '')) {
