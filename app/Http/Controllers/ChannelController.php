@@ -1209,10 +1209,10 @@ class ChannelController extends Controller
 
         $live = $stableChecks > 0;
         $stable = $failedChecks === 0;
-        $quality = '❌ Offline';
+        $quality = 'offline';
 
         if ($live) {
-            $quality = $stable ? '✅ Online' : '⚠️ Instabil';
+            $quality = $stable ? 'online' : 'unstable';
         }
 
         return response()->json([
