@@ -152,6 +152,11 @@ class XtreamStreamController extends Controller
      */
     public function handleDirect(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
+        // Validate that streamId is numeric to prevent database errors
+        if (! is_numeric($streamId)) {
+            return response()->json(['error' => 'Invalid stream ID'], 400);
+        }
+
         // If no live or VOD stream type specified, determine stream type by model
         $model = Channel::find($streamId);
         if ($model instanceof Channel) {
@@ -198,6 +203,11 @@ class XtreamStreamController extends Controller
      */
     public function handleLive(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
+        // Validate that streamId is numeric to prevent database errors
+        if (! is_numeric($streamId)) {
+            return response()->json(['error' => 'Invalid stream ID'], 400);
+        }
+
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         [$playlist, $channel] = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
 
@@ -239,6 +249,11 @@ class XtreamStreamController extends Controller
      */
     public function handleVod(Request $request, string $username, string $password, string $streamId, ?string $format = null)
     {
+        // Validate that streamId is numeric to prevent database errors
+        if (! is_numeric($streamId)) {
+            return response()->json(['error' => 'Invalid stream ID'], 400);
+        }
+
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         [$playlist, $channel] = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
         if ($channel instanceof Channel) {
@@ -263,6 +278,11 @@ class XtreamStreamController extends Controller
      */
     public function handleSeries(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
+        // Validate that streamId is numeric to prevent database errors
+        if (! is_numeric($streamId)) {
+            return response()->json(['error' => 'Invalid stream ID'], 400);
+        }
+
         $format = $format ?? 'mp4'; // Default to 'mp4' if no format provided
         [$playlist, $episode] = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
         if ($episode instanceof Episode) {
@@ -311,6 +331,11 @@ class XtreamStreamController extends Controller
      */
     public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, string|int $streamId, ?string $format = null)
     {
+        // Validate that streamId is numeric to prevent database errors
+        if (! is_numeric($streamId)) {
+            return response()->json(['error' => 'Invalid stream ID'], 400);
+        }
+
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
 
         // Timeshift is only available for live channels
