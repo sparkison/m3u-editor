@@ -27,14 +27,14 @@ docker run -d \
   -v ./data:/var/www/config \
   -v /dev/shm:/hls-segments \  # ← Map host /dev/shm to container path
   -e HLS_TEMP_DIR=/hls-segments \  # ← Point to the mapped path
-  hektyc/m3u-editor:dev
+  grimothy/m3u-editor:dev
 ```
 
 **Docker Compose**:
 ```yaml
 services:
   m3u-editor:
-    image: hektyc/m3u-editor:dev
+    image: grimothy/m3u-editor:dev
     container_name: m3u-editor
     ports:
       - "36400:36400"
@@ -66,8 +66,8 @@ docker run -d \
 ```yaml
 services:
   m3u-editor:
-    image: hektyc/m3u-editor:dev
-    container_name: m3u-editor
+    image: grimothy/m3u-editor:dev
+    container_name: grimothy/m3u-editor
     ports:
       - "36400:36400"
     volumes:
@@ -163,6 +163,16 @@ HLS_GC_INTERVAL=600
 # Delete files older than this threshold in seconds (default: 7200 seconds = 2 hours)
 HLS_GC_AGE_THRESHOLD=7200
 ```
+
+### Defaults & behavior (when env vars are not set)
+- **Defaults used by the system:**
+  - `HLS_TEMP_DIR=/var/www/html/storage/app/hls-segments`
+  - `HLS_GC_ENABLED=true`
+  - `HLS_GC_INTERVAL=600` (seconds)
+  - `HLS_GC_AGE_THRESHOLD=7200` (seconds)
+- **Startup behavior:** If `HLS_TEMP_DIR` is not set the startup script uses the default path, **creates the directory if missing**, sets permissions, and **checks available disk space** (warns if <2GB, critical if <512MB).
+- **Garbage collector behavior:** `php artisan hls:gc` honors `HLS_GC_ENABLED`; when enabled Supervisor runs the command in loop mode using the configured `--interval` and `--threshold` values. Use `--dry-run` to preview deletions safely.
+- **Recommendation:** For production explicitly set these env vars and **volume map** `HLS_TEMP_DIR` to a host path (or tmpfs) so you control capacity and retention.
 
 **Tips:**
 - Use `HLS_GC_ENABLED=false` to disable automatic GC (useful for local development or debugging). 
