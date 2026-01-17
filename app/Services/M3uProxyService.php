@@ -577,6 +577,10 @@ class M3uProxyService
         // Get channel ID
         $id = $channel->id;
 
+        // Track the original requested channel and playlist for cross-provider failover pooling
+        $originalChannelId = $channel->id;
+        $originalPlaylistUuid = $playlist->uuid;
+
         // IMPORTANT: Check for existing pooled stream BEFORE capacity check
         // If a pooled stream exists, we can reuse it without consuming additional capacity
         // NOTE: We need to select the provider profile FIRST to check for pooled streams with the same provider
@@ -597,13 +601,14 @@ class M3uProxyService
                 }
             }
 
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id, $selectedProfile?->id);
+            // Search for pooled stream by ORIGINAL channel ID (handles cross-provider failovers)
+            $existingStreamId = $this->findExistingPooledStream($originalChannelId, $originalPlaylistUuid, $profile->id, $selectedProfile?->id);
 
             if ($existingStreamId) {
                 Log::info('Reusing existing pooled transcoded stream (bypassing capacity check)', [
                     'stream_id' => $existingStreamId,
-                    'channel_id' => $id,
-                    'playlist_uuid' => $playlist->uuid,
+                    'original_channel_id' => $originalChannelId,
+                    'original_playlist_uuid' => $originalPlaylistUuid,
                     'profile_id' => $profile->id,
                     'provider_profile_id' => $selectedProfile?->id,
                 ]);
@@ -615,6 +620,7 @@ class M3uProxyService
         // Check if primary playlist has stream limits and if it's at capacity
         // Only check capacity if we're about to create a NEW stream (no existing pooled stream found)
         $primaryUrl = null;
+        $actualChannel = $channel;  // Track the actual channel being used (may differ from original if failover)
         if ($playlist->available_streams !== 0) {
             $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
 
@@ -660,6 +666,7 @@ class M3uProxyService
                         if ($failoverPlaylist->available_streams === 0) {
                             // No limits on this failover playlist, use it
                             $playlist = $failoverPlaylist;
+                            $actualChannel = $failoverChannel;  // Track that we're using a failover channel
                             $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
                             break;
                         } else {
@@ -669,6 +676,7 @@ class M3uProxyService
                             if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
                                 // Found available failover playlist
                                 $playlist = $failoverPlaylist;
+                                $actualChannel = $failoverChannel;  // Track that we're using a failover channel
                                 $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
                                 break;
                             }
@@ -750,17 +758,31 @@ class M3uProxyService
             // (before capacity check) to avoid blocking reuse of existing streams.
             // If we reach here, no existing stream was found, so create a new one.
 
+            // Determine if this is a failover stream
+            $isFailover = ($actualChannel->id !== $originalChannelId);
+
             $metadata = [
-                'id' => $id,
+                'id' => $actualChannel->id,  // Actual channel being streamed
                 'type' => 'channel',
-                'playlist_uuid' => $playlist->uuid,
+                'playlist_uuid' => $playlist->uuid,  // Actual playlist being used
                 'profile_id' => $profile->id,
+                'original_channel_id' => $originalChannelId,  // For cross-provider failover pooling
+                'original_playlist_uuid' => $originalPlaylistUuid,  // For cross-provider failover pooling
+                'is_failover' => $isFailover,
             ];
 
             // Add provider profile ID if using profiles
             if ($selectedProfile) {
                 $metadata['provider_profile_id'] = $selectedProfile->id;
             }
+
+            Log::debug('Creating transcoded stream with failover tracking', [
+                'original_channel_id' => $originalChannelId,
+                'actual_channel_id' => $actualChannel->id,
+                'is_failover' => $isFailover,
+                'original_playlist_uuid' => $originalPlaylistUuid,
+                'actual_playlist_uuid' => $playlist->uuid,
+            ]);
 
             $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, $metadata);
 
@@ -773,11 +795,17 @@ class M3uProxyService
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts', $username);
         } else {
             // Use direct streaming endpoint
+            // Determine if this is a failover stream
+            $isFailover = ($actualChannel->id !== $originalChannelId);
+
             $metadata = [
-                'id' => $id,
+                'id' => $actualChannel->id,  // Actual channel being streamed
                 'type' => 'channel',
-                'playlist_uuid' => $playlist->uuid,
+                'playlist_uuid' => $playlist->uuid,  // Actual playlist being used
                 'strict_live_ts' => $playlist->strict_live_ts,
+                'original_channel_id' => $originalChannelId,  // For cross-provider failover pooling
+                'original_playlist_uuid' => $originalPlaylistUuid,  // For cross-provider failover pooling
+                'is_failover' => $isFailover,
             ];
 
             // Add provider profile ID if using profiles
@@ -1472,8 +1500,11 @@ class M3uProxyService
      * This allows multiple clients to connect to the same transcoded stream without
      * consuming additional provider connections.
      *
-     * @param  int  $channelId  Channel ID
-     * @param  string  $playlistUuid  Playlist UUID
+     * Supports cross-provider failover pooling by searching based on the ORIGINAL
+     * requested channel, not the actual source channel (which may be a failover).
+     *
+     * @param  int  $channelId  Original requested channel ID
+     * @param  string  $playlistUuid  Original requested playlist UUID
      * @param  int|null  $profileId  StreamProfile ID (transcoding profile)
      * @param  int|null  $providerProfileId  PlaylistProfile ID (provider profile)
      * @return string|null Stream ID if found, null otherwise
@@ -1481,14 +1512,15 @@ class M3uProxyService
     protected function findExistingPooledStream(int $channelId, string $playlistUuid, ?int $profileId = null, ?int $providerProfileId = null): ?string
     {
         try {
-            // Query m3u-proxy for streams by metadata
+            // Query m3u-proxy for streams by ORIGINAL channel ID metadata
+            // This enables pooling across different provider failovers
             $endpoint = $this->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(5)->acceptJson()
                 ->withHeaders(array_filter([
                     'X-API-Token' => $this->apiToken,
                 ]))
                 ->get($endpoint, [
-                    'field' => 'id',
+                    'field' => 'original_channel_id',  // Search by original, not actual channel
                     'value' => (string) $channelId,
                     'active_only' => true,  // Only return active streams
                 ]);
@@ -1505,22 +1537,25 @@ class M3uProxyService
                 $metadata = $stream['metadata'] ?? [];
 
                 // Check if this stream matches our criteria:
-                // 1. Same channel ID
-                // 2. Same playlist UUID
+                // 1. Same ORIGINAL channel ID (enables cross-provider failover pooling)
+                // 2. Same ORIGINAL playlist UUID (enables cross-provider failover pooling)
                 // 3. Is a transcoded stream (has transcoding metadata)
                 // 4. Same StreamProfile ID (transcoding profile, if specified)
                 // 5. Same PlaylistProfile ID (provider profile, if specified)
                 if (
-                    ($metadata['id'] ?? null) == $channelId &&
-                    ($metadata['playlist_uuid'] ?? null) === $playlistUuid &&
+                    ($metadata['original_channel_id'] ?? null) == $channelId &&
+                    ($metadata['original_playlist_uuid'] ?? null) === $playlistUuid &&
                     ($metadata['transcoding'] ?? null) === 'true' &&
                     ($profileId === null || ($metadata['profile_id'] ?? null) == $profileId) &&
                     ($providerProfileId === null || ($metadata['provider_profile_id'] ?? null) == $providerProfileId)
                 ) {
-                    Log::info('Found existing pooled transcoded stream', [
+                    Log::info('Found existing pooled transcoded stream (cross-provider failover support)', [
                         'stream_id' => $stream['stream_id'],
-                        'channel_id' => $channelId,
-                        'playlist_uuid' => $playlistUuid,
+                        'original_channel_id' => $channelId,
+                        'original_playlist_uuid' => $playlistUuid,
+                        'actual_channel_id' => $metadata['id'] ?? null,
+                        'actual_playlist_uuid' => $metadata['playlist_uuid'] ?? null,
+                        'is_failover' => $metadata['is_failover'] ?? false,
                         'profile_id' => $profileId,
                         'provider_profile_id' => $providerProfileId,
                         'client_count' => $stream['client_count'],
