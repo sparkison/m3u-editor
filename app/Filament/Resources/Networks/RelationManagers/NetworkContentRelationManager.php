@@ -6,14 +6,11 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Network;
 use App\Models\NetworkContent;
-use App\Models\Series;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -139,121 +136,16 @@ class NetworkContentRelationManager extends RelationManager
                 ->icon('heroicon-o-film')
                 ->color('info')
                 ->visible(fn () => $playlistId !== null)
-                ->form([
-                    Select::make('series_id')
-                        ->label('Series')
-                        ->helperText("From {$mediaServerName}")
-                        ->options(function () use ($playlistId) {
-                            if (! $playlistId) {
-                                return [];
-                            }
-
-                            return Series::where('playlist_id', $playlistId)
-                                ->orderBy('name')
-                                ->pluck('name', 'id');
-                        })
-                        ->searchable()
-                        ->preload()
-                        ->live()
-                        ->required(),
-
-                    Select::make('episode_ids')
-                        ->label('Episodes')
-                        ->options(function (callable $get) {
-                            $seriesId = $get('series_id');
-                            if (! $seriesId) {
-                                return [];
-                            }
-
-                            $existingIds = $this->getOwnerRecord()
-                                ->networkContent()
-                                ->where('contentable_type', Episode::class)
-                                ->pluck('contentable_id');
-
-                            return Episode::where('series_id', $seriesId)
-                                ->whereNotIn('id', $existingIds)
-                                ->orderBy('season')
-                                ->orderBy('episode_num')
-                                ->get()
-                                ->mapWithKeys(fn ($ep) => [
-                                    $ep->id => "S{$ep->season}E{$ep->episode_num} - {$ep->title}",
-                                ]);
-                        })
-                        ->multiple()
-                        ->searchable()
-                        ->required(),
-                ])
-                ->action(function (array $data) {
-                    $network = $this->getOwnerRecord();
-                    $maxSort = $network->networkContent()->max('sort_order') ?? 0;
-
-                    foreach ($data['episode_ids'] as $episodeId) {
-                        NetworkContent::create([
-                            'network_id' => $network->id,
-                            'contentable_type' => Episode::class,
-                            'contentable_id' => $episodeId,
-                            'sort_order' => ++$maxSort,
-                            'weight' => 1,
-                        ]);
-                    }
-
-                    Notification::make()
-                        ->success()
-                        ->title('Episodes Added')
-                        ->body('Added '.count($data['episode_ids']).' episodes to the network.')
-                        ->send();
-                }),
+                ->modalWidth('7xl')
+                ->modalContent(fn () => view('filament.networks.modals.episode-picker', ['network' => $this->getOwnerRecord()])),
 
             Action::make('addMovies')
                 ->label('Add Movies')
                 ->icon('heroicon-o-video-camera')
                 ->color('success')
                 ->visible(fn () => $playlistId !== null)
-                ->form([
-                    Select::make('channel_ids')
-                        ->label('Movies (VOD)')
-                        ->helperText("From {$mediaServerName}")
-                        ->options(function () use ($playlistId) {
-                            if (! $playlistId) {
-                                return [];
-                            }
-
-                            $existingIds = $this->getOwnerRecord()
-                                ->networkContent()
-                                ->where('contentable_type', Channel::class)
-                                ->pluck('contentable_id');
-
-                            return Channel::where('playlist_id', $playlistId)
-                                ->where('is_vod', true)
-                                ->whereNotIn('id', $existingIds)
-                                ->orderBy('name')
-                                ->pluck('name', 'id');
-                        })
-                        ->multiple()
-                        ->searchable()
-                        ->preload()
-                        ->required(),
-                ])
-                ->action(function (array $data) {
-                    $network = $this->getOwnerRecord();
-                    $maxSort = $network->networkContent()->max('sort_order') ?? 0;
-
-                    foreach ($data['channel_ids'] as $channelId) {
-                        NetworkContent::create([
-                            'network_id' => $network->id,
-                            'contentable_type' => Channel::class,
-                            'contentable_id' => $channelId,
-                            'sort_order' => ++$maxSort,
-                            'weight' => 1,
-                        ]);
-                    }
-
-                    Notification::make()
-                        ->success()
-                        ->title('Movies Added')
-                        ->body('Added '.count($data['channel_ids']).' movies to the network.')
-                        ->send();
-                }),
+                ->modalWidth('7xl')
+                ->modalContent(fn () => view('filament.networks.modals.vod-picker', ['network' => $this->getOwnerRecord()])),
         ];
     }
 
