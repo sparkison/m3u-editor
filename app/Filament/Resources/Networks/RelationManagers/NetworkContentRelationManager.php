@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Networks\RelationManagers;
 
+use App\Filament\Tables\NetworkEpisodesTable;
+use App\Filament\Tables\NetworkMoviesTable;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Network;
@@ -10,7 +12,9 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\ModalTableSelect;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -53,6 +57,9 @@ class NetworkContentRelationManager extends RelationManager
         $mediaServerName = $this->getMediaServerName();
 
         return $table
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
             ->reorderable('sort_order')
             ->defaultSort('sort_order')
             ->columns($this->getColumns())
@@ -130,6 +137,9 @@ class NetworkContentRelationManager extends RelationManager
      */
     protected function getHeaderActions(?int $playlistId, string $mediaServerName): array
     {
+        /** @var Network $network */
+        $network = $this->getOwnerRecord();
+
         return [
             Action::make('addEpisodes')
                 ->label('Add Episodes')
@@ -137,7 +147,53 @@ class NetworkContentRelationManager extends RelationManager
                 ->color('info')
                 ->visible(fn () => $playlistId !== null)
                 ->modalWidth('7xl')
-                ->modalContent(fn () => view('filament.networks.modals.episode-picker', ['network' => $this->getOwnerRecord()])),
+                ->schema([
+                    ModalTableSelect::make('episodes')
+                        ->tableConfiguration(NetworkEpisodesTable::class)
+                        ->label('Select Episodes')
+                        ->multiple()
+                        ->required()
+                        ->helperText('Select episodes to add to this network. You can filter by category.')
+                        ->tableArguments(fn (): array => [
+                            'playlist_id' => $playlistId,
+                        ])
+                        ->getOptionLabelFromRecordUsing(fn ($record) => $record->title)
+                        ->getOptionLabelsUsing(function (array $values): array {
+                            return Episode::whereIn('id', $values)
+                                ->pluck('title', 'id')
+                                ->toArray();
+                        }),
+                ])
+                ->action(function (array $data) use ($network): void {
+                    $episodeIds = $data['episodes'] ?? [];
+
+                    if (empty($episodeIds)) {
+                        return;
+                    }
+
+                    // Get the highest sort order
+                    $maxSortOrder = $network->networkContent()->max('sort_order') ?? 0;
+
+                    // Add selected episodes to the network
+                    foreach ($episodeIds as $index => $episodeId) {
+                        $episode = Episode::find($episodeId);
+                        if ($episode) {
+                            $network->networkContent()->create([
+                                'contentable_type' => Episode::class,
+                                'contentable_id' => $episode->id,
+                                'sort_order' => $maxSortOrder + $index + 1,
+                                'weight' => 1,
+                            ]);
+                        }
+                    }
+
+                    Notification::make()
+                        ->success()
+                        ->title('Episodes added')
+                        ->body(count($episodeIds).' episode(s) have been added to the network.')
+                        ->send();
+                })
+                ->successNotificationTitle('Episodes added successfully'),
 
             Action::make('addMovies')
                 ->label('Add Movies')
@@ -145,7 +201,53 @@ class NetworkContentRelationManager extends RelationManager
                 ->color('success')
                 ->visible(fn () => $playlistId !== null)
                 ->modalWidth('7xl')
-                ->modalContent(fn () => view('filament.networks.modals.vod-picker', ['network' => $this->getOwnerRecord()])),
+                ->schema([
+                    ModalTableSelect::make('movies')
+                        ->tableConfiguration(NetworkMoviesTable::class)
+                        ->label('Select Movies')
+                        ->multiple()
+                        ->required()
+                        ->helperText('Select movies to add to this network. You can filter by group.')
+                        ->tableArguments(fn (): array => [
+                            'playlist_id' => $playlistId,
+                        ])
+                        ->getOptionLabelFromRecordUsing(fn ($record) => $record->title)
+                        ->getOptionLabelsUsing(function (array $values): array {
+                            return Channel::whereIn('id', $values)
+                                ->pluck('title', 'id')
+                                ->toArray();
+                        }),
+                ])
+                ->action(function (array $data) use ($network): void {
+                    $movieIds = $data['movies'] ?? [];
+
+                    if (empty($movieIds)) {
+                        return;
+                    }
+
+                    // Get the highest sort order
+                    $maxSortOrder = $network->networkContent()->max('sort_order') ?? 0;
+
+                    // Add selected movies to the network
+                    foreach ($movieIds as $index => $movieId) {
+                        $movie = Channel::find($movieId);
+                        if ($movie) {
+                            $network->networkContent()->create([
+                                'contentable_type' => Channel::class,
+                                'contentable_id' => $movie->id,
+                                'sort_order' => $maxSortOrder + $index + 1,
+                                'weight' => 1,
+                            ]);
+                        }
+                    }
+
+                    Notification::make()
+                        ->success()
+                        ->title('Movies added')
+                        ->body(count($movieIds).' movie(s) have been added to the network.')
+                        ->send();
+                })
+                ->successNotificationTitle('Movies added successfully'),
         ];
     }
 
