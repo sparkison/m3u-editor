@@ -732,7 +732,7 @@ class NetworkResource extends Resource
                     Action::make('startBroadcast')
                         ->label('Start Broadcast')
                         ->icon('heroicon-o-play')
-                        ->color('info')
+                        ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Start Broadcasting')
                         ->modalDescription(function (Network $record): string {
@@ -807,7 +807,6 @@ class NetworkResource extends Resource
                     Action::make('viewPlaylist')
                         ->label('View Playlist')
                         ->icon('heroicon-o-eye')
-                        ->color('secondary')
                         ->visible(fn (Network $record): bool => $record->network_playlist_id !== null)
                         ->url(fn (Network $record): string => \App\Filament\Resources\Playlists\PlaylistResource::getUrl('view', ['record' => $record->network_playlist_id])),
 
