@@ -19,7 +19,7 @@ class EditNetwork extends EditRecord
             Action::make('generateSchedule')
                 ->label('Generate Schedule')
                 ->icon('heroicon-o-calendar')
-                ->color('success')
+                ->color('gray')
                 ->requiresConfirmation()
                 ->modalHeading('Generate Schedule')
                 ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
