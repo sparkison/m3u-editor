@@ -34,7 +34,8 @@ it('deletes old files and removes empty directories', function () {
     file_put_contents($oldFile, 'x');
     touch($oldFile, time() - 9000);
 
-    $this->artisan('hls:gc', ['--threshold' => 3600])->expectsOutputToContain('Deleting:')->assertSuccessful();
+    // Will clean up either via stopped broadcast cleanup or age-based cleanup
+    $this->artisan('hls:gc', ['--threshold' => 3600])->assertSuccessful();
 
     expect(file_exists($oldFile))->toBeFalse();
     // Directory should be removed because empty

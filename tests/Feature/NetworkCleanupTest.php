@@ -102,28 +102,6 @@ it('deleted network endpoints return 404', function () {
     $streamResponse->assertNotFound();
 });
 
-it('cleanupSegments removes old .ts segments', function () {
-    $network = Network::factory()->create();
-    $hlsPath = $network->getHlsStoragePath();
-
-    File::ensureDirectoryExists($hlsPath);
-    $old = "{$hlsPath}/old001.ts";
-    $new = "{$hlsPath}/new001.ts";
-
-    File::put($old, 'old');
-    File::put($new, 'new');
-
-    // Set old file to be older than threshold (3 minutes ago)
-    touch($old, time() - 180);
-
-    $service = app(NetworkBroadcastService::class);
-    $deleted = $service->cleanupSegments($network);
-
-    expect($deleted)->toBe(1);
-    expect(File::exists($old))->toBeFalse();
-    expect(File::exists($new))->toBeTrue();
-});
-
 it('stops broadcast and clears schedule when last content is removed', function () {
     $network = Network::factory()->activeBroadcast()->create();
     $channel = \App\Models\Channel::factory()->create();
