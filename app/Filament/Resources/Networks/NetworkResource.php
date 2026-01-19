@@ -390,7 +390,7 @@ class NetworkResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
-                                ->copyable(),
+                                ->hint(fn ($record) => $record?->epg_url ? view('components.copy-to-clipboard', ['text' => $record->epg_url, 'position' => 'left']) : null),
 
                             TextInput::make('schedule_info')
                                 ->label('Schedule Info')
@@ -424,14 +424,14 @@ class NetworkResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record?->stream_url ?? 'Save network first')
-                                ->copyable(),
+                                ->hint(fn ($record) => $record?->stream_url ? view('components.copy-to-clipboard', ['text' => $record->stream_url, 'position' => 'left']) : null),
 
                             TextInput::make('m3u_url')
                                 ->label('M3U Playlist URL')
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
-                                ->copyable(),
+                                ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
                         ]),
                 ])
                 ->visibleOn('edit'),
@@ -551,7 +551,7 @@ class NetworkResource extends Resource
                                         ->disabled()
                                         ->dehydrated(false)
                                         ->formatStateUsing(fn ($record) => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first')
-                                        ->copyable(),
+                                        ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.hls.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
                                 ])
                                 ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
                         ]),
