@@ -141,66 +141,11 @@ class NetworkContentRelationManager extends RelationManager
         $network = $this->getOwnerRecord();
 
         return [
-            Action::make('addEpisodes')
-                ->label('Add Episodes')
-                ->icon('heroicon-o-film')
-                ->color('info')
-                ->visible(fn () => $playlistId !== null)
-                ->modalWidth('7xl')
-                ->schema([
-                    ModalTableSelect::make('episodes')
-                        ->tableConfiguration(NetworkEpisodesTable::class)
-                        ->label('Select Episodes')
-                        ->multiple()
-                        ->required()
-                        ->helperText('Select episodes to add to this network. You can filter by category.')
-                        ->tableArguments(fn (): array => [
-                            'playlist_id' => $playlistId,
-                        ])
-                        ->getOptionLabelFromRecordUsing(fn ($record) => $record->title)
-                        ->getOptionLabelsUsing(function (array $values): array {
-                            return Episode::whereIn('id', $values)
-                                ->pluck('title', 'id')
-                                ->toArray();
-                        }),
-                ])
-                ->action(function (array $data) use ($network): void {
-                    $episodeIds = $data['episodes'] ?? [];
-
-                    if (empty($episodeIds)) {
-                        return;
-                    }
-
-                    // Get the highest sort order
-                    $maxSortOrder = $network->networkContent()->max('sort_order') ?? 0;
-
-                    // Add selected episodes to the network
-                    foreach ($episodeIds as $index => $episodeId) {
-                        $episode = Episode::find($episodeId);
-                        if ($episode) {
-                            $network->networkContent()->create([
-                                'contentable_type' => Episode::class,
-                                'contentable_id' => $episode->id,
-                                'sort_order' => $maxSortOrder + $index + 1,
-                                'weight' => 1,
-                            ]);
-                        }
-                    }
-
-                    Notification::make()
-                        ->success()
-                        ->title('Episodes added')
-                        ->body(count($episodeIds).' episode(s) have been added to the network.')
-                        ->send();
-                })
-                ->successNotificationTitle('Episodes added successfully'),
-
             Action::make('addMovies')
                 ->label('Add Movies')
-                ->icon('heroicon-o-video-camera')
-                ->color('success')
+                ->icon('heroicon-o-film')
+                ->slideOver()
                 ->visible(fn () => $playlistId !== null)
-                ->modalWidth('7xl')
                 ->schema([
                     ModalTableSelect::make('movies')
                         ->tableConfiguration(NetworkMoviesTable::class)
@@ -211,6 +156,13 @@ class NetworkContentRelationManager extends RelationManager
                         ->tableArguments(fn (): array => [
                             'playlist_id' => $playlistId,
                         ])
+                        ->selectAction(
+                            fn (Action $action) => $action
+                                ->label('Select Movies from '.$mediaServerName)
+                                ->modalHeading('Search and Select Movies')
+                                ->modalSubmitActionLabel('Confirm selection')
+                                ->button(),
+                        )
                         ->getOptionLabelFromRecordUsing(fn ($record) => $record->title)
                         ->getOptionLabelsUsing(function (array $values): array {
                             return Channel::whereIn('id', $values)
@@ -248,6 +200,66 @@ class NetworkContentRelationManager extends RelationManager
                         ->send();
                 })
                 ->successNotificationTitle('Movies added successfully'),
+
+            Action::make('addEpisodes')
+                ->label('Add Episodes')
+                ->icon('heroicon-o-play')
+                ->slideOver()
+                ->visible(fn () => $playlistId !== null)
+                ->schema([
+                    ModalTableSelect::make('episodes')
+                        ->tableConfiguration(NetworkEpisodesTable::class)
+                        ->label('Select Episodes')
+                        ->multiple()
+                        ->required()
+                        ->helperText('Select episodes to add to this network. You can filter by category.')
+                        ->tableArguments(fn (): array => [
+                            'playlist_id' => $playlistId,
+                        ])
+                        ->selectAction(
+                            fn (Action $action) => $action
+                                ->label('Select Episodes from '.$mediaServerName)
+                                ->modalHeading('Search and Select Episodes')
+                                ->modalSubmitActionLabel('Confirm selection')
+                                ->button(),
+                        )
+                        ->getOptionLabelFromRecordUsing(fn ($record) => $record->title)
+                        ->getOptionLabelsUsing(function (array $values): array {
+                            return Episode::whereIn('id', $values)
+                                ->pluck('title', 'id')
+                                ->toArray();
+                        }),
+                ])
+                ->action(function (array $data) use ($network): void {
+                    $episodeIds = $data['episodes'] ?? [];
+
+                    if (empty($episodeIds)) {
+                        return;
+                    }
+
+                    // Get the highest sort order
+                    $maxSortOrder = $network->networkContent()->max('sort_order') ?? 0;
+
+                    // Add selected episodes to the network
+                    foreach ($episodeIds as $index => $episodeId) {
+                        $episode = Episode::find($episodeId);
+                        if ($episode) {
+                            $network->networkContent()->create([
+                                'contentable_type' => Episode::class,
+                                'contentable_id' => $episode->id,
+                                'sort_order' => $maxSortOrder + $index + 1,
+                                'weight' => 1,
+                            ]);
+                        }
+                    }
+
+                    Notification::make()
+                        ->success()
+                        ->title('Episodes added')
+                        ->body(count($episodeIds).' episode(s) have been added to the network.')
+                        ->send();
+                })
+                ->successNotificationTitle('Episodes added successfully'),
         ];
     }
 
