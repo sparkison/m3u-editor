@@ -24,6 +24,8 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
@@ -77,121 +79,121 @@ class NetworkResource extends Resource
     public static function getFormSections(): array
     {
         return [
-            Section::make('Media Server')
-                ->description('Select the media server that provides content for this network.')
-                ->icon('heroicon-o-server')
+            Tabs::make()
                 ->schema([
-                    Select::make('media_server_integration_id')
-                        ->label('Media Server')
-                        ->relationship('mediaServerIntegration', 'name')
-                        ->helperText('Networks pull VOD content from the linked media server.')
-                        ->required()
-                        ->native(false)
-                        ->preload(),
+                    Tab::make('Media Server')
+                        ->icon('heroicon-o-server')
+                        ->schema([
+                            Select::make('media_server_integration_id')
+                                ->label('Media Server')
+                                ->relationship('mediaServerIntegration', 'name')
+                                ->helperText('Networks pull VOD content from the linked media server.')
+                                ->required()
+                                ->native(false)
+                                ->preload(),
+                        ]),
+
+                    Tab::make('Network Details')
+                        ->icon('heroicon-o-tv')
+                        ->schema([
+                            Grid::make(2)->schema([
+                                TextInput::make('name')
+                                    ->label('Network Name')
+                                    ->placeholder('e.g., Movie Classics, 80s TV, Kids Zone')
+                                    ->required()
+                                    ->maxLength(255),
+
+                                TextInput::make('channel_number')
+                                    ->label('Channel Number')
+                                    ->numeric()
+                                    ->placeholder('e.g., 100')
+                                    ->helperText('Optional channel number for EPG')
+                                    ->minValue(1),
+                            ]),
+
+                            Textarea::make('description')
+                                ->label('Description')
+                                ->placeholder('A channel dedicated to classic movies from the golden age of cinema')
+                                ->rows(2)
+                                ->maxLength(1000),
+
+                            TextInput::make('logo')
+                                ->label('Logo URL')
+                                ->placeholder('https://example.com/logo.png')
+                                ->url()
+                                ->maxLength(500),
+                        ]),
+
+                    Tab::make('Schedule Settings')
+                        ->icon('heroicon-o-calendar')
+                        ->schema([
+                            Grid::make(2)->schema([
+                                Select::make('schedule_type')
+                                    ->label('Schedule Type')
+                                    ->options([
+                                        'sequential' => 'Sequential (play in order)',
+                                        'shuffle' => 'Shuffle (randomized)',
+                                    ])
+                                    ->default('sequential')
+                                    ->helperText('How content is ordered in the schedule')
+                                    ->native(false),
+
+                                Toggle::make('loop_content')
+                                    ->label('Loop Content')
+                                    ->helperText('Restart from beginning when all content has played')
+                                    ->default(true),
+                            ]),
+
+                            Select::make('network_playlist_id')
+                                ->label('Output Playlist')
+                                ->relationship(
+                                    'networkPlaylist',
+                                    'name',
+                                    fn (Builder $query) => $query->where('is_network_playlist', true)
+                                )
+                                ->helperText('Assign this network to a playlist for M3U/EPG output. Create one if none exist.')
+                                ->createOptionForm([
+                                    TextInput::make('name')
+                                        ->label('Playlist Name')
+                                        ->placeholder('e.g., My Networks')
+                                        ->required(),
+                                ])
+                                ->createOptionUsing(function (array $data): int {
+                                    $playlist = \App\Models\Playlist::create([
+                                        'name' => $data['name'],
+                                        'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                                        'user_id' => Auth::id(),
+                                        'is_network_playlist' => true,
+                                    ]);
+
+                                    return $playlist->id;
+                                })
+                                ->nullable()
+                                ->native(false),
+
+                            Toggle::make('enabled')
+                                ->label('Enabled')
+                                ->helperText('Disable to stop generating schedule without deleting')
+                                ->default(true)
+                                ->live()
+                                ->afterStateUpdated(function ($state, $record) {
+                                    // If network is being disabled and is currently broadcasting, stop it
+                                    if ($state === false && $record && $record->isBroadcasting()) {
+                                        $service = app(NetworkBroadcastService::class);
+                                        $service->stop($record);
+
+                                        Notification::make()
+                                            ->warning()
+                                            ->title('Broadcast Stopped')
+                                            ->body("Network disabled - broadcast has been stopped for {$record->name}")
+                                            ->send();
+                                    }
+                                }),
+                        ]),
                 ]),
 
-            Section::make('Network Details')
-                ->description('Configure your pseudo-TV network channel')
-                ->icon('heroicon-o-tv')
-                ->schema([
-                    Grid::make(2)->schema([
-                        TextInput::make('name')
-                            ->label('Network Name')
-                            ->placeholder('e.g., Movie Classics, 80s TV, Kids Zone')
-                            ->required()
-                            ->maxLength(255),
-
-                        TextInput::make('channel_number')
-                            ->label('Channel Number')
-                            ->numeric()
-                            ->placeholder('e.g., 100')
-                            ->helperText('Optional channel number for EPG')
-                            ->minValue(1),
-                    ]),
-
-                    Textarea::make('description')
-                        ->label('Description')
-                        ->placeholder('A channel dedicated to classic movies from the golden age of cinema')
-                        ->rows(2)
-                        ->maxLength(1000),
-
-                    TextInput::make('logo')
-                        ->label('Logo URL')
-                        ->placeholder('https://example.com/logo.png')
-                        ->url()
-                        ->maxLength(500),
-                ]),
-
-            Section::make('Schedule Settings')
-                ->description('Control how content is scheduled on this network')
-                ->icon('heroicon-o-calendar')
-                ->schema([
-                    Grid::make(2)->schema([
-                        Select::make('schedule_type')
-                            ->label('Schedule Type')
-                            ->options([
-                                'sequential' => 'Sequential (play in order)',
-                                'shuffle' => 'Shuffle (randomized)',
-                            ])
-                            ->default('sequential')
-                            ->helperText('How content is ordered in the schedule')
-                            ->native(false),
-
-                        Toggle::make('loop_content')
-                            ->label('Loop Content')
-                            ->helperText('Restart from beginning when all content has played')
-                            ->default(true),
-                    ]),
-
-                    Select::make('network_playlist_id')
-                        ->label('Output Playlist')
-                        ->relationship(
-                            'networkPlaylist',
-                            'name',
-                            fn (Builder $query) => $query->where('is_network_playlist', true)
-                        )
-                        ->helperText('Assign this network to a playlist for M3U/EPG output. Create one if none exist.')
-                        ->createOptionForm([
-                            TextInput::make('name')
-                                ->label('Playlist Name')
-                                ->placeholder('e.g., My Networks')
-                                ->required(),
-                        ])
-                        ->createOptionUsing(function (array $data): int {
-                            $playlist = \App\Models\Playlist::create([
-                                'name' => $data['name'],
-                                'uuid' => (string) \Illuminate\Support\Str::uuid(),
-                                'user_id' => Auth::id(),
-                                'is_network_playlist' => true,
-                            ]);
-
-                            return $playlist->id;
-                        })
-                        ->nullable()
-                        ->native(false),
-
-                    Toggle::make('enabled')
-                        ->label('Enabled')
-                        ->helperText('Disable to stop generating schedule without deleting')
-                        ->default(true)
-                        ->live()
-                        ->afterStateUpdated(function ($state, $record) {
-                            // If network is being disabled and is currently broadcasting, stop it
-                            if ($state === false && $record && $record->isBroadcasting()) {
-                                $service = app(NetworkBroadcastService::class);
-                                $service->stop($record);
-
-                                Notification::make()
-                                    ->warning()
-                                    ->title('Broadcast Stopped')
-                                    ->body("Network disabled - broadcast has been stopped for {$record->name}")
-                                    ->send();
-                            }
-                        }),
-                ]),
-
-            ...self::getOutputSections(),
-            ...self::getBroadcastSections(),
+            ...self::getOutputTabs(),
+            ...self::getBroadcastTabs(),
         ];
     }
 
@@ -352,11 +354,10 @@ class NetworkResource extends Resource
     /**
      * Output sections (EPG/Stream URLs) - visible on edit only.
      */
-    private static function getOutputSections(): array
+    private static function getOutputTabs(): array
     {
         return [
-            Section::make('EPG Output')
-                ->description('EPG URL for IPTV players')
+            Tab::make('EPG Output')
                 ->icon('heroicon-o-document-text')
                 ->schema([
                     TextInput::make('epg_url')
@@ -382,11 +383,9 @@ class NetworkResource extends Resource
                                 : 'No programmes - generate schedule first';
                         }),
                 ])
-                ->collapsible()
                 ->visibleOn('edit'),
 
-            Section::make('Stream Output')
-                ->description('Live stream URL for IPTV players')
+            Tab::make('Stream Output')
                 ->icon('heroicon-o-play')
                 ->schema([
                     TextInput::make('stream_url')
@@ -403,7 +402,6 @@ class NetworkResource extends Resource
                         ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
                         ->copyable(),
                 ])
-                ->collapsible()
                 ->visibleOn('edit'),
         ];
     }
@@ -411,11 +409,10 @@ class NetworkResource extends Resource
     /**
      * Broadcast settings sections - visible on edit only.
      */
-    private static function getBroadcastSections(): array
+    private static function getBroadcastTabs(): array
     {
         return [
-            Section::make('Broadcast Settings')
-                ->description('Configure continuous live broadcasting (pseudo-TV)')
+            Tab::make('Broadcast Settings')
                 ->icon('heroicon-o-signal')
                 ->schema([
                     Toggle::make('broadcast_enabled')
@@ -521,7 +518,6 @@ class NetworkResource extends Resource
                         ])
                         ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
                 ])
-                ->collapsible()
                 ->visibleOn('edit'),
         ];
     }
