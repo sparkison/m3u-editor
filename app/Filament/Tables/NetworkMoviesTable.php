@@ -13,14 +13,16 @@ class NetworkMoviesTable
 {
     public static function configure(Table $table): Table
     {
+        $arguments = $table->getArguments();
+        $playlistId = $arguments['playlist_id'] ?? null;
+
         return $table
             ->query(fn (): Builder => Channel::query())
-            ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
-                $arguments = $table->getArguments();
+            ->modifyQueryUsing(function (Builder $query) use ($playlistId): Builder {
 
-                $query->with(['playlist', 'groupRelation']);
+                $query->with(['playlist', 'group']);
 
-                if ($playlistId = $arguments['playlist_id'] ?? null) {
+                if ($playlistId) {
                     $query->where('playlist_id', $playlistId);
                 }
 
@@ -32,6 +34,11 @@ class NetworkMoviesTable
 
                 return $query;
             })
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
+            ->paginated([15, 25, 50, 100])
+            ->defaultPaginationPageOption(15)
             ->defaultSort('title', 'asc')
             ->columns([
                 ImageColumn::make('logo')
@@ -71,7 +78,7 @@ class NetworkMoviesTable
             ->filters([
                 SelectFilter::make('group')
                     ->label('Group')
-                    ->relationship('groupRelation', 'name', fn ($query) => $query->where('type', 'vod'))
+                    ->relationship('group', 'name', fn ($query) => $query->where('type', 'vod'))
                     ->searchable()
                     ->preload(),
             ])

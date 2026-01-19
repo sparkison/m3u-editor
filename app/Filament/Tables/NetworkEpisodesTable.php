@@ -13,14 +13,16 @@ class NetworkEpisodesTable
 {
     public static function configure(Table $table): Table
     {
+        $arguments = $table->getArguments();
+        $playlistId = $arguments['playlist_id'] ?? null;
+
         return $table
             ->query(fn (): Builder => Episode::query())
-            ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
-                $arguments = $table->getArguments();
+            ->modifyQueryUsing(function (Builder $query) use ($playlistId): Builder {
 
                 $query->with(['series', 'season', 'playlist']);
 
-                if ($playlistId = $arguments['playlist_id'] ?? null) {
+                if ($playlistId) {
                     $query->where('playlist_id', $playlistId);
                 }
 
@@ -29,6 +31,11 @@ class NetworkEpisodesTable
 
                 return $query;
             })
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
+            ->paginated([15, 25, 50, 100])
+            ->defaultPaginationPageOption(15)
             ->defaultSort('title', 'asc')
             ->columns([
                 ImageColumn::make('info.movie_image')
@@ -53,12 +60,12 @@ class NetworkEpisodesTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('season.name')
-                    ->label('Season')
+                TextColumn::make('season')
+                    ->label('Season #')
                     ->searchable(),
 
                 TextColumn::make('episode_num')
-                    ->label('Episode #')
+                    ->label('Ep #')
                     ->sortable(),
 
                 TextColumn::make('info.duration')
@@ -70,6 +77,20 @@ class NetworkEpisodesTable
                     }),
             ])
             ->filters([
+                SelectFilter::make('series')
+                    ->label('Series')
+                    ->options(fn () => Episode::query()
+                        ->distinct()
+                        ->pluck('series_id', 'series_id')
+                        ->mapWithKeys(function ($seriesId) {
+                            $series = \App\Models\Series::find($seriesId);
+
+                            return [$seriesId => $series ? $series->name : 'Unknown'];
+                        })
+                        ->toArray(),
+                    )
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('category')
                     ->label('Category')
                     ->relationship('series.category', 'name')
