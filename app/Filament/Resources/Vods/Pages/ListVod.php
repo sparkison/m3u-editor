@@ -100,6 +100,10 @@ class ListVod extends ListRecords
                             ->label('Deactivate Failover Channels')
                             ->helperText('When enabled, channels that become failovers will be automatically disabled.')
                             ->default(false),
+                        Toggle::make('prefer_catchup_as_primary')
+                            ->label('Prefer catch-up channels as primary')
+                            ->helperText('When enabled, catch-up channels will be selected as the master when available.')
+                            ->default(false),
                     ])
                     ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -109,6 +113,7 @@ class ListVod extends ListRecords
                                 playlistId: $data['playlist_id'],
                                 checkResolution: $data['by_resolution'] ?? false, // Sort failovers by resolution, or by playlist (default behavior)
                                 deactivateFailoverChannels: $data['deactivate_failover_channels'] ?? false,
+                                preferCatchupAsPrimary: $data['prefer_catchup_as_primary'] ?? false,
                             ));
                     })->after(function () {
                         Notification::make()

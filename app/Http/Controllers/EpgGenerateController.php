@@ -113,14 +113,17 @@ class EpgGenerateController extends Controller
 
             // Get/set the channel number
             $channelNo = $channel->channel;
-            if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::ChannelId)) {
+            if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                 $channelNo = ++$channelNumber;
             }
 
             // Get the `tvg-id` based on the playlist setting
             switch ($idChannelBy) {
                 case PlaylistChannelId::ChannelId:
-                    $tvgId = $channel->source_id ?? $channel->id;
+                    $tvgId = $channel->id;
+                    break;
+                case PlaylistChannelId::Number:
+                    $tvgId = $channelNumber;
                     break;
                 case PlaylistChannelId::Name:
                     $tvgId = $channel->name_custom ?? $channel->name;
@@ -129,7 +132,7 @@ class EpgGenerateController extends Controller
                     $tvgId = $channel->title_custom ?? $channel->title;
                     break;
                 default:
-                    $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                    $tvgId = $channel->source_id ?? $channel->stream_id_custom ?? $channel->stream_id;
                     break;
             }
 

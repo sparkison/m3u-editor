@@ -495,15 +495,6 @@ class VodResource extends Resource
     {
         return [
             ActionGroup::make([
-                EditAction::make('edit')
-                    ->slideOver()
-                    ->schema(fn (EditAction $action): array => [
-                        Grid::make()
-                            ->schema(self::getForm(edit: true))
-                            ->columns(2),
-                    ])
-                    // Refresh table after edit to remove records that no longer match active filters
-                    ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
                 Action::make('process_vod')
                     ->label('Fetch Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -532,10 +523,30 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channel.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Action::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB/TVDB IDs')
+                    ->icon('heroicon-o-film')
+                    ->modalIcon('heroicon-o-film')
+                    ->modalDescription('Fetch TMDB, TVDB, and IMDB IDs for this series from The Movie Database.')
+                    ->modalSubmitActionLabel('Fetch IDs now')
+                    ->action(function ($record) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                vodChannelIds: [$record->id]
+                            ));
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('TMDB Search Started')
+                            ->body('Searching for TMDB/TVDB IDs. Check the logs or refresh the page in a few seconds.')
+                            ->duration(8000)
+                            ->send();
+                    })
+                    ->requiresConfirmation(),
                 Action::make('manual_tmdb_search')
                     ->label('Manual TMDB Search')
                     ->icon('heroicon-o-magnifying-glass')
-                    ->color('warning')
                     ->slideOver()
                     ->modalWidth('4xl')
                     ->modalSubmitAction(false)
@@ -647,6 +658,16 @@ class VodResource extends Resource
                     ->modalDescription('Are you sure you want to delete this VOD channel? This action cannot be undone.')
                     ->modalSubmitActionLabel('Yes, delete VOD'),
             ])->button()->hiddenLabel()->size('sm'),
+            EditAction::make('edit')
+                ->slideOver()
+                ->schema(fn (EditAction $action): array => [
+                    Grid::make()
+                        ->schema(self::getForm(edit: true))
+                        ->columns(2),
+                ])
+                ->button()->hiddenLabel()->size('sm')
+                    // Refresh table after edit to remove records that no longer match active filters
+                ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
             Action::make('play')
                 ->tooltip('Play Video')
                 ->action(function ($record, $livewire) {

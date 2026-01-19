@@ -267,10 +267,6 @@ class SeriesResource extends Resource
     {
         return [
             ActionGroup::make([
-                EditAction::make()
-                    ->slideOver()
-                    // Refresh table after edit to remove records that no longer match active filters
-                    ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
                 Action::make('move')
                     ->label('Move Series to Category')
                     ->schema([
@@ -308,8 +304,7 @@ class SeriesResource extends Resource
                     ->action(function ($record) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new FetchTmdbIds(
-                                type: 'series',
-                                ids: [$record->id]
+                                seriesIds: [$record->id]
                             ));
                     })
                     ->after(function () {
@@ -324,7 +319,6 @@ class SeriesResource extends Resource
                 Action::make('manual_tmdb_search')
                     ->label('Manual TMDB Search')
                     ->icon('heroicon-o-magnifying-glass')
-                    ->color('warning')
                     ->slideOver()
                     ->modalWidth('4xl')
                     ->modalSubmitAction(false)
@@ -469,6 +463,11 @@ class SeriesResource extends Resource
                     ->modalDescription('Are you sure you want to delete this series? This will delete all episodes and seasons for this series. This action cannot be undone.')
                     ->modalSubmitActionLabel('Yes, delete series'),
             ])->button()->hiddenLabel()->size('sm'),
+            EditAction::make()
+                ->slideOver()
+                ->button()->hiddenLabel()->size('sm')
+                    // Refresh table after edit to remove records that no longer match active filters
+                ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
         ];
     }
 

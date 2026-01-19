@@ -125,7 +125,7 @@ class PlaylistGenerateController extends Controller
                     $stationId = $channel->station_id ?? '';
                     $epgShift = $channel->tvg_shift ?? 0;
                     $group = $channel->group ?? '';
-                    if (! $channelNo && $playlist->auto_channel_increment) {
+                    if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                         $channelNo = ++$channelNumber;
                     }
                     if ($type === 'custom') {
@@ -140,7 +140,10 @@ class PlaylistGenerateController extends Controller
                     // Get the TVG ID
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
-                            $tvgId = $channel->source_id ?? $channel->id;
+                            $tvgId = $channel->id;
+                            break;
+                        case PlaylistChannelId::Number:
+                            $tvgId = $channelNumber;
                             break;
                         case PlaylistChannelId::Name:
                             $tvgId = $channel->name_custom ?? $channel->name;
@@ -149,7 +152,7 @@ class PlaylistGenerateController extends Controller
                             $tvgId = $channel->title_custom ?? $channel->title;
                             break;
                         default:
-                            $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                            $tvgId = $channel->source_id ?? $channel->stream_id_custom ?? $channel->stream_id;
                             break;
                     }
 
@@ -280,7 +283,10 @@ class PlaylistGenerateController extends Controller
                             // Get the TVG ID
                             switch ($idChannelBy) {
                                 case PlaylistChannelId::ChannelId:
-                                    $tvgId = $channel->source_id ?? $channel->id;
+                                    $tvgId = $episode->id;
+                                    break;
+                                case PlaylistChannelId::Number:
+                                    $tvgId = $channelNumber;
                                     break;
                                 case PlaylistChannelId::Name:
                                     $tvgId = $name;
@@ -431,14 +437,17 @@ class PlaylistGenerateController extends Controller
                 }
                 $url = rtrim($baseUrl."/{$urlPath}/{$username}/{$password}/".$channel->id.'.'.$extension, '.');
                 $channelNo = $channel->channel;
-                if (! $channelNo && $autoIncrement) {
+                if (! $channelNo && ($autoIncrement || $idChannelBy === PlaylistChannelId::Number)) {
                     $channelNo = ++$channelNumber;
                 }
 
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
-                        $tvgId = $channel->source_id ?? $channel->id;
+                        $tvgId = $channel->id;
+                        break;
+                    case PlaylistChannelId::Number:
+                        $tvgId = $channelNumber;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;
@@ -447,7 +456,7 @@ class PlaylistGenerateController extends Controller
                         $tvgId = $channel->title_custom ?? $channel->title;
                         break;
                     default:
-                        $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                        $tvgId = $channel->source_id ?? $channel->stream_id_custom ?? $channel->stream_id;
                         break;
                 }
 

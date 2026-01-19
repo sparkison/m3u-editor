@@ -7,6 +7,7 @@ use App\Filament\Resources\MediaServerIntegrations\Pages\EditMediaServerIntegrat
 use App\Filament\Resources\MediaServerIntegrations\Pages\ListMediaServerIntegrations;
 use App\Jobs\SyncMediaServer;
 use App\Models\MediaServerIntegration;
+use App\Models\Playlist;
 use App\Models\Season;
 use App\Models\Series;
 use App\Services\MediaServerService;
@@ -36,6 +37,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class MediaServerIntegrationResource extends Resource
@@ -269,6 +271,23 @@ class MediaServerIntegrationResource extends Resource
                 TextColumn::make('name')
                     ->label('Name')
                     ->searchable()
+                    ->description(function ($record) {
+                        if ($record->playlist_id) {
+                            $playlist = Playlist::find($record->playlist_id);
+                            if (! $playlist) {
+                                return null;
+                            }
+                            $playlistLink = route('filament.admin.resources.playlists.edit', $record->playlist_id);
+
+                            return new HtmlString('
+                            <div class="flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
+                                    <path d="M12.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h.5a.75.75 0 0 0 .75-.75V4.75a.75.75 0 0 0-.75-.75h-.5ZM17.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h.5a.75.75 0 0 0 .75-.75V4.75a.75.75 0 0 0-.75-.75h-.5ZM3.288 4.819A1.5 1.5 0 0 0 1 6.095v7.81a1.5 1.5 0 0 0 2.288 1.277l6.323-3.906a1.5 1.5 0 0 0 0-2.552L3.288 4.819Z" />
+                                </svg>
+                                <a class="inline m-0 p-0 hover:underline" href="'.$playlistLink.'">Playlist: '.$playlist->name.'</a>
+                            </div>');
+                        }
+                    })
                     ->sortable(),
 
                 ToggleColumn::make('enabled')
@@ -284,17 +303,10 @@ class MediaServerIntegrationResource extends Resource
                         default => 'gray',
                     }),
 
-                TextColumn::make('playlist.name')
-                    ->label('Playlist')
-                    ->url(fn ($record) => $record->playlist_id
-                        ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
-                        : null
-                    )
-                    ->placeholder('Not synced yet'),
-
                 TextColumn::make('host')
                     ->label('Server')
                     ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
+                    ->toggleable()
                     ->copyable(),
 
                 TextColumn::make('status')

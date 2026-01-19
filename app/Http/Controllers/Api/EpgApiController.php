@@ -256,9 +256,13 @@ class EpgApiController extends Controller
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
                 $channelNo = $channel->channel;
-                if (! $channelNo) {
+                if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::Number)) {
                     $channelNo = ++$channelNumber;
                 }
+
+                // Ensure we always have a unique identifier for the channel
+                // Use database ID as fallback if channel number is not set
+                $channelKey = $channelNo ?: $channel->id;
                 if ($epgData) {
                     $epgId = $epgData->epg_id;
                     $epgIds[] = $epgId;
@@ -288,10 +292,10 @@ class EpgApiController extends Controller
 
                     // Add the playlist channel info to the EPG channel map
                     $epgChannelMap[$epgId][$epgData->channel_id][] = [
-                        'playlist_channel_id' => $channelNo,
+                        'playlist_channel_id' => $channelKey,
                         'display_name' => $channel->title_custom ?? $channel->title,
                         'title' => $channel->name_custom ?? $channel->name,
-                        'channel_number' => $channel->channel,
+                        'channel_number' => $channelNo,
                         'group' => $channel->group ?? $channel->group_internal,
                         'logo' => $logo ?? '',
                     ];
@@ -308,11 +312,11 @@ class EpgApiController extends Controller
 
                     // Keep track of which channels need a dummy EPG program
                     $dummyEpgChannels[] = [
-                        'playlist_channel_id' => $channelNo,
+                        'playlist_channel_id' => $channelKey,
                         'display_name' => $channel->title_custom ?? $channel->title,
                         'title' => $channel->name_custom ?? $channel->name,
                         'icon' => $icon,
-                        'channel_number' => $channel->channel,
+                        'channel_number' => $channelNo,
                         'group' => $channel->group ?? $channel->group_internal,
                         'include_category' => $playlist->dummy_epg_category,
                     ];
@@ -321,7 +325,10 @@ class EpgApiController extends Controller
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
-                        $tvgId = $channel->source_id ?? $channel->id;
+                        $tvgId = $channel->id;
+                        break;
+                    case PlaylistChannelId::Number:
+                        $tvgId = $channelNumber;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;
@@ -330,7 +337,7 @@ class EpgApiController extends Controller
                         $tvgId = $channel->title_custom ?? $channel->title;
                         break;
                     default:
-                        $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                        $tvgId = $channel->source_id ?? $channel->stream_id_custom ?? $channel->stream_id;
                         break;
                 }
 
@@ -366,8 +373,8 @@ class EpgApiController extends Controller
                 if ($logoProxyEnabled) {
                     $icon = LogoProxyController::generateProxyUrl($icon, internal: true);
                 }
-                $playlistChannelData[$channelNo] = [
-                    'id' => $channelNo,
+                $playlistChannelData[$channelKey] = [
+                    'id' => $channelKey,
                     'database_id' => $channel->id, // Add the actual database ID for editing
                     'url' => $url,
                     'format' => $channel->is_vod
@@ -376,7 +383,7 @@ class EpgApiController extends Controller
                     'tvg_id' => $tvgId,
                     'display_name' => $channel->title_custom ?? $channel->title,
                     'title' => $channel->name_custom ?? $channel->name,
-                    'channel_number' => $channel->channel,
+                    'channel_number' => $channelNo,
                     'group' => $channel->group ?? $channel->group_internal,
                     'icon' => $icon,
                     'has_epg' => $epgData !== null,

@@ -182,12 +182,12 @@ class ChannelController extends Controller
                     ];
                 }
 
-                // Build group info
+                // Build group info (use relationLoaded to avoid conflict with 'group' column)
                 $groupInfo = null;
-                if ($channel->group) {
+                if ($channel->relationLoaded('group') && $channel->getRelation('group')) {
                     $groupInfo = [
-                        'id' => $channel->group->id,
-                        'name' => $channel->group->name,
+                        'id' => $channel->getRelation('group')->id,
+                        'name' => $channel->getRelation('group')->name,
                     ];
                 }
 
@@ -641,12 +641,12 @@ class ChannelController extends Controller
             ];
         }
 
-        // Build group info
+        // Build group info (use relationLoaded to avoid conflict with 'group' column)
         $groupInfo = null;
-        if ($channel->group) {
+        if ($channel->relationLoaded('group') && $channel->getRelation('group')) {
             $groupInfo = [
-                'id' => $channel->group->id,
-                'name' => $channel->group->name,
+                'id' => $channel->getRelation('group')->id,
+                'name' => $channel->getRelation('group')->name,
             ];
         }
 
