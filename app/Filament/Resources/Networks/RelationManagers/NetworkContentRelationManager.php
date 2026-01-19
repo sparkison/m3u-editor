@@ -152,7 +152,7 @@ class NetworkContentRelationManager extends RelationManager
                         ->label('Select Movies')
                         ->multiple()
                         ->required()
-                        ->helperText('Select movies to add to this network. You can filter by group.')
+                        ->helperText('Select movies to add to this network. Once added, you can sort them using drag and drop in the main table.')
                         ->tableArguments([
                             'playlist_id' => $playlistId,
                         ])
@@ -212,7 +212,7 @@ class NetworkContentRelationManager extends RelationManager
                         ->label('Select Episodes')
                         ->multiple()
                         ->required()
-                        ->helperText('Select episodes to add to this network. You can filter by category.')
+                        ->helperText('Select episodes to add to this network. Once added, you can sort them using drag and drop in the main table.')
                         ->tableArguments([
                             'playlist_id' => $playlistId,
                         ])

@@ -63,7 +63,7 @@ class NetworkEpisodesTable
                     ->toggleable()
                     ->sortable(),
 
-                TextColumn::make('category.name')
+                TextColumn::make('series.category.name')
                     ->label('Category')
                     ->searchable()
                     ->toggleable()
@@ -71,10 +71,12 @@ class NetworkEpisodesTable
 
                 TextColumn::make('season')
                     ->label('Season #')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('episode_num')
                     ->label('Ep #')
+                    ->searchable()
                     ->sortable(),
 
                 TextColumn::make('info.duration')
