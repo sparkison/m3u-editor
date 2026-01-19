@@ -55,7 +55,7 @@ class Network extends Model
 
         // If the original programme still exists and is currently airing, continue from persisted offset + elapsed
         if ($programme && now()->between($programme->start_time, $programme->end_time)) {
-            $elapsed = now()->diffInSeconds($this->broadcast_started_at);
+            $elapsed = $this->broadcast_started_at->diffInSeconds(now());
 
             return (int) max(0, $this->broadcast_initial_offset_seconds + $elapsed);
         }

@@ -29,8 +29,8 @@ class NetworkProgrammeFactory extends Factory
             'start_time' => $start,
             'end_time' => $start->copy()->addMinutes($duration),
             'duration_seconds' => $duration * 60,
-            'contentable_type' => null,
-            'contentable_id' => null,
+            'contentable_type' => \App\Models\Channel::class,
+            'contentable_id' => 1, // Dummy ID - tests should override with real content
         ];
     }
 }
