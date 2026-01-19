@@ -37,6 +37,8 @@ class Network extends Model
         'broadcast_pid' => 'integer',
         'broadcast_programme_id' => 'integer',
         'broadcast_initial_offset_seconds' => 'integer',
+        'broadcast_scheduled_start' => 'datetime',
+        'broadcast_schedule_enabled' => 'boolean',
     ];
 
     /**
@@ -211,6 +213,17 @@ class Network extends Model
     public function isBroadcasting(): bool
     {
         return $this->broadcast_started_at !== null && $this->broadcast_pid !== null;
+    }
+
+    /**
+     * Check if this network is waiting for its scheduled start time.
+     */
+    public function isWaitingForScheduledStart(): bool
+    {
+        return $this->broadcast_enabled
+            && $this->broadcast_schedule_enabled
+            && $this->broadcast_scheduled_start !== null
+            && now()->lt($this->broadcast_scheduled_start);
     }
 
     /**

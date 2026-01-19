@@ -16,6 +16,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -159,6 +160,7 @@ class NetworkResource extends Resource
 
                                         Toggle::make('loop_content')
                                             ->label('Loop Content')
+                                            ->inline(false)
                                             ->helperText('Restart from beginning when all content has played')
                                             ->default(true),
                                     ]),
@@ -450,12 +452,14 @@ class NetworkResource extends Resource
                     Section::make('Broadcast Settings')
                         ->compact()
                         ->icon('heroicon-o-signal')
+                        ->columns(2)
                         ->description('')
                         ->schema([
                             Toggle::make('broadcast_enabled')
                                 ->label('Enable Broadcasting')
                                 ->helperText('When enabled, this network will continuously broadcast content according to the schedule.')
                                 ->default(false)
+                                ->columnSpan(1)
                                 ->live()
                                 ->afterStateUpdated(function ($state, $record) {
                                     // If broadcast is being disabled and is currently running, stop it
@@ -468,6 +472,38 @@ class NetworkResource extends Resource
                                             ->title('Broadcast Stopped')
                                             ->body("Broadcasting disabled - stream stopped for {$record->name}")
                                             ->send();
+                                    }
+                                }),
+
+                            Toggle::make('broadcast_schedule_enabled')
+                                ->label('Schedule Start Time')
+                                ->helperText('Wait until a specific date/time before starting the broadcast.')
+                                ->default(false)
+                                ->columnSpan(1)
+                                ->live()
+                                ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
+
+                            DateTimePicker::make('broadcast_scheduled_start')
+                                ->label('Scheduled Start Time')
+                                ->helperText('Broadcast will wait until this time to start. Leave empty to start immediately.')
+                                ->native(false)
+                                ->seconds(true)
+                                ->minDate(now())
+                                ->columnSpanFull()
+                                ->timezone(config('app.timezone'))
+                                ->displayFormat('M j, Y H:i:s')
+                                ->nullable()
+                                ->visible(fn (Get $get): bool => $get('broadcast_enabled') && $get('broadcast_schedule_enabled'))
+                                ->afterStateUpdated(function ($state, $record) {
+                                    if ($state && $record) {
+                                        $scheduledTime = \Carbon\Carbon::parse($state);
+                                        if ($scheduledTime->isPast()) {
+                                            Notification::make()
+                                                ->warning()
+                                                ->title('Invalid Time')
+                                                ->body('Scheduled start time must be in the future.')
+                                                ->send();
+                                        }
                                     }
                                 }),
 
@@ -493,6 +529,7 @@ class NetworkResource extends Resource
                             ])->visible(fn (Get $get): bool => $get('broadcast_enabled')),
 
                             Section::make('Transcoding')
+                                ->compact()
                                 ->description('Control how media is transcoded')
                                 ->schema([
                                     Toggle::make('transcode_on_server')
@@ -529,10 +566,10 @@ class NetworkResource extends Resource
                                             ->nullable(),
                                     ])->visible(fn (Get $get): bool => $get('transcode_on_server')),
                                 ])
-                                ->collapsed()
                                 ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
 
                             Section::make('Broadcast Status')
+                                ->compact()
                                 ->schema([
                                     TextInput::make('broadcast_status')
                                         ->label('Status')
@@ -626,6 +663,9 @@ class NetworkResource extends Resource
                         if (! $record->broadcast_enabled) {
                             return 'Disabled';
                         }
+                        if ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                            return 'Scheduled';
+                        }
                         if ($record->isBroadcasting()) {
                             return 'Live';
                         }
@@ -635,9 +675,17 @@ class NetworkResource extends Resource
 
                         return 'Starting';
                     })
+                    ->description(function (Network $record): ?string {
+                        if ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                            return 'Starts: '.$record->broadcast_scheduled_start->diffForHumans();
+                        }
+
+                        return null;
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'Live' => 'success',
                         'Starting' => 'info',
+                        'Scheduled' => 'warning',
                         'Stopped' => 'warning',
                         'Disabled' => 'gray',
                         default => 'gray',
@@ -645,6 +693,7 @@ class NetworkResource extends Resource
                     ->icon(fn (string $state): string => match ($state) {
                         'Live' => 'heroicon-o-signal',
                         'Starting' => 'heroicon-o-arrow-path',
+                        'Scheduled' => 'heroicon-o-clock',
                         'Stopped' => 'heroicon-o-stop',
                         'Disabled' => 'heroicon-o-no-symbol',
                         default => 'heroicon-o-question-mark-circle',
@@ -686,7 +735,15 @@ class NetworkResource extends Resource
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Start Broadcasting')
-                        ->modalDescription('Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.')
+                        ->modalDescription(function (Network $record): string {
+                            $base = 'Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.';
+
+                            if ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                                return $base."\n\nNote: Broadcast is scheduled to start at ".$record->broadcast_scheduled_start->format('M j, Y H:i:s').' ('.$record->broadcast_scheduled_start->diffForHumans().')';
+                            }
+
+                            return $base;
+                        })
                         ->visible(fn (Network $record): bool => $record->broadcast_enabled && ! $record->isBroadcasting())
                         ->disabled(fn (Network $record): bool => $record->network_playlist_id === null || $record->programmes()->count() === 0)
                         ->tooltip(function (Network $record): ?string {
@@ -701,6 +758,10 @@ class NetworkResource extends Resource
                         })
                         ->action(function (Network $record) {
                             $service = app(NetworkBroadcastService::class);
+
+                            // Mark as requested so worker will start it when time comes
+                            $record->update(['broadcast_requested' => true]);
+
                             $result = $service->start($record);
 
                             if ($result) {
@@ -708,6 +769,12 @@ class NetworkResource extends Resource
                                     ->success()
                                     ->title('Broadcast Started')
                                     ->body("Broadcasting started for {$record->name}")
+                                    ->send();
+                            } elseif ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                                Notification::make()
+                                    ->info()
+                                    ->title('Broadcast Scheduled')
+                                    ->body("Broadcast will start at {$record->broadcast_scheduled_start->format('M j, Y H:i:s')} ({$record->broadcast_scheduled_start->diffForHumans()})")
                                     ->send();
                             } else {
                                 Notification::make()

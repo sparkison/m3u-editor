@@ -20,6 +20,13 @@ This document explains the features and technical details of the Network broadca
 - Clean up old HLS files: `php artisan hls:gc [--dry-run] [--threshold=<s>]`
 - Regenerate schedules (hourly job exists): `php artisan networks:regenerate-schedules`
 
+**Scheduled Broadcasts:**
+- Networks can be configured to wait until a specific date/time before starting
+- Enable "Schedule Start Time" toggle in Broadcast Settings tab
+- Set a future date/time (down to the second) for when broadcast should begin
+- The broadcast worker will automatically start the stream when the scheduled time is reached
+- Scheduled networks show status "Scheduled" with countdown in the networks list
+
 Tip: Use `--dry-run` on `hls:gc` to preview deletions before actual cleanup. ✅
 
 ---

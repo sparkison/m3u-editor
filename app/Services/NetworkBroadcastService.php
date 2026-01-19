@@ -37,6 +37,19 @@ class NetworkBroadcastService
             return false;
         }
 
+        // Check if scheduled start is enabled and we haven't reached the time yet
+        if ($network->broadcast_schedule_enabled && $network->broadcast_scheduled_start) {
+            if (now()->lt($network->broadcast_scheduled_start)) {
+                Log::info('Cannot start broadcast - waiting for scheduled start time', [
+                    'network_id' => $network->id,
+                    'scheduled_start' => $network->broadcast_scheduled_start->toIso8601String(),
+                    'seconds_remaining' => now()->diffInSeconds($network->broadcast_scheduled_start, false),
+                ]);
+
+                return false;
+            }
+        }
+
         // Check if already broadcasting
         if ($this->isProcessRunning($network)) {
             Log::info('Broadcast already running', [
@@ -788,6 +801,23 @@ class NetworkBroadcastService
             }
 
             return $result;
+        }
+
+        // Check if scheduled start time is enabled and we haven't reached it yet
+        if ($network->broadcast_schedule_enabled && $network->broadcast_scheduled_start) {
+            if (now()->lt($network->broadcast_scheduled_start)) {
+                // Not time yet - ensure not running
+                if ($network->broadcast_pid !== null) {
+                    $this->stop($network);
+                    $result['action'] = 'stopped_waiting_for_schedule';
+                } else {
+                    $result['action'] = 'waiting_for_scheduled_start';
+                    $result['scheduled_start'] = $network->broadcast_scheduled_start->toIso8601String();
+                    $result['seconds_until_start'] = now()->diffInSeconds($network->broadcast_scheduled_start, false);
+                }
+
+                return $result;
+            }
         }
 
         // Check if process is still running
