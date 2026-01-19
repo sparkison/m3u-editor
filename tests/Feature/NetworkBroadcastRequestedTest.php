@@ -3,9 +3,6 @@
 use App\Models\Network;
 use App\Models\NetworkProgramme;
 use App\Services\NetworkBroadcastService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(Tests\TestCase::class, RefreshDatabase::class);
 
 it('does not auto-start broadcast when broadcast_requested is false', function () {
     $network = Network::factory()->create([
