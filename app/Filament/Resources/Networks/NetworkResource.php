@@ -710,86 +710,6 @@ class NetworkResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    Action::make('startBroadcast')
-                        ->label('Start Broadcast')
-                        ->icon('heroicon-o-play')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Start Broadcasting')
-                        ->modalDescription(function (Network $record): string {
-                            $base = 'Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.';
-
-                            if ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
-                                return $base."\n\nNote: Broadcast is scheduled to start at ".$record->broadcast_scheduled_start->format('M j, Y H:i:s').' ('.$record->broadcast_scheduled_start->diffForHumans().')';
-                            }
-
-                            return $base;
-                        })
-                        ->visible(fn (Network $record): bool => $record->broadcast_enabled && ! $record->isBroadcasting())
-                        ->disabled(fn (Network $record): bool => $record->network_playlist_id === null || $record->programmes()->count() === 0)
-                        ->tooltip(function (Network $record): ?string {
-                            if ($record->network_playlist_id === null) {
-                                return 'Assign to a playlist first';
-                            }
-                            if ($record->programmes()->count() === 0) {
-                                return 'Generate schedule first';
-                            }
-
-                            return null;
-                        })
-                        ->action(function (Network $record) {
-                            $service = app(NetworkBroadcastService::class);
-
-                            // Mark as requested so worker will start it when time comes
-                            $record->update(['broadcast_requested' => true]);
-
-                            $result = $service->start($record);
-
-                            // Refresh to get updated error message
-                            $record->refresh();
-
-                            if ($result) {
-                                Notification::make()
-                                    ->success()
-                                    ->title('Broadcast Started')
-                                    ->body("Broadcasting started for {$record->name}")
-                                    ->send();
-                            } elseif ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
-                                Notification::make()
-                                    ->info()
-                                    ->title('Broadcast Scheduled')
-                                    ->body("Broadcast will start at {$record->broadcast_scheduled_start->format('M j, Y H:i:s')} ({$record->broadcast_scheduled_start->diffForHumans()})")
-                                    ->send();
-                            } else {
-                                $errorMsg = $record->broadcast_error ?? 'Could not start broadcast. Check that there is content scheduled.';
-
-                                Notification::make()
-                                    ->danger()
-                                    ->title('Failed to Start')
-                                    ->body($errorMsg)
-                                    ->send();
-                            }
-                        }),
-
-                    Action::make('stopBroadcast')
-                        ->label('Stop Broadcast')
-                        ->icon('heroicon-o-stop')
-                        ->color('danger')
-                        ->requiresConfirmation()
-                        ->modalHeading('Stop Broadcasting')
-                        ->modalDescription('Stop the current broadcast. Viewers will be disconnected.')
-                        ->visible(fn (Network $record): bool => $record->isBroadcasting())
-                        ->action(function (Network $record) {
-                            $service = app(NetworkBroadcastService::class);
-                            $service->stop($record);
-
-                            Notification::make()
-                                ->warning()
-                                ->title('Broadcast Stopped')
-                                ->body("Broadcasting stopped for {$record->name}")
-                                ->send();
-                        }),
-
                     Action::make('generateSchedule')
                         ->label('Generate Schedule')
                         ->icon('heroicon-o-calendar')
@@ -818,6 +738,85 @@ class NetworkResource extends Resource
                     DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
+                Action::make('startBroadcast')
+                    ->label('Start Broadcast')
+                    ->icon('heroicon-o-play')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Start Broadcasting')
+                    ->modalDescription(function (Network $record): string {
+                        $base = 'Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.';
+
+                        if ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                            return $base."\n\nNote: Broadcast is scheduled to start at ".$record->broadcast_scheduled_start->format('M j, Y H:i:s').' ('.$record->broadcast_scheduled_start->diffForHumans().')';
+                        }
+
+                        return $base;
+                    })
+                    ->visible(fn (Network $record): bool => $record->broadcast_enabled && ! $record->isBroadcasting())
+                    ->disabled(fn (Network $record): bool => $record->network_playlist_id === null || $record->programmes()->count() === 0)
+                    ->tooltip(function (Network $record): ?string {
+                        if ($record->network_playlist_id === null) {
+                            return 'Assign to a playlist first';
+                        }
+                        if ($record->programmes()->count() === 0) {
+                            return 'Generate schedule first';
+                        }
+
+                        return null;
+                    })
+                    ->action(function (Network $record) {
+                        $service = app(NetworkBroadcastService::class);
+
+                        // Mark as requested so worker will start it when time comes
+                        $record->update(['broadcast_requested' => true]);
+
+                        $result = $service->start($record);
+
+                        // Refresh to get updated error message
+                        $record->refresh();
+
+                        if ($result) {
+                            Notification::make()
+                                ->success()
+                                ->title('Broadcast Started')
+                                ->body("Broadcasting started for {$record->name}")
+                                ->send();
+                        } elseif ($record->broadcast_schedule_enabled && $record->broadcast_scheduled_start && now()->lt($record->broadcast_scheduled_start)) {
+                            Notification::make()
+                                ->info()
+                                ->title('Broadcast Scheduled')
+                                ->body("Broadcast will start at {$record->broadcast_scheduled_start->format('M j, Y H:i:s')} ({$record->broadcast_scheduled_start->diffForHumans()})")
+                                ->send();
+                        } else {
+                            $errorMsg = $record->broadcast_error ?? 'Could not start broadcast. Check that there is content scheduled.';
+
+                            Notification::make()
+                                ->danger()
+                                ->title('Failed to Start')
+                                ->body($errorMsg)
+                                ->send();
+                        }
+                    })->button()->hiddenLabel()->size('sm'),
+
+                Action::make('stopBroadcast')
+                    ->label('Stop Broadcast')
+                    ->icon('heroicon-o-stop')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Stop Broadcasting')
+                    ->modalDescription('Stop the current broadcast. Viewers will be disconnected.')
+                    ->visible(fn (Network $record): bool => $record->isBroadcasting())
+                    ->action(function (Network $record) {
+                        $service = app(NetworkBroadcastService::class);
+                        $service->stop($record);
+
+                        Notification::make()
+                            ->warning()
+                            ->title('Broadcast Stopped')
+                            ->body("Broadcasting stopped for {$record->name}")
+                            ->send();
+                    })->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
