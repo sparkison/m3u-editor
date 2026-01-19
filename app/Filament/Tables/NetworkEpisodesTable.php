@@ -2,7 +2,9 @@
 
 namespace App\Filament\Tables;
 
+use App\Models\Category;
 use App\Models\Episode;
+use App\Models\Series;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -13,16 +15,14 @@ class NetworkEpisodesTable
 {
     public static function configure(Table $table): Table
     {
-        $arguments = $table->getArguments();
-        $playlistId = $arguments['playlist_id'] ?? null;
-
         return $table
             ->query(fn (): Builder => Episode::query())
-            ->modifyQueryUsing(function (Builder $query) use ($playlistId): Builder {
+            ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
+                $arguments = $table->getArguments();
 
                 $query->with(['series', 'season', 'playlist']);
 
-                if ($playlistId) {
+                if ($playlistId = $arguments['playlist_id'] ?? null) {
                     $query->where('playlist_id', $playlistId);
                 }
 
@@ -34,9 +34,11 @@ class NetworkEpisodesTable
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->defaultGroup('series.name')
+            ->defaultSort('series.name', 'asc')
+            ->defaultSort('episode_num', 'asc')
             ->paginated([15, 25, 50, 100])
             ->defaultPaginationPageOption(15)
-            ->defaultSort('title', 'asc')
             ->columns([
                 ImageColumn::make('info.movie_image')
                     ->label('Cover')
@@ -58,6 +60,13 @@ class NetworkEpisodesTable
                 TextColumn::make('series.name')
                     ->label('Series')
                     ->searchable()
+                    ->toggleable()
+                    ->sortable(),
+
+                TextColumn::make('category.name')
+                    ->label('Category')
+                    ->searchable()
+                    ->toggleable()
                     ->sortable(),
 
                 TextColumn::make('season')
@@ -79,21 +88,12 @@ class NetworkEpisodesTable
             ->filters([
                 SelectFilter::make('series')
                     ->label('Series')
-                    ->options(fn () => Episode::query()
-                        ->distinct()
-                        ->pluck('series_id', 'series_id')
-                        ->mapWithKeys(function ($seriesId) {
-                            $series = \App\Models\Series::find($seriesId);
-
-                            return [$seriesId => $series ? $series->name : 'Unknown'];
-                        })
-                        ->toArray(),
-                    )
+                    ->options(fn () => Series::where('playlist_id', $table->getArguments()['playlist_id'] ?? null)->pluck('name', 'id'))
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('category')
-                    ->label('Category')
-                    ->relationship('series.category', 'name')
+                    ->label(label: 'Category')
+                    ->options(fn () => Category::where('playlist_id', $table->getArguments()['playlist_id'] ?? null)->pluck('name', 'id'))
                     ->searchable()
                     ->preload(),
             ])

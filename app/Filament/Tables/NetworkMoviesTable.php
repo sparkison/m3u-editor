@@ -3,6 +3,7 @@
 namespace App\Filament\Tables;
 
 use App\Models\Channel;
+use App\Models\Group;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -13,24 +14,19 @@ class NetworkMoviesTable
 {
     public static function configure(Table $table): Table
     {
-        $arguments = $table->getArguments();
-        $playlistId = $arguments['playlist_id'] ?? null;
-
         return $table
             ->query(fn (): Builder => Channel::query())
-            ->modifyQueryUsing(function (Builder $query) use ($playlistId): Builder {
+            ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
+                $arguments = $table->getArguments();
 
                 $query->with(['playlist', 'group']);
 
-                if ($playlistId) {
+                if ($playlistId = $arguments['playlist_id'] ?? null) {
                     $query->where('playlist_id', $playlistId);
                 }
 
                 // Only show VOD channels (movies)
                 $query->where('is_vod', true);
-
-                // Only show enabled movies
-                $query->where('enabled', true);
 
                 return $query;
             })
@@ -78,7 +74,7 @@ class NetworkMoviesTable
             ->filters([
                 SelectFilter::make('group')
                     ->label('Group')
-                    ->relationship('group', 'name', fn ($query) => $query->where('type', 'vod'))
+                    ->options(fn () => Group::where('playlist_id', $table->getArguments()['playlist_id'] ?? null)->pluck('name', 'id'))
                     ->searchable()
                     ->preload(),
             ])
