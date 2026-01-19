@@ -1,19 +1,10 @@
 <?php
 
-use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Schedule;
 
 /*
  * Register schedules
  */
-
-// Determine HLS cleanup interval from settings (defaults to 5 minutes)
-$hlsCleanupInterval = 5;
-try {
-    $hlsCleanupInterval = app(GeneralSettings::class)->broadcast_segment_cleanup_interval ?? 5;
-} catch (\Throwable $e) {
-    // Settings unavailable, use default
-}
 
 // Check for updates
 Schedule::command('app:update-check')
@@ -76,7 +67,5 @@ Schedule::command('networks:regenerate-schedules')
     ->hourly()
     ->withoutOverlapping();
 
-// Cleanup old HLS segments from network broadcasts
-Schedule::command('network:cleanup-segments')
-    ->cron("*/{$hlsCleanupInterval} * * * *")
-    ->withoutOverlapping();
+// Note: HLS segment cleanup is handled automatically by FFmpeg's delete_segments flag
+// Orphaned segments from crashes are cleaned up in NetworkBroadcastService::cleanupHlsForNetwork()

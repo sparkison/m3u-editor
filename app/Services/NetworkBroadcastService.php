@@ -608,6 +608,7 @@ class NetworkBroadcastService
 
     /**
      * Remove HLS files and kill promoter loop for a network.
+     * Called when stopping broadcast or cleaning up after crashes.
      */
     protected function cleanupHlsForNetwork(Network $network): void
     {
@@ -617,9 +618,14 @@ class NetworkBroadcastService
             return;
         }
 
+        $deletedPlaylists = 0;
+        $deletedSegments = 0;
+
+        // Clean up playlists
         foreach (File::glob("{$hlsPath}/*.m3u8") as $file) {
             try {
                 File::delete($file);
+                $deletedPlaylists++;
             } catch (\Throwable $e) {
                 Log::warning('Failed to delete m3u8', ['file' => $file, 'error' => $e->getMessage()]);
             }
@@ -628,25 +634,38 @@ class NetworkBroadcastService
         foreach (File::glob("{$hlsPath}/*.m3u8.tmp") as $file) {
             try {
                 File::delete($file);
+                $deletedPlaylists++;
             } catch (\Throwable $e) {
                 Log::warning('Failed to delete tmp m3u8', ['file' => $file, 'error' => $e->getMessage()]);
             }
         }
 
+        // Clean up orphaned segments (from crashes where FFmpeg couldn't delete them)
         foreach (File::glob("{$hlsPath}/*.ts") as $file) {
             try {
                 File::delete($file);
+                $deletedSegments++;
             } catch (\Throwable $e) {
                 Log::warning('Failed to delete segment', ['file' => $file, 'error' => $e->getMessage()]);
             }
         }
 
+        if ($deletedPlaylists > 0 || $deletedSegments > 0) {
+            Log::info('Cleaned up HLS files', [
+                'network_id' => $network->id,
+                'playlists' => $deletedPlaylists,
+                'segments' => $deletedSegments,
+            ]);
+        }
+
+        // Kill promoter loop process (cross-platform with posix_kill)
         $promotePidFile = "{$hlsPath}/promote_pid";
         if (File::exists($promotePidFile)) {
             try {
                 $promotePid = (int) File::get($promotePidFile);
-                if ($promotePid > 0 && file_exists("/proc/{$promotePid}")) {
+                if ($promotePid > 0 && @posix_kill($promotePid, 0)) {
                     posix_kill($promotePid, SIGKILL);
+                    Log::debug('Killed promoter loop', ['network_id' => $network->id, 'pid' => $promotePid]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('Failed to kill promoter on cleanup', ['network_id' => $network->id, 'error' => $e->getMessage()]);
@@ -658,34 +677,6 @@ class NetworkBroadcastService
                 // ignore
             }
         }
-    }
-
-    /**
-     * Clean up old HLS segments for a network.
-     */
-    public function cleanupSegments(Network $network): int
-    {
-        $hlsPath = $network->getHlsStoragePath();
-
-        if (! File::isDirectory($hlsPath)) {
-            return 0;
-        }
-
-        $deleted = 0;
-        $files = File::glob("{$hlsPath}/*.ts");
-
-        // Keep segments newer than 2 minutes
-        $threshold = Carbon::now()->subMinutes(2);
-
-        foreach ($files as $file) {
-            $mtime = Carbon::createFromTimestamp(File::lastModified($file));
-            if ($mtime->lt($threshold)) {
-                File::delete($file);
-                $deleted++;
-            }
-        }
-
-        return $deleted;
     }
 
     /**
@@ -872,6 +863,17 @@ class NetworkBroadcastService
                 'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
             ]);
 
+            // Clean up any orphaned HLS files from the crash
+            // When FFmpeg crashes, it can't clean up its own segments
+            try {
+                $this->cleanupHlsForNetwork($network);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to cleanup orphaned HLS files after crash', [
+                    'network_id' => $network->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // Emit a metric/log entry for the crash
             Log::warning('HLS_METRIC: broadcast_crashed', [
                 'network_id' => $network->id,
@@ -932,18 +934,8 @@ class NetworkBroadcastService
         $result['action'] = 'monitoring';
         $result['remaining_seconds'] = $remaining;
 
-        // Periodically cleanup old HLS segments to prevent disk growth
-        try {
-            $deleted = $this->cleanupSegments($network);
-            if ($deleted > 0) {
-                $result['deleted_old_segments'] = $deleted;
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Failed to clean up HLS segments', [
-                'network_id' => $network->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        // Note: Segment cleanup is handled automatically by FFmpeg's delete_segments flag
+        // No manual cleanup needed during normal operation
 
         return $result;
     }
