@@ -710,25 +710,6 @@ class NetworkResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    Action::make('generateSchedule')
-                        ->label('Generate Schedule')
-                        ->icon('heroicon-o-calendar')
-                        ->requiresConfirmation()
-                        ->modalHeading('Generate Schedule')
-                        ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
-                        ->disabled(fn (Network $record): bool => $record->network_playlist_id === null)
-                        ->tooltip(fn (Network $record): ?string => $record->network_playlist_id === null ? 'Assign to a playlist first' : null)
-                        ->action(function (Network $record) {
-                            $service = app(NetworkScheduleService::class);
-                            $service->generateSchedule($record);
-
-                            Notification::make()
-                                ->success()
-                                ->title('Schedule Generated')
-                                ->body("Generated programme schedule for {$record->name}")
-                                ->send();
-                        }),
-
                     Action::make('startBroadcast')
                         ->label('Start Broadcast')
                         ->icon('heroicon-o-play')
@@ -806,6 +787,25 @@ class NetworkResource extends Resource
                                 ->warning()
                                 ->title('Broadcast Stopped')
                                 ->body("Broadcasting stopped for {$record->name}")
+                                ->send();
+                        }),
+
+                    Action::make('generateSchedule')
+                        ->label('Generate Schedule')
+                        ->icon('heroicon-o-calendar')
+                        ->requiresConfirmation()
+                        ->modalHeading('Generate Schedule')
+                        ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
+                        ->disabled(fn (Network $record): bool => $record->network_playlist_id === null)
+                        ->tooltip(fn (Network $record): ?string => $record->network_playlist_id === null ? 'Assign to a playlist first' : null)
+                        ->action(function (Network $record) {
+                            $service = app(NetworkScheduleService::class);
+                            $service->generateSchedule($record);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Schedule Generated')
+                                ->body("Generated programme schedule for {$record->name}")
                                 ->send();
                         }),
 
