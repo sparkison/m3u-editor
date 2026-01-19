@@ -8,7 +8,7 @@ use App\Models\NetworkProgramme;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
  * NetworkBroadcastService - Manages continuous HLS broadcasting for Networks.
@@ -515,29 +515,31 @@ class NetworkBroadcastService
         // Create output log file
         $logFile = $network->getHlsStoragePath().'/ffmpeg.log';
 
-        // Start process in background using nohup
-        $fullCommand = "nohup {$commandString} >> ".escapeshellarg($logFile).' 2>&1 & echo $!';
+        // Set PATH explicitly to include common FFmpeg installation locations
+        // This ensures ffmpeg is found in both local (Homebrew) and Docker environments
+        $pathPrefix = 'PATH=/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH';
+        $fullCommand = "{$pathPrefix} {$commandString} >> ".escapeshellarg($logFile).' 2>&1';
 
-        $output = [];
-        $returnCode = 0;
-        exec($fullCommand, $output, $returnCode);
+        // Use SymfonyProcess to start FFmpeg in background (like Channel model uses for ffprobe)
+        $process = SymfonyProcess::fromShellCommandline($fullCommand);
+        $process->setTimeout(null); // No timeout for long-running broadcast
+        $process->start();
 
-        if ($returnCode !== 0 || empty($output[0])) {
-            Log::error('Failed to start FFmpeg process', [
+        // Get the PID
+        $pid = $process->getPid();
+
+        if (! $pid) {
+            Log::error('Failed to start FFmpeg process - no PID', [
                 'network_id' => $network->id,
-                'return_code' => $returnCode,
-                'output' => $output,
             ]);
 
             return false;
         }
 
-        $pid = (int) $output[0];
-
         // Wait a moment and verify process is still running
         usleep(500000); // 500ms
 
-        if (! file_exists("/proc/{$pid}")) {
+        if (! $process->isRunning()) {
             $logContent = @file_get_contents($logFile);
 
             Log::error('FFmpeg process exited immediately', [
@@ -577,7 +579,10 @@ class NetworkBroadcastService
         // Start a small promoter loop to atomically promote temporary playlists
         try {
             $hlsPath = $network->getHlsStoragePath();
-            $promotePidCmd = "nohup sh -c 'while sleep 1; do php /var/www/html/artisan network:promote-tmp-playlist {$network->uuid} >/dev/null 2>&1; done' >/dev/null 2>&1 & echo $!";
+            $artisanPath = base_path('artisan');
+            $phpBinary = PHP_BINARY; // Use the same PHP binary running this code
+
+            $promotePidCmd = "nohup sh -c 'while sleep 1; do {$phpBinary} ".escapeshellarg($artisanPath)." network:promote-tmp-playlist {$network->uuid} >/dev/null 2>&1; done' >/dev/null 2>&1 & echo $!";
             $output = [];
             $rc = 0;
             exec($promotePidCmd, $output, $rc);
