@@ -392,6 +392,15 @@ class NetworkResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
+                                ->hintAction(
+                                    Action::make('qrCode')
+                                        ->label('QR Code')
+                                        ->icon('heroicon-o-qr-code')
+                                        ->modalHeading('EPG URL')
+                                        ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record?->epg_url]))
+                                        ->modalWidth('sm')
+                                        ->visible(fn ($record) => $record?->epg_url !== null)
+                                )
                                 ->hint(fn ($record) => $record?->epg_url ? view('components.copy-to-clipboard', ['text' => $record->epg_url, 'position' => 'left']) : null),
 
                             TextInput::make('schedule_info')
@@ -426,6 +435,15 @@ class NetworkResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record?->stream_url ?? 'Save network first')
+                                ->hintAction(
+                                    Action::make('qrCode')
+                                        ->label('QR Code')
+                                        ->icon('heroicon-o-qr-code')
+                                        ->modalHeading('Stream URL')
+                                        ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record?->stream_url]))
+                                        ->modalWidth('sm')
+                                        ->visible(fn ($record) => $record?->stream_url !== null)
+                                )
                                 ->hint(fn ($record) => $record?->stream_url ? view('components.copy-to-clipboard', ['text' => $record->stream_url, 'position' => 'left']) : null),
 
                             TextInput::make('m3u_url')
@@ -433,6 +451,15 @@ class NetworkResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
+                                ->hintAction(
+                                    Action::make('qrCode')
+                                        ->label('QR Code')
+                                        ->icon('heroicon-o-qr-code')
+                                        ->modalHeading('M3U Playlist URL')
+                                        ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first']))
+                                        ->modalWidth('sm')
+                                        ->visible(fn ($record) => $record?->uuid !== null)
+                                )
                                 ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
                         ]),
                 ])
@@ -588,6 +615,15 @@ class NetworkResource extends Resource
                                         ->disabled()
                                         ->dehydrated(false)
                                         ->formatStateUsing(fn ($record) => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first')
+                                        ->hintAction(
+                                            Action::make('qrCode')
+                                                ->label('QR Code')
+                                                ->icon('heroicon-o-qr-code')
+                                                ->modalHeading('HLS Playlist URL')
+                                                ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first']))
+                                                ->modalWidth('sm')
+                                                ->visible(fn ($record) => $record?->uuid !== null)
+                                        )
                                         ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.hls.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
                                 ])
                                 ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
