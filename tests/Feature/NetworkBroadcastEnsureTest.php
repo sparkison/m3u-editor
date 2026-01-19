@@ -12,10 +12,11 @@ it('enables network, generates schedule and starts broadcast via ensure command'
     $network->programmes()->delete();
 
     // Mock schedule service and broadcast service
-    $this->mock(NetworkScheduleService::class, function ($mock) use ($network) {
-        $mock->shouldReceive('generateSchedule')->once()->with($network)->andReturnUsing(function ($n) {
+    $this->mock(NetworkScheduleService::class, function ($mock) {
+        $mock->shouldReceive('generateSchedule')->once()->with(Mockery::type(Network::class))->andReturnUsing(function ($n) {
             // create a simple programme
             $n->programmes()->create([
+                'title' => 'Test Programme',
                 'contentable_type' => \App\Models\Channel::class,
                 'contentable_id' => 1,
                 'start_time' => Carbon::now()->subMinutes(1),

@@ -16,15 +16,18 @@ beforeEach(function () {
     $this->playlist = Playlist::factory()->create();
     $this->series = Series::factory()->for($this->playlist)->create();
 
-    Episode::factory()->for($this->series)->count(40)->sequence(fn ($s) => ['season' => 1, 'episode_num' => $s + 1])->create();
+    Episode::factory()->for($this->series)->count(40)->sequence(fn ($sequence) => ['season' => 1, 'episode_num' => $sequence->index + 1])->create();
 
-    $this->network = Network::factory()->create([
+    // Create media server integration linked to the playlist
+    $integration = \App\Models\MediaServerIntegration::factory()->create([
+        'user_id' => $this->user->id,
         'playlist_id' => $this->playlist->id,
-        'media_server_integration_id' => null,
     ]);
 
-    // Link media server integration via playlist relationship to satisfy guard
-    $this->network->mediaServerIntegration()->associate($this->playlist)->saveQuietly();
+    $this->network = Network::factory()->create([
+        'user_id' => $this->user->id,
+        'media_server_integration_id' => $integration->id,
+    ]);
 });
 
 it('paginates and searches episodes and can bulk add them', function () {

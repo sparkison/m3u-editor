@@ -563,6 +563,9 @@ class NetworkResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
             ->columns([
                 TextColumn::make('name')
                     ->label('Name')
