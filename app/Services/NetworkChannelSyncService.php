@@ -82,8 +82,8 @@ class NetworkChannelSyncService
                 'channel' => $network->channel_number,
                 'enabled' => $network->enabled,
                 'is_vod' => false,
-                'stream_id' => 'network-' . $network->id,
-                'source_id' => 'network-' . $network->id,
+                'stream_id' => 'network-'.$network->id,
+                'source_id' => 'network-'.$network->id,
             ]
         );
 

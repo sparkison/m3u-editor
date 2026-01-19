@@ -1,10 +1,9 @@
 <?php
 
+use App\Models\Channel;
 use App\Models\Network;
 use App\Models\NetworkProgramme;
-use App\Models\Channel;
 use App\Models\User;
-use Carbon\Carbon;
 
 beforeEach(function () {
     $this->user = User::factory()->create();

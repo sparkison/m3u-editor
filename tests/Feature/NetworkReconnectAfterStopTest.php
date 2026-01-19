@@ -14,7 +14,7 @@ it('reconnect after stop cannot resume HLS playlist or segments', function () {
 
     // Create a playlist and a segment to simulate an active broadcast
     File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nlive000001.ts\n");
-    File::put("{$hlsPath}/live000001.ts", "segment-data");
+    File::put("{$hlsPath}/live000001.ts", 'segment-data');
 
     // Simulate broadcast as "running" by setting started_at and a bogus pid
     $network->update(['broadcast_started_at' => now(), 'broadcast_pid' => 999999]);

@@ -28,6 +28,7 @@ it('enables network, generates schedule and starts broadcast via ensure command'
     $this->mock(NetworkBroadcastService::class, function ($mock) {
         $mock->shouldReceive('restart')->andReturnUsing(function ($nw) {
             $nw->update(['broadcast_pid' => 22222, 'broadcast_started_at' => Carbon::now()]);
+
             return true;
         });
     });

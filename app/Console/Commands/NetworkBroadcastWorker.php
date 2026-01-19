@@ -68,7 +68,7 @@ class NetworkBroadcastWorker extends Command
         }
 
         // Continuous loop with resilience (catch exceptions and apply exponential backoff)
-        $this->info("Running in continuous mode (Ctrl+C to stop)...");
+        $this->info('Running in continuous mode (Ctrl+C to stop)...');
         $this->info("Tick interval: {$interval} seconds");
 
         $backoff = 1; // seconds
@@ -120,7 +120,7 @@ class NetworkBroadcastWorker extends Command
         }
 
         // Continuous loop with resilience (catch exceptions and apply exponential backoff)
-        $this->info("Running in continuous mode (Ctrl+C to stop)...");
+        $this->info('Running in continuous mode (Ctrl+C to stop)...');
         $this->info("Tick interval: {$interval} seconds");
 
         $backoff = 1; // seconds

@@ -40,14 +40,14 @@ class NetworkContent extends Model
         // When content is deleted, check if network has any remaining content
         static::deleted(function (NetworkContent $networkContent) {
             $network = $networkContent->network;
-            
+
             if (! $network) {
                 return;
             }
 
             // Check if this was the last content item
             $remainingContent = $network->networkContent()->count();
-            
+
             if ($remainingContent === 0) {
                 \Illuminate\Support\Facades\Log::info('Last content removed from network, triggering cleanup', [
                     'network_id' => $network->id,

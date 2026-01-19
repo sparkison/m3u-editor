@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 uses(Tests\TestCase::class);
 it('promotes tmp playlist to live when stable', function () {
     // Create a non-persisted Network model with a UUID so we don't need DB/factory
-    $network = new Network();
+    $network = new Network;
     $network->uuid = (string) Str::uuid();
 
     $hlsPath = $network->getHlsStoragePath();

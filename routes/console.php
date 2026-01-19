@@ -53,6 +53,7 @@ Schedule::command('network:cleanup-segments')
     ->cron(function () {
         try {
             $interval = app(\App\Settings\GeneralSettings::class)->broadcast_segment_cleanup_interval ?? 5;
+
             return "*/{$interval} * * * *";
         } catch (\Throwable $e) {
             return '*/5 * * * *'; // Fallback to 5 minutes if settings unavailable

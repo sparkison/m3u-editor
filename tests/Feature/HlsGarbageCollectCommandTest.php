@@ -1,11 +1,9 @@
 <?php
 
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\Filesystem\Filesystem;
 
 beforeEach(function () {
-    $this->files = new Filesystem();
+    $this->files = new Filesystem;
 
     // Ensure base dirs exist
     $this->networkBase = storage_path('app/networks');
@@ -16,10 +14,10 @@ beforeEach(function () {
 });
 
 it('shows files in dry-run and does not delete them', function () {
-    $networkDir = $this->networkBase . '/test-network-dry';
+    $networkDir = $this->networkBase.'/test-network-dry';
     $this->files->ensureDirectoryExists($networkDir);
 
-    $oldFile = $networkDir . '/old0001.ts';
+    $oldFile = $networkDir.'/old0001.ts';
     file_put_contents($oldFile, 'x');
     touch($oldFile, time() - 7200 - 10);
 
@@ -29,10 +27,10 @@ it('shows files in dry-run and does not delete them', function () {
 });
 
 it('deletes old files and removes empty directories', function () {
-    $networkDir = $this->networkBase . '/test-network-clean';
+    $networkDir = $this->networkBase.'/test-network-clean';
     $this->files->ensureDirectoryExists($networkDir);
 
-    $oldFile = $networkDir . '/old0002.ts';
+    $oldFile = $networkDir.'/old0002.ts';
     file_put_contents($oldFile, 'x');
     touch($oldFile, time() - 9000);
 

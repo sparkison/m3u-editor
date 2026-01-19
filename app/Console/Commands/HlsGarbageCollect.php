@@ -34,6 +34,7 @@ class HlsGarbageCollect extends Command
         $enabled = filter_var(env('HLS_GC_ENABLED', true), FILTER_VALIDATE_BOOLEAN);
         if (! $enabled) {
             $this->info('HLS garbage collection is disabled (HLS_GC_ENABLED=false)');
+
             return 0;
         }
 
@@ -42,7 +43,7 @@ class HlsGarbageCollect extends Command
         $threshold = (int) $this->option('threshold');
         $dryRun = (bool) $this->option('dry-run');
 
-        $this->info("Starting HLS garbage collection (threshold={$threshold}s, interval={$interval}s)" . ($dryRun ? ' [dry-run]' : ''));
+        $this->info("Starting HLS garbage collection (threshold={$threshold}s, interval={$interval}s)".($dryRun ? ' [dry-run]' : ''));
 
         do {
             $this->runOnce($files, $threshold, $dryRun);

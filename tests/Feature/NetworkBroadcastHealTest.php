@@ -25,11 +25,12 @@ it('heals stale broadcast and restarts it using persisted reference', function (
     ]);
 
     // Mock the broadcast service to simulate a successful restart
-    $this->mock(NetworkBroadcastService::class, function ($mock) use ($network) {
+    $this->mock(NetworkBroadcastService::class, function ($mock) {
         $mock->shouldReceive('isProcessRunning')->andReturn(false);
         $mock->shouldReceive('start')->andReturnUsing(function ($nw) {
             // Simulate the start updating the model as executeCommand would
             $nw->update(['broadcast_pid' => 12345, 'broadcast_started_at' => Carbon::now()]);
+
             return true;
         });
     });

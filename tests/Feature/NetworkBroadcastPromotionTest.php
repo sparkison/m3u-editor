@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 it('promotes tmp playlist to live when stable (feature)', function () {
     // Use a real TestCase bootstrapped environment
-    $network = new Network();
+    $network = new Network;
     $network->uuid = (string) Str::uuid();
 
     $hlsPath = $network->getHlsStoragePath();

@@ -4,8 +4,8 @@ use App\Livewire\Filament\Networks\EpisodePicker;
 use App\Models\Episode;
 use App\Models\Network;
 use App\Models\NetworkContent;
-use App\Models\Series;
 use App\Models\Playlist;
+use App\Models\Series;
 use App\Models\User;
 use Livewire\Livewire;
 

@@ -153,7 +153,7 @@ class NetworkBroadcastService
 
             // Check if process is still running
             if (! $this->isProcessRunning($network)) {
-                    Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
+                Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
                 $network->update([
                     'broadcast_started_at' => null,
@@ -406,7 +406,7 @@ class NetworkBroadcastService
             // Jellyfin/Emby use ticks (100-nanosecond intervals)
             $params['StartTimeTicks'] = $seekSeconds * 10_000_000;
 
-            Log::debug("📍 Media server seek applied", [
+            Log::debug('📍 Media server seek applied', [
                 'network_id' => $network->id,
                 'item_id' => $itemId,
                 'seek_seconds' => $seekSeconds,
@@ -483,7 +483,7 @@ class NetworkBroadcastService
         $logFile = $network->getHlsStoragePath().'/ffmpeg.log';
 
         // Start process in background using nohup
-        $fullCommand = "nohup {$commandString} >> ".escapeshellarg($logFile)." 2>&1 & echo $!";
+        $fullCommand = "nohup {$commandString} >> ".escapeshellarg($logFile).' 2>&1 & echo $!';
 
         $output = [];
         $returnCode = 0;
@@ -680,6 +680,7 @@ class NetworkBroadcastService
             return true;
         } catch (\Throwable $e) {
             Log::warning('Failed to promote tmp playlist', ['network_id' => $network->id, 'error' => $e->getMessage()]);
+
             return false;
         }
     }

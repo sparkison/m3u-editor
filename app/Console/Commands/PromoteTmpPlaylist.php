@@ -20,6 +20,7 @@ class PromoteTmpPlaylist extends Command
             $network = Network::where('uuid', $networkArg)->orWhere('id', $networkArg)->firstOrFail();
         } catch (\Throwable $e) {
             $this->error('Network not found');
+
             return 1;
         }
 

@@ -42,7 +42,7 @@ class PlaylistInfo extends Component
 
             // Count totals for display in Playlist view tiles
             $totalNetworks = $networks->count();
-            $broadcastingCount = $networks->filter(fn($n) => $n->isBroadcasting())->count();
+            $broadcastingCount = $networks->filter(fn ($n) => $n->isBroadcasting())->count();
 
             return [
                 'is_network_playlist' => true,

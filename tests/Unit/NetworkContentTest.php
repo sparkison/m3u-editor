@@ -3,7 +3,7 @@
 use App\Models\NetworkContent;
 
 it('parses various duration formats to seconds', function () {
-    $model = new NetworkContent();
+    $model = new NetworkContent;
 
     // Use Closure::bind to call the protected method without using Reflection::setAccessible
     $call = \Closure::bind(function ($d) {

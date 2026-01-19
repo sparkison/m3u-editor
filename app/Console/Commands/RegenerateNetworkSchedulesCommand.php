@@ -91,7 +91,7 @@ class RegenerateNetworkSchedulesCommand extends Command
 
             $this->line("    Generated {$programmeCount} programmes until {$endDate}");
 
-            Log::info("Regenerated network schedule", [
+            Log::info('Regenerated network schedule', [
                 'network_id' => $network->id,
                 'network_name' => $network->name,
                 'programmes' => $programmeCount,
@@ -99,7 +99,7 @@ class RegenerateNetworkSchedulesCommand extends Command
         } catch (\Exception $e) {
             $this->error("    Failed: {$e->getMessage()}");
 
-            Log::error("Failed to regenerate network schedule", [
+            Log::error('Failed to regenerate network schedule', [
                 'network_id' => $network->id,
                 'network_name' => $network->name,
                 'error' => $e->getMessage(),

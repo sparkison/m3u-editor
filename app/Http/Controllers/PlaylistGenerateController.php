@@ -613,7 +613,7 @@ class PlaylistGenerateController extends Controller
                 $streamUrl = $network->stream_url;
 
                 // Build EXTINF line
-                $extInf = "#EXTINF:-1";
+                $extInf = '#EXTINF:-1';
                 $extInf .= " tvg-chno=\"{$channelNumber}\"";
                 $extInf .= " tvg-id=\"{$tvgId}\"";
                 $extInf .= " tvg-name=\"{$name}\"";

@@ -32,6 +32,7 @@ class NetworkBroadcastEnsure extends Command
 
         if (! $network) {
             $this->error('Network not found: '.$arg);
+
             return self::FAILURE;
         }
 
@@ -58,6 +59,7 @@ class NetworkBroadcastEnsure extends Command
         } catch (\Throwable $e) {
             Log::error('Failed to start broadcast via ensure command', ['network_id' => $network->id, 'error' => $e->getMessage()]);
             $this->error('Failed to start broadcast: '.$e->getMessage());
+
             return self::FAILURE;
         }
 

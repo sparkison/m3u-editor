@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Network;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -89,7 +88,7 @@ class NetworkPlaylistController extends Controller
         $streamUrl = $network->stream_url;
 
         // Build EXTINF line
-        $extInf = "#EXTINF:-1";
+        $extInf = '#EXTINF:-1';
         $extInf .= " tvg-chno=\"{$channelNumber}\"";
         $extInf .= " tvg-id=\"{$tvgId}\"";
         $extInf .= " tvg-name=\"{$name}\"";

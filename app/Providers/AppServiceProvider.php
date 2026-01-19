@@ -63,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
         // Register Artisan commands for HLS maintenance
         if ($this->app->runningInConsole()) {
             // Ensure command class file is loaded in environments without composer dump-autoload
-            $ensurePath = __DIR__ . '/../Console/Commands/NetworkBroadcastEnsure.php';
+            $ensurePath = __DIR__.'/../Console/Commands/NetworkBroadcastEnsure.php';
             if (file_exists($ensurePath)) {
                 require_once $ensurePath;
             }
