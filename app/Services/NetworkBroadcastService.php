@@ -229,6 +229,7 @@ class NetworkBroadcastService
 
     /**
      * Check if a network's broadcast process is running.
+     * Uses posix_kill with signal 0 for cross-platform compatibility (macOS/Linux).
      */
     public function isProcessRunning(Network $network): bool
     {
@@ -238,15 +239,10 @@ class NetworkBroadcastService
             return false;
         }
 
-        // Check if process exists and is FFmpeg
-        if (! file_exists("/proc/{$pid}")) {
-            return false;
-        }
-
-        // Verify it's our FFmpeg process by checking cmdline
-        $cmdline = @file_get_contents("/proc/{$pid}/cmdline");
-
-        return $cmdline && str_contains($cmdline, 'ffmpeg');
+        // Use posix_kill with signal 0 to check if process exists (cross-platform)
+        // Returns true if process exists, false if it doesn't
+        // Signal 0 doesn't actually send a signal, just checks existence
+        return @posix_kill($pid, 0);
     }
 
     /**
@@ -602,14 +598,12 @@ class NetworkBroadcastService
 
     /**
      * Send a signal to a process.
+     * Cross-platform compatible (macOS/Linux).
      */
     protected function signalProcess(int $pid, int $signal): bool
     {
-        if (! file_exists("/proc/{$pid}")) {
-            return false;
-        }
-
-        return posix_kill($pid, $signal);
+        // posix_kill returns false if process doesn't exist, no need for separate check
+        return @posix_kill($pid, $signal);
     }
 
     /**
