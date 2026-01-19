@@ -851,14 +851,25 @@ class NetworkBroadcastService
 
         // Process died but should be running
         if (! $isRunning && $network->broadcast_pid !== null) {
-            Log::info('Broadcast process died, cleaning up', [
+            $crashedProgramme = $network->broadcast_programme_id
+                ? NetworkProgramme::find($network->broadcast_programme_id)
+                : null;
+
+            Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
                 'network_id' => $network->id,
+                'network_name' => $network->name,
                 'old_pid' => $network->broadcast_pid,
+                'crashed_programme_id' => $crashedProgramme?->id,
+                'crashed_programme_title' => $crashedProgramme?->title,
+                'uptime_seconds' => $network->broadcast_started_at
+                    ? now()->diffInSeconds($network->broadcast_started_at)
+                    : null,
             ]);
 
             $network->update([
                 'broadcast_started_at' => null,
                 'broadcast_pid' => null,
+                'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
             ]);
 
             // Emit a metric/log entry for the crash
@@ -866,6 +877,9 @@ class NetworkBroadcastService
                 'network_id' => $network->id,
                 'uuid' => $network->uuid,
                 'old_pid' => $network->broadcast_pid,
+                'uptime_seconds' => $network->broadcast_started_at
+                    ? now()->diffInSeconds($network->broadcast_started_at)
+                    : null,
             ]);
         }
 
@@ -884,10 +898,24 @@ class NetworkBroadcastService
 
         // Should be running but isn't - start it (only if user requested it)
         if ($network->broadcast_pid === null && $network->broadcast_requested) {
+            // Calculate where we should resume from
+            $seekPosition = $network->getPersistedBroadcastSeekForNow() ?? $network->getCurrentSeekPosition();
+
+            Log::info('🔄 BROADCAST RECOVERY: Restarting broadcast', [
+                'network_id' => $network->id,
+                'network_name' => $network->name,
+                'programme_id' => $programme->id,
+                'programme_title' => $programme->title,
+                'resume_position_seconds' => $seekPosition,
+                'resume_position_formatted' => gmdate('H:i:s', $seekPosition),
+                'is_crash_recovery' => isset($result['action']) && $result['action'] !== 'none',
+            ]);
+
             $success = $this->start($network);
             $result['action'] = 'started';
             $result['success'] = $success;
             $result['programme'] = $programme->title;
+            $result['resume_position_seconds'] = $seekPosition;
 
             return $result;
         }
