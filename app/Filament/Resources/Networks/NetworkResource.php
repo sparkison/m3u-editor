@@ -639,6 +639,10 @@ class NetworkResource extends Resource
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
+            ->reorderable('channel_number')
             ->columns([
                 TextColumn::make('name')
                     ->label('Name')
