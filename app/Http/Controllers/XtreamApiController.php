@@ -1424,6 +1424,7 @@ class XtreamApiController extends Controller
             $streamId = $request->input('stream_id');
             $limit = $request->input('limit');
             $limit = (int) ($limit ?? 4);
+            $proxyEnabled = $playlist->enable_proxy;
 
             if (! $streamId) {
                 return response()->json(['error' => 'stream_id parameter is required for get_short_epg action'], 400);
@@ -1468,8 +1469,7 @@ class XtreamApiController extends Controller
             }
 
             // Check if channel is currently playing
-            $isNowPlaying = M3uProxyService::isChannelActive($channel);
-            $isNowPlaying = false;
+            $isNowPlaying = $proxyEnabled ? M3uProxyService::isChannelActive($channel) : false;
 
             // Filter programmes to current time and future, then limit
             $now = Carbon::now();
@@ -1509,6 +1509,7 @@ class XtreamApiController extends Controller
             return response()->json(['epg_listings' => $epgListings]);
         } elseif ($action === 'get_simple_data_table') {
             $streamId = $request->input('stream_id');
+            $proxyEnabled = $playlist->enable_proxy;
 
             if (! $streamId) {
                 return response()->json(['error' => 'stream_id parameter is required for get_simple_data_table action'], 400);
@@ -1544,8 +1545,7 @@ class XtreamApiController extends Controller
             $epgListings = [];
             if (isset($programmes[$channel->epgChannel->channel_id])) {
                 // Check if channel is currently playing
-                $isNowPlaying = M3uProxyService::isChannelActive($channel);
-                $isNowPlaying = false;
+                $isNowPlaying = $proxyEnabled ? M3uProxyService::isChannelActive($channel) : false;
 
                 $now = Carbon::now();
                 foreach ($programmes[$channel->epgChannel->channel_id] as $index => $programme) {
