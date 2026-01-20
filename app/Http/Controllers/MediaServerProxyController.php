@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MediaServerIntegration;
+use App\Services\MediaServerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -50,12 +51,11 @@ class MediaServerProxyController extends Controller
                 return response($cachedResponse['body'], 200, $cachedResponse['headers']);
             }
 
-            // Build the media server image URL with authentication
-            $imageUrl = "{$integration->base_url}/Items/{$itemId}/Images/{$imageType}";
+            $mediaServer = MediaServerService::make($integration);
+            $imageUrl = $mediaServer->getDirectImageUrl($itemId, $imageType);
 
             // Fetch the image with authentication
             $response = Http::withHeaders([
-                'X-Emby-Token' => $integration->api_key,
                 'Accept' => 'image/*',
             ])->timeout(30)->get($imageUrl);
 
@@ -139,29 +139,14 @@ class MediaServerProxyController extends Controller
                 return response()->json(['error' => 'Integration is disabled'], 403);
             }
 
-            // Build the media server stream URL with authentication
-            $streamUrl = "{$integration->base_url}/Videos/{$itemId}/stream.{$container}";
-            $params = [
-                'static' => 'true',
-                'api_key' => $integration->api_key,
-            ];
-
-            // Add any additional query parameters from the request (seeking, etc.)
-            $forwardParams = ['StartTimeTicks', 'AudioStreamIndex', 'SubtitleStreamIndex'];
-            foreach ($forwardParams as $param) {
-                if ($request->has($param)) {
-                    $params[$param] = $request->input($param);
-                }
-            }
-
-            $fullUrl = $streamUrl.'?'.http_build_query($params);
+            $mediaServer = MediaServerService::make($integration);
+            $fullUrl = $mediaServer->getDirectStreamUrl($request, $itemId, $container);
 
             // Get content type based on container
             $contentType = $this->getContentTypeForContainer($container);
 
             // Handle range requests for seeking
             $headers = [
-                'X-Emby-Token' => $integration->api_key,
                 'Accept' => '*/*',
             ];
 

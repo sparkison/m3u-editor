@@ -3,6 +3,7 @@
 namespace App\Interfaces;
 
 use App\Models\MediaServerIntegration;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 interface MediaServer
@@ -19,9 +20,9 @@ interface MediaServer
 
     public function fetchEpisodes(string $seriesId, ?string $seasonId = null): Collection;
 
-    public function getStreamUrl(string $itemId, string $container = 'ts'): string;
+    public function getStreamUrl(Request $request, string $itemId, string $container = 'ts'): string;
 
-    public function getDirectStreamUrl(string $itemId, string $container = 'ts'): string;
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string;
 
     public function getImageUrl(string $itemId, string $imageType = 'Primary'): string;
 

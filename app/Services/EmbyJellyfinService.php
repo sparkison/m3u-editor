@@ -7,6 +7,7 @@ use App\Interfaces\MediaServer;
 use App\Models\MediaServerIntegration;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -247,7 +248,7 @@ class EmbyJellyfinService implements MediaServer
      * @param  string  $itemId  The media server's item ID
      * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
-    public function getStreamUrl(string $itemId, string $container = 'ts'): string
+    public function getStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
     {
         // Use proxy URL to hide API key from external clients
         return MediaServerProxyController::generateStreamProxyUrl(
@@ -263,9 +264,26 @@ class EmbyJellyfinService implements MediaServer
      * @param  string  $itemId  The media server's item ID
      * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
-    public function getDirectStreamUrl(string $itemId, string $container = 'ts'): string
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
     {
-        return "{$this->baseUrl}/Videos/{$itemId}/stream.{$container}?static=true&api_key={$this->apiKey}";
+        $streamUrl = "{$this->baseUrl}/Videos/{$itemId}/stream.{$container}";
+
+        // Base parameters
+        $params = [
+            'static' => 'true',
+            'api_key' => $this->apiKey,
+        ];
+
+        // Forward relevant parameters from the incoming request
+        $forwardParams = ['StartTimeTicks', 'AudioStreamIndex', 'SubtitleStreamIndex'];
+        foreach ($forwardParams as $param) {
+            if ($request->has($param)) {
+                $params[$param] = $request->input($param);
+            }
+        }
+
+        // Return the full URL with query parameters
+        return $streamUrl.'?'.http_build_query($params);
     }
 
     /**
