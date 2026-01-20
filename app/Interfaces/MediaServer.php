@@ -20,7 +20,7 @@ interface MediaServer
 
     public function fetchEpisodes(string $seriesId, ?string $seasonId = null): Collection;
 
-    public function getStreamUrl(Request $request, string $itemId, string $container = 'ts'): string;
+    public function getStreamUrl(string $itemId, string $container = 'ts'): string;
 
     public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string;
 

@@ -240,7 +240,7 @@ class PlexService implements MediaServer
         }
     }
 
-    public function getStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
+    public function getStreamUrl(string $itemId, string $container = 'ts'): string
     {
         // Use proxy URL to hide API key from external clients
         return MediaServerProxyController::generateStreamProxyUrl(

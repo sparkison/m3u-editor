@@ -248,7 +248,7 @@ class EmbyJellyfinService implements MediaServer
      * @param  string  $itemId  The media server's item ID
      * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
-    public function getStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
+    public function getStreamUrl(string $itemId, string $container = 'ts'): string
     {
         // Use proxy URL to hide API key from external clients
         return MediaServerProxyController::generateStreamProxyUrl(
