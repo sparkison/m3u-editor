@@ -82,9 +82,11 @@ class MediaServerIntegrationResource extends Resource
                                 ->options([
                                     'emby' => 'Emby',
                                     'jellyfin' => 'Jellyfin',
+                                    'plex' => 'Plex',
                                 ])
                                 ->required()
                                 ->default('emby')
+                                ->live()
                                 ->native(false),
                         ]),
 
@@ -100,6 +102,7 @@ class MediaServerIntegrationResource extends Resource
                                 ->label('Port')
                                 ->numeric()
                                 ->default(8096)
+                                ->helperText('e.g., 8096 for Emby/Jellyfin, 32400 for Plex')
                                 ->required()
                                 ->minValue(1)
                                 ->maxValue(65535),
@@ -113,14 +116,21 @@ class MediaServerIntegrationResource extends Resource
                         ]),
 
                         TextInput::make('api_key')
-                            ->label('API Key')
+                            ->label('API Key/Token')
                             ->password()
                             ->revealable()
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->dehydrateStateUsing(fn ($state, $record) => filled($state) ? $state : $record?->api_key)
-                            ->helperText(fn (string $operation) => $operation === 'edit'
-                                ? 'Leave blank to keep existing API key'
-                                : 'Generate an API key in your media server\'s dashboard under Settings → API Keys'),
+                            ->helperText(function (string $operation, callable $get) {
+                                if ($operation === 'edit') {
+                                    return 'Leave blank to keep existing API key';
+                                }
+
+                                return match ($get('type')) {
+                                    'plex' => new HtmlString('See <a class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300" href="https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/" target="_blank">Plex Docs</a> for instructions on finding your token'),
+                                    default => 'Generate an API key in your media server\'s dashboard under Settings → API Keys',
+                                };
+                            }),
                     ]),
 
                 Section::make('Import Settings')
@@ -300,6 +310,7 @@ class MediaServerIntegrationResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'emby' => 'success',
                         'jellyfin' => 'info',
+                        'plex' => 'warning',
                         default => 'gray',
                     }),
 
@@ -343,6 +354,7 @@ class MediaServerIntegrationResource extends Resource
                     ->options([
                         'emby' => 'Emby',
                         'jellyfin' => 'Jellyfin',
+                        'plex' => 'Plex',
                     ]),
                 Tables\Filters\TernaryFilter::make('enabled')
                     ->label('Enabled'),
