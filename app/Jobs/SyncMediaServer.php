@@ -10,9 +10,9 @@ use App\Models\Episode;
 use App\Models\Group;
 use App\Models\MediaServerIntegration;
 use App\Models\Playlist;
+use App\Interfaces\MediaServer;
 use App\Models\Season;
 use App\Models\Series;
-use App\Services\MediaServerService;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -226,7 +226,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovies(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $movies = $service->fetchMovies();
 
@@ -264,7 +264,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovie(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $movie
     ): void {
         $itemId = $movie['Id'];
@@ -381,7 +381,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $seriesList = $service->fetchSeries();
 
@@ -419,7 +419,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncOneSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $seriesData
     ): void {
         $seriesId = $seriesData['Id'];
