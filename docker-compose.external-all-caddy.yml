@@ -183,8 +183,10 @@ services:
     volumes:
       # Persistent configuration data
       - ./data:/var/www/config
+      # NOTE: Might not be required if Caddy proxies requests to PHP-FPM directly
       # Share public directory with caddy for static file serving
-      - app-public:/var/www/html/public
+      #- Uncomment the line below if needed
+      #- app-public:/var/www/html/public
     restart: unless-stopped
     # Don't expose port externally - only accessible via caddy
     # Expose FPM port 9000 to caddy via internal network only
