@@ -399,6 +399,8 @@ class NetworkResource extends Resource
                                         ->modalHeading('EPG URL')
                                         ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record?->epg_url]))
                                         ->modalWidth('sm')
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelAction(fn ($action) => $action->label('Close'))
                                         ->visible(fn ($record) => $record?->epg_url !== null)
                                 )
                                 ->hint(fn ($record) => $record?->epg_url ? view('components.copy-to-clipboard', ['text' => $record->epg_url, 'position' => 'left']) : null),
@@ -442,6 +444,8 @@ class NetworkResource extends Resource
                                         ->modalHeading('Stream URL')
                                         ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record?->stream_url]))
                                         ->modalWidth('sm')
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelAction(fn ($action) => $action->label('Close'))
                                         ->visible(fn ($record) => $record?->stream_url !== null)
                                 )
                                 ->hint(fn ($record) => $record?->stream_url ? view('components.copy-to-clipboard', ['text' => $record->stream_url, 'position' => 'left']) : null),
@@ -458,6 +462,8 @@ class NetworkResource extends Resource
                                         ->modalHeading('M3U Playlist URL')
                                         ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first']))
                                         ->modalWidth('sm')
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelAction(fn ($action) => $action->label('Close'))
                                         ->visible(fn ($record) => $record?->uuid !== null)
                                 )
                                 ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
@@ -622,6 +628,8 @@ class NetworkResource extends Resource
                                                 ->modalHeading('HLS Playlist URL')
                                                 ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first']))
                                                 ->modalWidth('sm')
+                                                ->modalSubmitAction(false)
+                                                ->modalCancelAction(fn ($action) => $action->label('Close'))
                                                 ->visible(fn ($record) => $record?->uuid !== null)
                                         )
                                         ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('network.hls.playlist', ['network' => $record->uuid]), 'position' => 'left']) : null),
