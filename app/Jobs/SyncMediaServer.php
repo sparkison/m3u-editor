@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
+use App\Interfaces\MediaServer;
 use App\Models\Category;
 use App\Models\Channel;
 use App\Models\Episode;
@@ -226,7 +227,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovies(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $movies = $service->fetchMovies();
 
@@ -264,7 +265,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovie(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $movie
     ): void {
         $itemId = $movie['Id'];
@@ -381,7 +382,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $seriesList = $service->fetchSeries();
 
@@ -419,7 +420,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncOneSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $seriesData
     ): void {
         $seriesId = $seriesData['Id'];
@@ -470,7 +471,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncSeason(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         Series $series,
         array $seasonData
     ): void {
@@ -511,7 +512,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncEpisode(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         Series $series,
         Season $season,
         array $episodeData
