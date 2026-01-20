@@ -29,5 +29,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- Disable HLS garbage collection during tests to avoid races between parallel workers -->
+        <env name="HLS_GC_ENABLED" value="false"/>
     </php>
 </phpunit>
