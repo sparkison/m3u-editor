@@ -217,6 +217,47 @@ class MediaServerIntegrationResource extends Resource
                         ]),
                     ])
                     ->visibleOn('edit'),
+
+                Section::make('Networks (Pseudo-Live Channels)')
+                    ->description('Create live TV channels from your media server content')
+                    ->schema([
+                        TextInput::make('networks_playlist_url')
+                            ->label('Networks Playlist URL')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($record) => $record
+                                ? route('networks.playlist', ['user' => $record->user_id])
+                                : 'Save integration first'
+                            )
+                            ->copyable()
+                            ->helperText('M3U playlist containing all your Networks as live channels'),
+
+                        TextInput::make('networks_epg_url')
+                            ->label('Networks EPG URL')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($record) => $record
+                                ? route('networks.epg', ['user' => $record->user_id])
+                                : 'Save integration first'
+                            )
+                            ->copyable()
+                            ->helperText('EPG data for your Networks'),
+
+                        TextInput::make('networks_count')
+                            ->label('Networks')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(function ($record) {
+                                if (! $record) {
+                                    return '0 networks';
+                                }
+                                $count = $record->networks()->where('enabled', true)->count();
+
+                                return $count.' '.str('network')->plural($count);
+                            })
+                            ->helperText('Create Networks in the Networks section to build pseudo-live channels'),
+                    ])
+                    ->visibleOn('edit'),
             ]);
     }
 

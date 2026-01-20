@@ -530,6 +530,7 @@ class Preferences extends SettingsPage
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->columnSpan(2),
                                     ]),
+
                             ]),
 
                         Tab::make('Sync Options')

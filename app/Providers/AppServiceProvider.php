@@ -59,6 +59,21 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(GitInfoService::class);
+
+        // Register Artisan commands for HLS maintenance
+        if ($this->app->runningInConsole()) {
+            // Ensure command class file is loaded in environments without composer dump-autoload
+            $ensurePath = __DIR__.'/../Console/Commands/NetworkBroadcastEnsure.php';
+            if (file_exists($ensurePath)) {
+                require_once $ensurePath;
+            }
+
+            $this->commands([
+                \App\Console\Commands\HlsGarbageCollect::class,
+                \App\Console\Commands\NetworkBroadcastHeal::class,
+                \App\Console\Commands\NetworkBroadcastEnsure::class,
+            ]);
+        }
     }
 
     /**
