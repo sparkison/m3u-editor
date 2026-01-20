@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Log;
 class PlexService implements MediaServer
 {
     protected MediaServerIntegration $integration;
+
     protected string $baseUrl;
+
     protected string $apiKey;
 
     public function __construct(MediaServerIntegration $integration)
