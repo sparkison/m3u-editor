@@ -141,7 +141,7 @@ class NetworkScheduleService
         // This ensures different weeks get different shuffles while
         // regenerating the same week produces consistent results
         $weekNumber = (int) now()->format('oW'); // Year + week number (e.g., 202603)
-        $seed = crc32($network->id . '-' . $weekNumber);
+        $seed = crc32($network->id.'-'.$weekNumber);
 
         return $this->seededShuffle($weighted, $seed);
     }

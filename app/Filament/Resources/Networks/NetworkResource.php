@@ -379,6 +379,7 @@ class NetworkResource extends Resource
 
                                 Toggle::make('auto_regenerate_schedule')
                                     ->label('Auto-regenerate Schedule')
+                                    ->inline(false)
                                     ->helperText('Automatically regenerate when schedule is about to expire.')
                                     ->default(true),
                             ])->visible(fn (Get $get): bool => $get('broadcast_enabled')),
@@ -585,6 +586,7 @@ class NetworkResource extends Resource
 
                                 Toggle::make('auto_regenerate_schedule')
                                     ->label('Auto-regenerate Schedule')
+                                    ->inline(false)
                                     ->helperText('Automatically regenerate when schedule is about to expire (within 24 hours).')
                                     ->default(true),
                             ])->visible(fn (Get $get): bool => $get('broadcast_enabled')),
