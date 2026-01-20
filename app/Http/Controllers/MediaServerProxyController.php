@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Facades\ProxyFacade;
 use App\Models\MediaServerIntegration;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -255,7 +256,7 @@ class MediaServerProxyController extends Controller
      */
     public static function generateImageProxyUrl(int $integrationId, string $itemId, string $imageType = 'Primary'): string
     {
-        return url("/media-server/{$integrationId}/image/{$itemId}/{$imageType}");
+        return ProxyFacade::getBaseUrl()."/media-server/{$integrationId}/image/{$itemId}/{$imageType}";
     }
 
     /**
@@ -263,6 +264,6 @@ class MediaServerProxyController extends Controller
      */
     public static function generateStreamProxyUrl(int $integrationId, string $itemId, string $container = 'ts'): string
     {
-        return url("/media-server/{$integrationId}/stream/{$itemId}.{$container}");
+        return ProxyFacade::getBaseUrl()."/media-server/{$integrationId}/stream/{$itemId}.{$container}";
     }
 }
