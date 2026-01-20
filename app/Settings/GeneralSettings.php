@@ -182,8 +182,6 @@ class GeneralSettings extends Settings
     // Network broadcast settings
     public ?int $broadcast_max_concurrent = 10;
 
-    public ?int $broadcast_segment_cleanup_interval = 5;
-
     public static function group(): string
     {
         return 'general';
