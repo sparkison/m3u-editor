@@ -7,6 +7,7 @@ use App\Interfaces\MediaServer;
 use App\Models\MediaServerIntegration;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -249,7 +250,7 @@ class PlexService implements MediaServer
         );
     }
 
-    public function getDirectStreamUrl(string $itemId, string $container = 'ts'): string
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
     {
         try {
             $response = $this->client()->get("/library/metadata/{$itemId}");
@@ -261,8 +262,31 @@ class PlexService implements MediaServer
                 if ($metadata && isset($metadata['Media'][0]['Part'][0]['key'])) {
                     $partKey = $metadata['Media'][0]['Part'][0]['key'];
 
-                    // The container argument is ignored as the key contains the direct path to the file
-                    return "{$this->baseUrl}{$partKey}?X-Plex-Token={$this->apiKey}";
+                    // Base URL for the stream
+                    $streamUrl = "{$this->baseUrl}{$partKey}";
+
+                    // Start with the API key
+                    $params = ['X-Plex-Token' => $this->apiKey];
+
+                    // Handle seeking (StartTimeTicks from Emby/Jellyfin needs to be converted to seconds for Plex)
+                    if ($request->has('StartTimeTicks')) {
+                        $ticks = (int) $request->input('StartTimeTicks');
+                        $seconds = $this->ticksToSeconds($ticks);
+                        if ($seconds !== null) {
+                            $params['offset'] = $seconds;
+                        }
+                    }
+
+                    // Forward audio and subtitle stream indexes if provided
+                    if ($request->has('AudioStreamIndex')) {
+                        $params['audioStreamID'] = $request->input('AudioStreamIndex');
+                    }
+                    if ($request->has('SubtitleStreamIndex')) {
+                        $params['subtitleStreamID'] = $request->input('SubtitleStreamIndex');
+                    }
+
+                    // Return the full URL with query parameters
+                    return $streamUrl.'?'.http_build_query($params);
                 }
             }
 
