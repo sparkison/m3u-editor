@@ -2,13 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Channel;
-use App\Models\Epg;
-use App\Models\EpgChannel;
-use App\Models\Episode;
-use App\Models\Group;
-use App\Models\Playlist;
-use App\Models\Series;
 use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;

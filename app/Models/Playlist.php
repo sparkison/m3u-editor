@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\PlaylistChannelId;
 use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
-use App\Services\XtreamService;
 use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +14,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class Playlist extends Model
 {
@@ -339,7 +337,7 @@ class Playlist extends Model
                 $results = is_string($value) ? json_decode($value, true) : ($value ?? []);
 
                 // Cache the database value for 60 seconds
-                if (! empty($results)) {
+                if (!empty($results)) {
                     Cache::put($key, $results, 60);
                 }
 
