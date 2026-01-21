@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Groups;
 
+use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\Pages\ListGroups;
 use App\Filament\Resources\Groups\Pages\ViewGroup;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
@@ -249,10 +250,7 @@ class GroupResource extends Resource
                         ])
                         ->action(function (Group $record, array $data): void {
                             $start = (int) $data['start'];
-                            $channels = $record->channels()->orderBy('sort')->cursor();
-                            foreach ($channels as $channel) {
-                                $channel->update(['channel' => $start++]);
-                            }
+                            SortFacade::bulkRecountGroupChannels($record, $start);
                         })
                         ->after(function () {
                             Notification::make()
@@ -280,13 +278,7 @@ class GroupResource extends Resource
                         ->action(function (Group $record, array $data): void {
                             // Sort by title_custom (if present) then title, matching the UI column sort
                             $order = $data['sort'] ?? 'ASC';
-                            $channels = $record->channels()
-                                ->orderByRaw("COALESCE(title_custom, title) $order")
-                                ->cursor();
-                            $sort = 1;
-                            foreach ($channels as $channel) {
-                                $channel->update(['sort' => $sort++]);
-                            }
+                            SortFacade::bulkSortGroupChannels($record, $order);
                         })
                         ->after(function () {
                             Notification::make()

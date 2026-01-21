@@ -26,6 +26,7 @@ use App\Services\EpgCacheService;
 use App\Services\GitInfoService;
 use App\Services\PlaylistService;
 use App\Services\ProxyService;
+use App\Services\SortService;
 use App\Settings\GeneralSettings;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -636,6 +637,11 @@ class AppServiceProvider extends ServiceProvider
         // Register the playlist url service
         $this->app->singleton('playlist', function () {
             return new PlaylistService;
+        });
+
+        // Register the sort service
+        $this->app->singleton('sort', function () {
+            return new SortService;
         });
     }
 

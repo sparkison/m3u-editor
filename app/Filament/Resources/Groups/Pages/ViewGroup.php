@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Groups\Pages;
 
+use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\GroupResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
@@ -123,12 +124,10 @@ class ViewGroup extends ViewRecord
                     ])
                     ->action(function (Group $record, array $data): void {
                         $start = (int) $data['start'];
-                        $channels = $record->channels()->orderBy('sort')->cursor();
-                        foreach ($channels as $channel) {
-                            $channel->update(['channel' => $start++]);
-                        }
+                        SortFacade::bulkRecountGroupChannels($record, $start);
                     })
-                    ->after(function () {
+                    ->after(function ($livewire) {
+                        $livewire->dispatch('refreshRelation');
                         Notification::make()
                             ->success()
                             ->title('Channels Recounted')
@@ -154,15 +153,10 @@ class ViewGroup extends ViewRecord
                     ->action(function (Group $record, array $data): void {
                         // Sort by title_custom (if present) then title, matching the UI column sort
                         $order = $data['sort'] ?? 'ASC';
-                        $channels = $record->channels()
-                            ->orderByRaw("COALESCE(title_custom, title) $order")
-                            ->cursor();
-                        $sort = 1;
-                        foreach ($channels as $channel) {
-                            $channel->update(['sort' => $sort++]);
-                        }
+                        SortFacade::bulkSortGroupChannels($record, $order);
                     })
-                    ->after(function () {
+                    ->after(function ($livewire) {
+                        $livewire->dispatch('refreshRelation');
                         Notification::make()
                             ->success()
                             ->title('Channels Sorted')
