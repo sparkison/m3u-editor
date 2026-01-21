@@ -326,7 +326,7 @@ class Playlist extends Model
     {
         return Attribute::make(
             get: function ($value, $attributes) {
-                $key = "playlist:{$attributes['id']}:xtream_status";
+                $key = "p:{$attributes['id']}:xtream_status";
                 $cached = Cache::get($key);
                 if ($cached !== null) {
                     return $cached;
