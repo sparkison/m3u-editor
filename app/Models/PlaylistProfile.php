@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use App\Services\XtreamService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class PlaylistProfile extends Model
 {
@@ -102,7 +100,7 @@ class PlaylistProfile extends Model
                 $result = is_string($value) ? json_decode($value, true) : ($value ?? []);
 
                 // Cache the database value for 60 seconds
-                if (! empty($result)) {
+                if (!empty($result)) {
                     Cache::put($cacheKey, $result, 60);
                 }
 
