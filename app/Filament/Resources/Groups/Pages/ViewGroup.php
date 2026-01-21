@@ -141,10 +141,21 @@ class ViewGroup extends ViewRecord
                 Action::make('sort_alpha')
                     ->label('Sort Alpha')
                     ->icon('heroicon-o-bars-arrow-down')
-                    ->action(function (Group $record): void {
+                    ->schema([
+                        Select::make('sort')
+                            ->label('Sort Order')
+                            ->options([
+                                'ASC' => 'A to Z',
+                                'DESC' => 'Z to A',
+                            ])
+                            ->default('ASC')
+                            ->required(),
+                    ])
+                    ->action(function (Group $record, array $data): void {
                         // Sort by title_custom (if present) then title, matching the UI column sort
+                        $order = $data['sort'] ?? 'ASC';
                         $channels = $record->channels()
-                            ->orderByRaw('COALESCE(title_custom, title) ASC')
+                            ->orderByRaw("COALESCE(title_custom, title) $order")
                             ->cursor();
                         $sort = 1;
                         foreach ($channels as $channel) {
