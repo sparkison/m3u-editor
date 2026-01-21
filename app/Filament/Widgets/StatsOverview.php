@@ -20,7 +20,6 @@ class StatsOverview extends BaseWidget
         $userId = auth()->id();
 
         // Cache the stats for better performance
-        // Single optimized query replaces 11 separate queries
         $stats = Cache::remember("dashboard_stats_{$userId}", $this->cacheDuration, function () use ($userId) {
             // Use a single query with aggregates for PostgreSQL and SQLite compatibility
             $result = DB::table('playlists as p')

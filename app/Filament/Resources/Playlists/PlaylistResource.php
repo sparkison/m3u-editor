@@ -126,15 +126,14 @@ class PlaylistResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                // Eager load all counts to prevent N+1 queries
                 $query->withCount([
                     'enabled_live_channels',
                     'enabled_vod_channels',
                     'enabled_series',
-                    'groups',           // Fix N+1 for groups_count column
-                    'live_channels',    // Fix N+1 for live_channels_count column
-                    'vod_channels',     // Fix N+1 for vod_channels_count column
-                    'series',           // Fix N+1 for series_count column
+                    'groups',
+                    'live_channels',
+                    'vod_channels',
+                    'series',
                 ]);
             })
             ->deferLoading()
@@ -209,10 +208,10 @@ class PlaylistResource extends Resource
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
                     ->description(function (Playlist $record): string {
-                        // Cache active streams count for 30 seconds to prevent N+1 HTTP requests
+                        // Cache active streams count for 5 seconds to reduce load
                         $count = Cache::remember(
                             "active_streams_{$record->id}",
-                            30,
+                            5,
                             fn () => M3uProxyService::getPlaylistActiveStreamsCount($record)
                         );
 
