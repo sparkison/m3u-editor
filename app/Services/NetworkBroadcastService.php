@@ -73,11 +73,46 @@ class NetworkBroadcastService
         $hlsPath = $network->getHlsStoragePath();
         File::ensureDirectoryExists($hlsPath);
 
-        // Determine programme and seek position. Prefer persisted broadcast reference when available.
+        // Determine programme to broadcast.
+        // Priority: current programme > next programme > persisted (only if still valid)
         $programme = $network->getCurrentProgramme();
+
+        if (! $programme) {
+            // No current programme - try to get the next upcoming one
+            $programme = $network->getNextProgramme();
+
+            if ($programme) {
+                Log::info('No current programme, using next upcoming programme', [
+                    'network_id' => $network->id,
+                    'next_programme_id' => $programme->id,
+                    'next_programme_title' => $programme->title,
+                    'next_programme_start' => $programme->start_time->toIso8601String(),
+                ]);
+            }
+        }
+
+        // Only fall back to persisted programme if it's STILL AIRING (not ended)
         if (! $programme && $network->broadcast_programme_id) {
-            // Try to load the persisted programme if current one not found
-            $programme = NetworkProgramme::find($network->broadcast_programme_id);
+            $persistedProgramme = NetworkProgramme::find($network->broadcast_programme_id);
+            if ($persistedProgramme && $persistedProgramme->end_time->gt(now())) {
+                // Persisted programme is still valid (hasn't ended yet)
+                $programme = $persistedProgramme;
+                Log::info('Using persisted programme that is still airing', [
+                    'network_id' => $network->id,
+                    'programme_id' => $programme->id,
+                    'programme_title' => $programme->title,
+                ]);
+            } else {
+                // Persisted programme has ended - clear the stale reference
+                Log::info('Clearing stale persisted programme reference (programme has ended)', [
+                    'network_id' => $network->id,
+                    'old_programme_id' => $network->broadcast_programme_id,
+                ]);
+                $network->update([
+                    'broadcast_programme_id' => null,
+                    'broadcast_initial_offset_seconds' => null,
+                ]);
+            }
         }
 
         if (! $programme) {
@@ -851,57 +886,89 @@ class NetworkBroadcastService
 
         // Process died but should be running
         if (! $isRunning && $network->broadcast_pid !== null) {
-            $crashedProgramme = $network->broadcast_programme_id
+            $oldProgramme = $network->broadcast_programme_id
                 ? NetworkProgramme::find($network->broadcast_programme_id)
                 : null;
 
-            Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
-                'network_id' => $network->id,
-                'network_name' => $network->name,
-                'old_pid' => $network->broadcast_pid,
-                'crashed_programme_id' => $crashedProgramme?->id,
-                'crashed_programme_title' => $crashedProgramme?->title,
-                'uptime_seconds' => $network->broadcast_started_at
-                    ? now()->diffInSeconds($network->broadcast_started_at)
-                    : null,
-            ]);
+            // Determine if this was a normal completion (programme ended) or an unexpected crash
+            $programmeEnded = $oldProgramme && $oldProgramme->end_time->lte(now());
 
-            $network->update([
-                'broadcast_started_at' => null,
-                'broadcast_pid' => null,
-                'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
-            ]);
-
-            // Clean up any orphaned HLS files from the crash
-            // When FFmpeg crashes, it can't clean up its own segments
-            try {
-                $this->cleanupHlsForNetwork($network);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to cleanup orphaned HLS files after crash', [
+            if ($programmeEnded) {
+                // Normal completion - programme finished, FFmpeg exited as expected
+                Log::info('🔄 BROADCAST PROGRAMME COMPLETED: Moving to next programme', [
                     'network_id' => $network->id,
-                    'error' => $e->getMessage(),
+                    'network_name' => $network->name,
+                    'old_pid' => $network->broadcast_pid,
+                    'completed_programme_id' => $oldProgramme->id,
+                    'completed_programme_title' => $oldProgramme->title,
+                ]);
+
+                // Clear the persisted reference so we get the next programme on restart
+                $network->update([
+                    'broadcast_started_at' => null,
+                    'broadcast_pid' => null,
+                    'broadcast_programme_id' => null,
+                    'broadcast_initial_offset_seconds' => null,
+                    'broadcast_error' => null,
+                ]);
+            } else {
+                // Unexpected crash - programme was still supposed to be airing
+                Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
+                    'network_id' => $network->id,
+                    'network_name' => $network->name,
+                    'old_pid' => $network->broadcast_pid,
+                    'crashed_programme_id' => $oldProgramme?->id,
+                    'crashed_programme_title' => $oldProgramme?->title,
+                    'uptime_seconds' => $network->broadcast_started_at
+                        ? now()->diffInSeconds($network->broadcast_started_at)
+                        : null,
+                ]);
+
+                // Keep persisted reference for crash recovery (resume from where we left off)
+                $network->update([
+                    'broadcast_started_at' => null,
+                    'broadcast_pid' => null,
+                    'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
+                ]);
+
+                // Clean up any orphaned HLS files from the crash
+                // When FFmpeg crashes, it can't clean up its own segments
+                try {
+                    $this->cleanupHlsForNetwork($network);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to cleanup orphaned HLS files after crash', [
+                        'network_id' => $network->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // Emit a metric/log entry for the crash
+                Log::warning('HLS_METRIC: broadcast_crashed', [
+                    'network_id' => $network->id,
+                    'uuid' => $network->uuid,
+                    'old_pid' => $network->broadcast_pid,
+                    'uptime_seconds' => $network->broadcast_started_at
+                        ? now()->diffInSeconds($network->broadcast_started_at)
+                        : null,
                 ]);
             }
-
-            // Emit a metric/log entry for the crash
-            Log::warning('HLS_METRIC: broadcast_crashed', [
-                'network_id' => $network->id,
-                'uuid' => $network->uuid,
-                'old_pid' => $network->broadcast_pid,
-                'uptime_seconds' => $network->broadcast_started_at
-                    ? now()->diffInSeconds($network->broadcast_started_at)
-                    : null,
-            ]);
         }
 
-        // Get current programme
+        // Get current or next programme
         $programme = $network->getCurrentProgramme();
 
-        // No current programme - stop if running
+        // If no current programme, try to get the next one (for seamless transitions)
+        if (! $programme) {
+            $programme = $network->getNextProgramme();
+        }
+
+        // No current or next programme - stop if running
         if (! $programme) {
             if ($network->broadcast_pid !== null) {
                 $this->stop($network);
                 $result['action'] = 'stopped_no_content';
+            } else {
+                $result['action'] = 'no_content';
             }
 
             return $result;
