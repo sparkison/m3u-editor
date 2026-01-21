@@ -629,9 +629,14 @@ class M3uProxyService
 
         // Check if primary playlist has stream limits and if it's at capacity
         // Only check capacity if we're about to create a NEW stream (no existing pooled stream found)
+        // IMPORTANT: Skip playlist-level limit check if using provider profiles
+        // When using provider profiles, each profile has its own connection limit,
+        // and the total capacity is the sum of all profile limits, not the playlist's available_streams
         $primaryUrl = null;
         $actualChannel = $channel;  // Track the actual channel being used (may differ from original if failover)
-        if ($playlist->available_streams !== 0) {
+        $usingProviderProfiles = $playlist instanceof Playlist && $playlist->profiles_enabled;
+
+        if ($playlist->available_streams !== 0 && ! $usingProviderProfiles) {
             $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
 
             // Keep track of original playlist in case we need to check failovers
@@ -755,8 +760,11 @@ class M3uProxyService
             ? $channel->failoverChannels()->count() > 0
             : $channel->failoverChannels()
                 ->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
-                ->map(function ($ch) use ($playlist) {
-                    return PlaylistUrlService::getChannelUrl($ch, $playlist);
+                ->map(function ($ch) use ($playlist, $selectedProfile) {
+                    // Use the selected profile as context if available
+                    $urlContext = $selectedProfile ?? $playlist;
+
+                    return PlaylistUrlService::getChannelUrl($ch, $urlContext);
                 })
                 ->filter()
                 ->values()
@@ -786,15 +794,22 @@ class M3uProxyService
                 $metadata['provider_profile_id'] = $selectedProfile->id;
             }
 
-            Log::debug('Creating transcoded stream with failover tracking', [
+            Log::debug('Creating transcoded stream with provider profile', [
+                'channel_id' => $actualChannel->id,
                 'original_channel_id' => $originalChannelId,
-                'actual_channel_id' => $actualChannel->id,
+                'stream_profile_id' => $profile->id,
+                'provider_profile_id' => $selectedProfile?->id,
                 'is_failover' => $isFailover,
-                'original_playlist_uuid' => $originalPlaylistUuid,
-                'actual_playlist_uuid' => $playlist->uuid,
+                'primary_url' => $primaryUrl,
+                'failover_count' => is_array($failovers) ? count($failovers) : ($failovers ? 'using_resolver' : 0),
             ]);
 
             $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, $metadata);
+
+            Log::debug('Transcoded stream created, tracking connection', [
+                'stream_id' => $streamId,
+                'provider_profile_id' => $selectedProfile?->id,
+            ]);
 
             // Track connection for provider profile
             if ($selectedProfile) {
@@ -805,6 +820,11 @@ class M3uProxyService
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts', $username);
         } else {
             // Use direct streaming endpoint
+            Log::debug('Creating direct stream with provider profile', [
+                'channel_id' => $id,
+                'provider_profile_id' => $selectedProfile?->id,
+            ]);
+
             // Determine if this is a failover stream
             $isFailover = ($actualChannel->id !== $originalChannelId);
 
@@ -824,6 +844,11 @@ class M3uProxyService
             }
 
             $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, $metadata);
+
+            Log::debug('Direct stream created, tracking connection', [
+                'stream_id' => $streamId,
+                'provider_profile_id' => $selectedProfile?->id,
+            ]);
 
             // Track connection for provider profile
             if ($selectedProfile) {

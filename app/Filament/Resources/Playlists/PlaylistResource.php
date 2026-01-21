@@ -80,6 +80,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
@@ -125,9 +126,16 @@ class PlaylistResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('enabled_live_channels')
-                    ->withCount('enabled_vod_channels')
-                    ->withCount('enabled_series');
+                // Eager load all counts to prevent N+1 queries
+                $query->withCount([
+                    'enabled_live_channels',
+                    'enabled_vod_channels',
+                    'enabled_series',
+                    'groups',           // Fix N+1 for groups_count column
+                    'live_channels',    // Fix N+1 for live_channels_count column
+                    'vod_channels',     // Fix N+1 for vod_channels_count column
+                    'series',           // Fix N+1 for series_count column
+                ]);
             })
             ->deferLoading()
             ->columns([
@@ -210,7 +218,16 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn (Playlist $record): string => 'Active: '.M3uProxyService::getPlaylistActiveStreamsCount($record))
+                    ->description(function (Playlist $record): string {
+                        // Cache active streams count for 30 seconds to prevent N+1 HTTP requests
+                        $count = Cache::remember(
+                            "active_streams_{$record->id}",
+                            30,
+                            fn () => M3uProxyService::getPlaylistActiveStreamsCount($record)
+                        );
+
+                        return "Active: {$count}";
+                    })
                     ->sortable(),
                 TextColumn::make('groups_count')
                     ->label('Groups')
