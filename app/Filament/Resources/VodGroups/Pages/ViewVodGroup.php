@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
@@ -109,6 +110,68 @@ class ViewVodGroup extends ViewRecord
                     ->modalIcon('heroicon-o-arrows-right-left')
                     ->modalDescription('Move the group channels to the another group.')
                     ->modalSubmitActionLabel('Move now'),
+
+                Action::make('recount')
+                    ->label('Recount Channels')
+                    ->icon('heroicon-o-hashtag')
+                    ->schema([
+                        TextInput::make('start')
+                            ->label('Start Number')
+                            ->numeric()
+                            ->default(1)
+                            ->required(),
+                    ])
+                    ->action(function (Group $record, array $data): void {
+                        $start = (int) $data['start'];
+                        $channels = $record->channels()->orderBy('sort')->cursor();
+                        foreach ($channels as $channel) {
+                            $channel->update(['channel' => $start++]);
+                        }
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels Recounted')
+                            ->body('The channels in this group have been recounted.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-hashtag')
+                    ->modalDescription('Recount all channels in this group sequentially?'),
+                Action::make('sort_alpha')
+                    ->label('Sort Alpha')
+                    ->icon('heroicon-o-bars-arrow-down')
+                    ->schema([
+                        Select::make('sort')
+                            ->label('Sort Order')
+                            ->options([
+                                'ASC' => 'A to Z',
+                                'DESC' => 'Z to A',
+                            ])
+                            ->default('ASC')
+                            ->required(),
+                    ])
+                    ->action(function (Group $record, array $data): void {
+                        // Sort by title_custom (if present) then title, matching the UI column sort
+                        $order = $data['sort'] ?? 'ASC';
+                        $channels = $record->channels()
+                            ->orderByRaw("COALESCE(title_custom, title) $order")
+                            ->get();
+                        $sort = 1;
+                        foreach ($channels as $channel) {
+                            $channel->update(['sort' => $sort++]);
+                        }
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels Sorted')
+                            ->body('The channels in this group have been sorted alphabetically.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-bars-arrow-down')
+                    ->modalDescription('Sort all channels in this group alphabetically? This will update the sort order.'),
 
                 Action::make('enable')
                     ->label('Enable group channels')
