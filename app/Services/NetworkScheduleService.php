@@ -29,7 +29,7 @@ class NetworkScheduleService
     /**
      * Generate the programme schedule for a network.
      */
-    public function generateSchedule(Network $network, ?Carbon $startFrom = null): void
+    public function generateSchedule(Network $network, ?Carbon $startFrom = null): int
     {
         $startFrom = $startFrom ?? Carbon::now();
         $scheduleWindowDays = $network->schedule_window_days ?? self::DEFAULT_SCHEDULE_WINDOW_DAYS;
@@ -47,13 +47,13 @@ class NetworkScheduleService
         if ($contentItems->isEmpty()) {
             Log::warning("No content found for network {$network->name}");
 
-            return;
+            return 0;
         }
 
         DB::transaction(function () use ($network, $startFrom, $endAt, $contentItems) {
-            // Clear future programmes (keep past for history)
+            // Clear future programmes (keep past for history) — exclude programmes that start exactly at the regeneration boundary
             $network->programmes()
-                ->where('start_time', '>=', $startFrom)
+                ->where('start_time', '>', $startFrom)
                 ->delete();
 
             // Generate new schedule
@@ -62,6 +62,35 @@ class NetworkScheduleService
             $contentCount = $contentItems->count();
 
             while ($currentTime->lt($endAt)) {
+                // If a programme already exists that starts exactly at this time, skip creating it
+                $existingProgramme = $network->programmes()->where('start_time', $currentTime)->first();
+                if ($existingProgramme) {
+                    // Advance to the end of the existing programme
+                    $currentTime = $existingProgramme->end_time->copy();
+
+                    // Try to advance the content index to the item after the existing programme's contentable if possible
+                    $foundIndex = null;
+                    foreach ($contentItems as $idx => $item) {
+                        if ($item && get_class($item) === $existingProgramme->contentable_type && $item->id === $existingProgramme->contentable_id) {
+                            $foundIndex = $idx;
+                            break;
+                        }
+                    }
+
+                    if ($foundIndex !== null) {
+                        $contentIndex = $foundIndex + 1;
+                        if ($contentIndex >= $contentCount) {
+                            if ($network->loop_content) {
+                                $contentIndex = 0;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    continue; // Skip creation for this time slot
+                }
+
                 $content = $contentItems[$contentIndex];
                 $duration = $this->getContentDuration($content);
 
@@ -93,9 +122,13 @@ class NetworkScheduleService
             $network->update(['schedule_generated_at' => Carbon::now()]);
         });
 
+        $generatedCount = $network->programmes()->where('start_time', '>=', $startFrom)->count();
+
         Log::info("Schedule generated for network {$network->name}", [
-            'programme_count' => $network->programmes()->count(),
+            'programme_count' => $generatedCount,
         ]);
+
+        return $generatedCount;
     }
 
     /**
