@@ -100,7 +100,7 @@ class PlaylistProfile extends Model
                 $result = is_string($value) ? json_decode($value, true) : ($value ?? []);
 
                 // Cache the database value for 60 seconds
-                if (!empty($result)) {
+                if ($result) {
                     Cache::put($cacheKey, $result, 60);
                 }
 
