@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PlaylistChannelId;
 use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
+use App\Jobs\UpdateXtreamStats;
 use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -326,20 +327,18 @@ class Playlist extends Model
         return Attribute::make(
             get: function ($value, $attributes) {
                 $key = "playlist:{$attributes['id']}:xtream_status";
-
-                // PERFORMANCE FIX: Check cache first, return immediately if found
                 $cached = Cache::get($key);
                 if ($cached !== null) {
                     return $cached;
                 }
 
-                // Return stored value from database (never fetch live during page render)
-                $results = is_string($value) ? json_decode($value, true) : ($value ?? []);
+                // Dispatch job to update in background if not cached/cache expired
+                UpdateXtreamStats::dispatch($this);
 
-                // Cache the database value for 60 seconds
-                if ($results) {
-                    Cache::put($key, $results, 60);
-                }
+                // Return stored value from database
+                $results = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
 
                 return $results;
             }
