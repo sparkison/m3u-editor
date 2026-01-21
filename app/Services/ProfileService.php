@@ -46,13 +46,43 @@ class ProfileService
 
         $profiles = $query->get();
 
+        Log::debug('Selecting profile for streaming', [
+            'playlist_id' => $playlist->id,
+            'total_profiles' => $profiles->count(),
+            'exclude_profile_id' => $excludeProfileId,
+        ]);
+
         foreach ($profiles as $profile) {
-            if (static::hasCapacity($profile)) {
+            $activeConnections = static::getConnectionCount($profile);
+            $maxConnections = $profile->effective_max_streams;
+            $hasCapacity = static::hasCapacity($profile);
+
+            Log::debug('Checking profile capacity', [
+                'profile_id' => $profile->id,
+                'profile_name' => $profile->name,
+                'priority' => $profile->priority,
+                'active_connections' => $activeConnections,
+                'max_connections' => $maxConnections,
+                'has_capacity' => $hasCapacity,
+                'enabled' => $profile->enabled,
+            ]);
+
+            if ($hasCapacity) {
+                Log::info('Selected profile for streaming', [
+                    'profile_id' => $profile->id,
+                    'profile_name' => $profile->name,
+                    'active_connections' => $activeConnections,
+                    'max_connections' => $maxConnections,
+                ]);
+
                 return $profile;
             }
         }
 
-        Log::warning("No profiles with capacity available for playlist {$playlist->id}");
+        Log::warning('No profiles with capacity available for playlist', [
+            'playlist_id' => $playlist->id,
+            'total_profiles' => $profiles->count(),
+        ]);
 
         return null;
     }
@@ -115,9 +145,14 @@ class ProfileService
                 $pipe->expire($streamsKey, static::STREAM_TRACKING_TTL);
             });
 
-            Log::debug("Incremented connections for profile {$profile->id}", [
+            $newCount = static::getConnectionCount($profile);
+
+            Log::info('Incremented connections for profile', [
+                'profile_id' => $profile->id,
+                'profile_name' => $profile->name,
                 'stream_id' => $streamId,
-                'new_count' => static::getConnectionCount($profile),
+                'new_count' => $newCount,
+                'max_connections' => $profile->effective_max_streams,
             ]);
         } catch (\Exception $e) {
             Log::error("Failed to increment connections for profile {$profile->id}", [
@@ -160,9 +195,14 @@ class ProfileService
                 ]);
             }
 
-            Log::debug("Decremented connections for profile {$profile->id}", [
+            $newCount = static::getConnectionCount($profile);
+
+            Log::info('Decremented connections for profile', [
+                'profile_id' => $profile->id,
+                'profile_name' => $profile->name,
                 'stream_id' => $streamId,
-                'new_count' => static::getConnectionCount($profile),
+                'new_count' => $newCount,
+                'max_connections' => $profile->effective_max_streams,
             ]);
         } catch (\Exception $e) {
             Log::error("Failed to decrement connections for profile {$profile->id}", [
@@ -271,6 +311,15 @@ class ProfileService
             $activeCount = static::getConnectionCount($profile);
             $maxStreams = $profile->effective_max_streams;
 
+            // Get expiration date from provider_info (stored in database)
+            $providerInfo = $profile->provider_info;
+            $expDate = $providerInfo['user_info']['exp_date'] ?? null;
+
+            // Convert Unix timestamp to date string for Carbon compatibility
+            if ($expDate && is_numeric($expDate)) {
+                $expDate = date('Y-m-d H:i:s', $expDate);
+            }
+
             $profiles[] = [
                 'id' => $profile->id,
                 'name' => $profile->name ?? "Profile #{$profile->id}",
@@ -282,6 +331,7 @@ class ProfileService
                 'active_connections' => $activeCount,
                 'available' => max(0, $maxStreams - $activeCount),
                 'provider_info_updated_at' => $profile->provider_info_updated_at?->toIso8601String(),
+                'exp_date' => $expDate, // Add expiration date for PlaylistInfo component (as date string)
             ];
 
             if ($profile->enabled) {
