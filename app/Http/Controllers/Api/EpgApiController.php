@@ -674,7 +674,7 @@ class EpgApiController extends Controller
                 // Build channel entry
                 $channels[$channelNo] = [
                     'id' => $channelNo,
-                    'database_id' => $network->id,
+                    'database_id' => null, // $network->id,
                     'url' => $url,
                     'format' => 'hls', // Network streams are HLS
                     'tvg_id' => 'network_'.$network->id,
