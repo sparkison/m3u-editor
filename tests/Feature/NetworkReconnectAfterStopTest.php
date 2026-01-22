@@ -62,4 +62,4 @@ it('reconnect after stop cannot resume HLS playlist or segments', function () {
 
     // Reset time
     Carbon::setTestNow();
-});
+})->group('serial');

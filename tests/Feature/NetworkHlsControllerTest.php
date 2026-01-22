@@ -35,7 +35,7 @@ describe('Network HLS Controller', function () {
             $response = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
 
             $response->assertNotFound();
-        });
+        })->group('serial');
 
         it('returns 503 when broadcast is enabled but no playlist exists', function () {
             $network = Network::factory()->for($this->user)->broadcasting()->create();
@@ -44,7 +44,7 @@ describe('Network HLS Controller', function () {
 
             $response->assertStatus(503);
             $response->assertHeader('Retry-After', '5');
-        });
+        })->group('serial');
 
         it('returns playlist content when broadcast is active and playlist exists', function () {
             $network = Network::factory()->for($this->user)->activeBroadcast()->create();
@@ -77,7 +77,7 @@ M3U8;
             $response->assertHeader('Access-Control-Allow-Origin', '*');
             $response->assertSee('#EXTM3U');
             $response->assertSee('live000001.ts');
-        });
+        })->group('serial');
 
         it('returns 503 when broadcast is enabled but not actively broadcasting even if playlist exists', function () {
             $network = Network::factory()->for($this->user)->broadcasting()->create();
@@ -91,7 +91,7 @@ M3U8;
 
             $response->assertStatus(503);
             $response->assertHeader('Retry-After', '5');
-        });
+        })->group('serial');
     });
 
     describe('segment endpoint', function () {
@@ -107,7 +107,7 @@ M3U8;
             ]));
 
             $response->assertNotFound();
-        });
+        })->group('serial');
 
         it('returns 503 when segment does not exist while broadcast enabled but not active', function () {
             $network = Network::factory()->for($this->user)->broadcasting()->create();
@@ -118,7 +118,7 @@ M3U8;
             ]));
 
             $response->assertStatus(503);
-        });
+        })->group('serial');
 
         it('returns 503 when broadcast is enabled but not actively broadcasting even if segment exists', function () {
             $network = Network::factory()->for($this->user)->broadcasting()->create();
@@ -137,7 +137,7 @@ M3U8;
             ]));
 
             $response->assertStatus(503);
-        });
+        })->group('serial');
 
         it('returns segment content when it exists', function () {
             $network = Network::factory()->for($this->user)->activeBroadcast()->create();
@@ -158,7 +158,7 @@ M3U8;
             $response->assertOk();
             $response->assertHeader('Content-Type', 'video/MP2T');
             $response->assertHeader('Access-Control-Allow-Origin', '*');
-        });
+        })->group('serial');
     });
 
     describe('storage path', function () {

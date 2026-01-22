@@ -23,6 +23,8 @@ it('enables network, generates schedule and starts broadcast via ensure command'
                 'end_time' => Carbon::now()->addMinutes(30),
                 'duration_seconds' => 31 * 60,
             ]);
+
+            return 1; // Return the count of programmes generated
         });
     });
 
