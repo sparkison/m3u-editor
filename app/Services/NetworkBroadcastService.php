@@ -73,11 +73,46 @@ class NetworkBroadcastService
         $hlsPath = $network->getHlsStoragePath();
         File::ensureDirectoryExists($hlsPath);
 
-        // Determine programme and seek position. Prefer persisted broadcast reference when available.
+        // Determine programme to broadcast.
+        // Priority: current programme > next programme > persisted (only if still valid)
         $programme = $network->getCurrentProgramme();
+
+        if (! $programme) {
+            // No current programme - try to get the next upcoming one
+            $programme = $network->getNextProgramme();
+
+            if ($programme) {
+                Log::info('No current programme, using next upcoming programme', [
+                    'network_id' => $network->id,
+                    'next_programme_id' => $programme->id,
+                    'next_programme_title' => $programme->title,
+                    'next_programme_start' => $programme->start_time->toIso8601String(),
+                ]);
+            }
+        }
+
+        // Only fall back to persisted programme if it's STILL AIRING (not ended)
         if (! $programme && $network->broadcast_programme_id) {
-            // Try to load the persisted programme if current one not found
-            $programme = NetworkProgramme::find($network->broadcast_programme_id);
+            $persistedProgramme = NetworkProgramme::find($network->broadcast_programme_id);
+            if ($persistedProgramme && $persistedProgramme->end_time->gt(now())) {
+                // Persisted programme is still valid (hasn't ended yet)
+                $programme = $persistedProgramme;
+                Log::info('Using persisted programme that is still airing', [
+                    'network_id' => $network->id,
+                    'programme_id' => $programme->id,
+                    'programme_title' => $programme->title,
+                ]);
+            } else {
+                // Persisted programme has ended - clear the stale reference
+                Log::info('Clearing stale persisted programme reference (programme has ended)', [
+                    'network_id' => $network->id,
+                    'old_programme_id' => $network->broadcast_programme_id,
+                ]);
+                $network->update([
+                    'broadcast_programme_id' => null,
+                    'broadcast_initial_offset_seconds' => null,
+                ]);
+            }
         }
 
         if (! $programme) {
@@ -137,12 +172,16 @@ class NetworkBroadcastService
             ]);
 
             // Clear any persisted broadcast reference and remove HLS files if they exist.
+            // When explicitly stopped (not a programme transition), reset sequences to start fresh
             $network->update([
                 'broadcast_started_at' => null,
                 'broadcast_pid' => null,
                 'broadcast_programme_id' => null,
                 'broadcast_initial_offset_seconds' => null,
                 'broadcast_requested' => false,
+                // Reset sequences on explicit stop - next start will be a fresh broadcast
+                'broadcast_segment_sequence' => 0,
+                'broadcast_discontinuity_sequence' => 0,
             ]);
 
             // Remove lingering playlist and segment files to prevent stale content from being served
@@ -157,25 +196,6 @@ class NetworkBroadcastService
                     }
                     foreach (File::glob("{$hlsPath}/*.ts") as $file) {
                         File::delete($file);
-                    }
-
-                    // Kill promoter loop if it was started (cross-platform)
-                    $promotePidFile = "{$hlsPath}/promote_pid";
-                    if (File::exists($promotePidFile)) {
-                        try {
-                            $promotePid = (int) File::get($promotePidFile);
-                            if ($promotePid > 0 && @posix_kill($promotePid, 0)) {
-                                posix_kill($promotePid, SIGKILL);
-                            }
-                        } catch (\Throwable $e) {
-                            Log::warning('Failed to kill playlist promoter process', ['network_id' => $network->id, 'error' => $e->getMessage()]);
-                        }
-
-                        try {
-                            File::delete($promotePidFile);
-                        } catch (\Throwable $e) {
-                            // ignore
-                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -197,15 +217,18 @@ class NetworkBroadcastService
             if (! $this->isProcessRunning($network)) {
                 Log::info("🔴 BROADCAST STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
+                // Explicit stop - reset sequences for fresh start next time
                 $network->update([
                     'broadcast_started_at' => null,
                     'broadcast_pid' => null,
                     'broadcast_programme_id' => null,
                     'broadcast_initial_offset_seconds' => null,
                     'broadcast_requested' => false,
+                    'broadcast_segment_sequence' => 0,
+                    'broadcast_discontinuity_sequence' => 0,
                 ]);
 
-                // Remove any HLS files and promoter loop
+                // Remove any HLS files
                 $this->cleanupHlsForNetwork($network);
 
                 // Emit a structured metric/log for broadcast stop
@@ -224,13 +247,16 @@ class NetworkBroadcastService
 
         Log::info("🔴 BROADCAST FORCE-STOPPED: {$network->name} (Network ID: {$network->id}, PID: {$pid})");
 
+        // Explicit force-stop - reset sequences for fresh start next time
         $network->update([
             'broadcast_started_at' => null,
             'broadcast_pid' => null,
             'broadcast_requested' => false,
+            'broadcast_segment_sequence' => 0,
+            'broadcast_discontinuity_sequence' => 0,
         ]);
 
-        // Ensure HLS files and promoter loop are removed on force-stop as well
+        // Ensure HLS files are removed on force-stop as well
         $this->cleanupHlsForNetwork($network);
 
         return true;
@@ -239,6 +265,7 @@ class NetworkBroadcastService
     /**
      * Check if a network's broadcast process is running.
      * Uses posix_kill with signal 0 for cross-platform compatibility (macOS/Linux).
+     * Also checks for zombie processes which appear as "running" to posix_kill but are dead.
      */
     public function isProcessRunning(Network $network): bool
     {
@@ -251,7 +278,25 @@ class NetworkBroadcastService
         // Use posix_kill with signal 0 to check if process exists (cross-platform)
         // Returns true if process exists, false if it doesn't
         // Signal 0 doesn't actually send a signal, just checks existence
-        return @posix_kill($pid, 0);
+        if (! @posix_kill($pid, 0)) {
+            return false;
+        }
+
+        // Check if process is a zombie (dead but not reaped)
+        // Zombies still exist in process table so posix_kill returns true,
+        // but they are effectively dead and won't process any data
+        $statusFile = "/proc/{$pid}/status";
+        if (file_exists($statusFile)) {
+            $status = @file_get_contents($statusFile);
+            if ($status !== false && preg_match('/^State:\s+Z/m', $status)) {
+                // Zombie process - try to reap it
+                @pcntl_waitpid($pid, $status, WNOHANG);
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -339,16 +384,59 @@ class NetworkBroadcastService
             $command = array_merge($command, $this->getTranscodeOptions($network));
         }
 
-        // HLS output options
-        // hls_list_size: Number of segments to keep in playlist (20 = ~2 min buffer at 6s segments)
-        // delete_segments: Remove old segments to save disk space
-        // append_list: Continue segment numbering across restarts
-        // program_date_time: Add timestamps for DVR-like seeking
+        // HLS output options for continuous streaming across programme transitions
+        // Critical for seamless playback without loops or stalls:
+        //
+        // start_number: Continue segment numbering from where we left off
+        //   - Prevents players from seeing duplicate sequence numbers
+        //   - Essential for append_list to work correctly across restarts
+        //
+        // hls_list_size: Number of segments to keep in playlist
+        //   - 0 = keep all (not recommended for live)
+        //   - 20 = ~2 min buffer at 6s segments (good default)
+        //
+        // HLS Flags explained:
+        //   - delete_segments: Remove old .ts files beyond hls_list_size (saves disk)
+        //   - append_list: Append to existing playlist instead of overwriting
+        //   - program_date_time: Add EXT-X-PROGRAM-DATE-TIME for DVR/seeking
+        //   - omit_endlist: Never write EXT-X-ENDLIST (live stream, not VOD)
+        //   - discont_start: Add EXT-X-DISCONTINUITY at start (signals format change)
+        //   - independent_segments: Each segment can be decoded independently
+        //
+        // The combination of start_number + discont_start ensures:
+        // 1. Playlist continuity across programme transitions
+        // 2. Proper discontinuity signaling when format/timing changes
+        // 3. Players don't loop back to old content
+        //
+        // NOTE: We do NOT use append_list because FFmpeg's implementation doesn't
+        // truly maintain continuity across process restarts. Instead, we use
+        // start_number to continue segment numbering and let FFmpeg write a fresh
+        // playlist. The insertDiscontinuityMarker() method handles discontinuity
+        // insertion when transitioning between programmes.
+        $startNumber = max(0, $network->broadcast_segment_sequence ?? 0);
+
+        // HLS flags:
+        // - delete_segments: Remove old .ts files beyond hls_list_size (saves disk)
+        // - program_date_time: Add EXT-X-PROGRAM-DATE-TIME for DVR/seeking
+        // - omit_endlist: Never write EXT-X-ENDLIST (live stream, not VOD)
+        // - discont_start: Add EXT-X-DISCONTINUITY at start when resuming
+        // - independent_segments: Each segment can be decoded independently
+        $hlsFlags = 'delete_segments+program_date_time+omit_endlist';
+
+        // Add discont_start flag if this is a content transition (sequence > 0 means we've had content before)
+        if ($startNumber > 0) {
+            $hlsFlags .= '+discont_start';
+        }
+
+        // Add independent_segments for better player compatibility
+        $hlsFlags .= '+independent_segments';
+
         $command = array_merge($command, [
             '-f', 'hls',
             '-hls_time', (string) ($network->segment_duration ?? 6),
             '-hls_list_size', (string) ($network->hls_list_size ?? 20),
-            '-hls_flags', 'delete_segments+append_list+program_date_time',
+            '-start_number', (string) $startNumber,
+            '-hls_flags', $hlsFlags,
             '-hls_segment_filename', "{$hlsPath}/live%06d.ts",
             "{$hlsPath}/live.m3u8",
         ]);
@@ -581,27 +669,6 @@ class NetworkBroadcastService
             'pid' => $pid,
         ]);
 
-        // Start a small promoter loop to atomically promote temporary playlists
-        try {
-            $hlsPath = $network->getHlsStoragePath();
-            $artisanPath = base_path('artisan');
-            $phpBinary = PHP_BINARY; // Use the same PHP binary running this code
-
-            $promotePidCmd = "nohup sh -c 'while sleep 1; do {$phpBinary} ".escapeshellarg($artisanPath)." network:promote-tmp-playlist {$network->uuid} >/dev/null 2>&1; done' >/dev/null 2>&1 & echo $!";
-            $output = [];
-            $rc = 0;
-            exec($promotePidCmd, $output, $rc);
-            if ($rc === 0 && ! empty($output[0])) {
-                $promotePid = (int) $output[0];
-                // persist promote PID in a file inside HLS path so we can kill it on stop
-                File::ensureDirectoryExists($hlsPath);
-                File::put("{$hlsPath}/promote_pid", (string) $promotePid);
-                Log::info('Started playlist promoter loop', ['network_id' => $network->id, 'promote_pid' => $promotePid]);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Failed to start playlist promoter loop', ['network_id' => $network->id, 'error' => $e->getMessage()]);
-        }
-
         return true;
     }
 
@@ -616,7 +683,163 @@ class NetworkBroadcastService
     }
 
     /**
-     * Remove HLS files and kill promoter loop for a network.
+     * Insert a discontinuity marker into the HLS playlist.
+     *
+     * This is called when transitioning between programmes to signal to HLS players
+     * that there's a format/timing change. The discontinuity marker tells players
+     * to reset their decoders and not assume continuity with previous segments.
+     *
+     * @return bool True if discontinuity was inserted successfully
+     */
+    protected function insertDiscontinuityMarker(Network $network): bool
+    {
+        $hlsPath = $network->getHlsStoragePath();
+        $playlistPath = "{$hlsPath}/live.m3u8";
+
+        if (! File::exists($playlistPath)) {
+            Log::debug('No playlist to insert discontinuity into', ['network_id' => $network->id]);
+
+            return false;
+        }
+
+        try {
+            $content = File::get($playlistPath);
+            $lines = explode("\n", $content);
+
+            // Find where to insert discontinuity - before the last segment or at the end
+            // We want it BEFORE the EXT-X-ENDLIST if present, or at the end otherwise
+            $insertIndex = count($lines);
+
+            for ($i = count($lines) - 1; $i >= 0; $i--) {
+                $line = trim($lines[$i]);
+                if ($line === '#EXT-X-ENDLIST') {
+                    $insertIndex = $i;
+                    break;
+                }
+                // Stop searching once we hit actual content
+                if (str_starts_with($line, '#EXTINF:') || str_ends_with($line, '.ts')) {
+                    $insertIndex = $i + 1;
+                    break;
+                }
+            }
+
+            // Insert discontinuity marker
+            array_splice($lines, $insertIndex, 0, ['#EXT-X-DISCONTINUITY']);
+
+            // Write back
+            $newContent = implode("\n", $lines);
+            File::put($playlistPath, $newContent);
+
+            // Increment discontinuity sequence for next FFmpeg process
+            $network->increment('broadcast_discontinuity_sequence');
+
+            Log::info('Inserted discontinuity marker into playlist', [
+                'network_id' => $network->id,
+                'discontinuity_sequence' => $network->broadcast_discontinuity_sequence,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Failed to insert discontinuity marker', [
+                'network_id' => $network->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Update the segment sequence counter based on existing segments.
+     *
+     * Scans the HLS directory for existing segments and sets the sequence
+     * counter to continue from where we left off.
+     */
+    protected function updateSegmentSequence(Network $network): void
+    {
+        $hlsPath = $network->getHlsStoragePath();
+        $segments = File::glob("{$hlsPath}/live*.ts");
+
+        if (empty($segments)) {
+            return;
+        }
+
+        $maxSequence = 0;
+        foreach ($segments as $segment) {
+            // Extract sequence number from filename: live000123.ts -> 123
+            if (preg_match('/live(\d+)\.ts$/', basename($segment), $matches)) {
+                $seq = (int) $matches[1];
+                if ($seq > $maxSequence) {
+                    $maxSequence = $seq;
+                }
+            }
+        }
+
+        // Set sequence to next number
+        $nextSequence = $maxSequence + 1;
+        if ($nextSequence > ($network->broadcast_segment_sequence ?? 0)) {
+            $network->update(['broadcast_segment_sequence' => $nextSequence]);
+
+            Log::debug('Updated segment sequence', [
+                'network_id' => $network->id,
+                'next_sequence' => $nextSequence,
+            ]);
+        }
+    }
+
+    /**
+     * Clean up only old segments, preserving the playlist for continuity.
+     *
+     * This is used during programme transitions where we want to keep the
+     * playlist intact but remove segments that are no longer needed.
+     *
+     * @param  int  $keepCount  Number of recent segments to keep (0 = delete all)
+     */
+    protected function cleanupOldSegments(Network $network, int $keepCount = 0): void
+    {
+        $hlsPath = $network->getHlsStoragePath();
+
+        if (! File::isDirectory($hlsPath)) {
+            return;
+        }
+
+        $segments = File::glob("{$hlsPath}/live*.ts");
+        if (empty($segments)) {
+            return;
+        }
+
+        // Sort by modification time (oldest first)
+        usort($segments, function ($a, $b) {
+            return File::lastModified($a) - File::lastModified($b);
+        });
+
+        // Keep the most recent segments
+        $toDelete = $keepCount > 0 ? array_slice($segments, 0, -$keepCount) : $segments;
+
+        $deleted = 0;
+        foreach ($toDelete as $segment) {
+            try {
+                File::delete($segment);
+                $deleted++;
+            } catch (\Throwable $e) {
+                Log::warning('Failed to delete old segment', [
+                    'file' => $segment,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($deleted > 0) {
+            Log::debug('Cleaned up old segments', [
+                'network_id' => $network->id,
+                'deleted' => $deleted,
+                'kept' => count($segments) - $deleted,
+            ]);
+        }
+    }
+
+    /**
+     * Remove HLS files for a network.
      * Called when stopping broadcast or cleaning up after crashes.
      */
     protected function cleanupHlsForNetwork(Network $network): void
@@ -665,62 +888,6 @@ class NetworkBroadcastService
                 'playlists' => $deletedPlaylists,
                 'segments' => $deletedSegments,
             ]);
-        }
-
-        // Kill promoter loop process (cross-platform with posix_kill)
-        $promotePidFile = "{$hlsPath}/promote_pid";
-        if (File::exists($promotePidFile)) {
-            try {
-                $promotePid = (int) File::get($promotePidFile);
-                if ($promotePid > 0 && @posix_kill($promotePid, 0)) {
-                    posix_kill($promotePid, SIGKILL);
-                    Log::debug('Killed promoter loop', ['network_id' => $network->id, 'pid' => $promotePid]);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Failed to kill promoter on cleanup', ['network_id' => $network->id, 'error' => $e->getMessage()]);
-            }
-
-            try {
-                File::delete($promotePidFile);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-        }
-    }
-
-    /**
-     * Promote a temporary playlist to the live playlist if it appears stable.
-     * Returns true if promotion occurred.
-     */
-    public function promoteTmpPlaylistIfStable(Network $network, int $stableSeconds = 1): bool
-    {
-        $hlsPath = $network->getHlsStoragePath();
-        $tmp = "{$hlsPath}/live.m3u8.tmp";
-        $target = "{$hlsPath}/live.m3u8";
-
-        if (! File::exists($tmp)) {
-            return false;
-        }
-
-        try {
-            $mtime = File::lastModified($tmp);
-            $stableCutoff = time() - $stableSeconds;
-
-            if ($mtime > $stableCutoff) {
-                // Not yet stable
-                return false;
-            }
-
-            // Copy atomically
-            File::copy($tmp, $target);
-            // Ensure target has same permissions
-            @chmod($target, 0644);
-
-            return true;
-        } catch (\Throwable $e) {
-            Log::warning('Failed to promote tmp playlist', ['network_id' => $network->id, 'error' => $e->getMessage()]);
-
-            return false;
         }
     }
 
@@ -851,57 +1018,125 @@ class NetworkBroadcastService
 
         // Process died but should be running
         if (! $isRunning && $network->broadcast_pid !== null) {
-            $crashedProgramme = $network->broadcast_programme_id
+            $oldProgramme = $network->broadcast_programme_id
                 ? NetworkProgramme::find($network->broadcast_programme_id)
                 : null;
 
-            Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
-                'network_id' => $network->id,
-                'network_name' => $network->name,
-                'old_pid' => $network->broadcast_pid,
-                'crashed_programme_id' => $crashedProgramme?->id,
-                'crashed_programme_title' => $crashedProgramme?->title,
-                'uptime_seconds' => $network->broadcast_started_at
-                    ? now()->diffInSeconds($network->broadcast_started_at)
-                    : null,
-            ]);
+            // Determine if this was a normal completion (programme ended) or an unexpected crash
+            $programmeEnded = $oldProgramme && $oldProgramme->end_time->lte(now());
 
-            $network->update([
-                'broadcast_started_at' => null,
-                'broadcast_pid' => null,
-                'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
-            ]);
-
-            // Clean up any orphaned HLS files from the crash
-            // When FFmpeg crashes, it can't clean up its own segments
-            try {
-                $this->cleanupHlsForNetwork($network);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to cleanup orphaned HLS files after crash', [
+            if ($programmeEnded) {
+                // Normal completion - programme finished, FFmpeg exited as expected
+                Log::info('🔄 BROADCAST PROGRAMME COMPLETED: Moving to next programme', [
                     'network_id' => $network->id,
-                    'error' => $e->getMessage(),
+                    'network_name' => $network->name,
+                    'old_pid' => $network->broadcast_pid,
+                    'completed_programme_id' => $oldProgramme->id,
+                    'completed_programme_title' => $oldProgramme->title,
+                    'segment_sequence' => $network->broadcast_segment_sequence,
+                    'discontinuity_sequence' => $network->broadcast_discontinuity_sequence,
+                ]);
+
+                // Update segment sequence counter based on existing segments
+                // This ensures the next FFmpeg process continues numbering correctly
+                $this->updateSegmentSequence($network);
+
+                // Insert discontinuity marker into existing playlist
+                // This signals to players that the content format/timing is changing
+                $this->insertDiscontinuityMarker($network);
+
+                // Clear the persisted reference so we get the next programme on restart
+                // BUT keep the segment and discontinuity sequences for continuity!
+                $network->update([
+                    'broadcast_started_at' => null,
+                    'broadcast_pid' => null,
+                    'broadcast_programme_id' => null,
+                    'broadcast_initial_offset_seconds' => null,
+                    'broadcast_error' => null,
+                    // Note: broadcast_segment_sequence and broadcast_discontinuity_sequence
+                    // are preserved to maintain playlist continuity
+                ]);
+
+                // DO NOT wipe the playlist! We want continuity.
+                // Only clean up OLD segments that are no longer referenced in the playlist.
+                // FFmpeg's delete_segments flag handles this, but we clean orphans just in case.
+                try {
+                    // Keep at least hls_list_size segments for buffering
+                    $keepCount = $network->hls_list_size ?? 20;
+                    $this->cleanupOldSegments($network, $keepCount);
+
+                    Log::info('Cleaned up old segments after programme completion (playlist preserved)', [
+                        'network_id' => $network->id,
+                        'kept_segments' => $keepCount,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to cleanup old segments after programme completion', [
+                        'network_id' => $network->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            } else {
+                // Unexpected crash - programme was still supposed to be airing
+                Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
+                    'network_id' => $network->id,
+                    'network_name' => $network->name,
+                    'old_pid' => $network->broadcast_pid,
+                    'crashed_programme_id' => $oldProgramme?->id,
+                    'crashed_programme_title' => $oldProgramme?->title,
+                    'uptime_seconds' => $network->broadcast_started_at
+                        ? now()->diffInSeconds($network->broadcast_started_at)
+                        : null,
+                ]);
+
+                // Update segment sequence for recovery
+                $this->updateSegmentSequence($network);
+
+                // Keep persisted reference for crash recovery (resume from where we left off)
+                $network->update([
+                    'broadcast_started_at' => null,
+                    'broadcast_pid' => null,
+                    'broadcast_error' => 'Broadcast crashed unexpectedly. Will auto-restart if programme is still active.',
+                ]);
+
+                // For crashes, we also preserve the playlist for seamless recovery
+                // Only clean up orphaned segments (those not in the playlist)
+                try {
+                    $keepCount = $network->hls_list_size ?? 20;
+                    $this->cleanupOldSegments($network, $keepCount);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to cleanup orphaned HLS segments after crash', [
+                        'network_id' => $network->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // Emit a metric/log entry for the crash
+                Log::warning('HLS_METRIC: broadcast_crashed', [
+                    'network_id' => $network->id,
+                    'uuid' => $network->uuid,
+                    'old_pid' => $network->broadcast_pid,
+                    'uptime_seconds' => $network->broadcast_started_at
+                        ? now()->diffInSeconds($network->broadcast_started_at)
+                        : null,
                 ]);
             }
-
-            // Emit a metric/log entry for the crash
-            Log::warning('HLS_METRIC: broadcast_crashed', [
-                'network_id' => $network->id,
-                'uuid' => $network->uuid,
-                'old_pid' => $network->broadcast_pid,
-                'uptime_seconds' => $network->broadcast_started_at
-                    ? now()->diffInSeconds($network->broadcast_started_at)
-                    : null,
-            ]);
         }
 
-        // Get current programme
+        // Get current or next programme
         $programme = $network->getCurrentProgramme();
 
-        // No current programme - stop if running
+        // If no current programme, try to get the next one (for seamless transitions)
+        if (! $programme) {
+            $programme = $network->getNextProgramme();
+        }
+
+        // No current or next programme - stop if running
         if (! $programme) {
             if ($network->broadcast_pid !== null) {
                 $this->stop($network);
                 $result['action'] = 'stopped_no_content';
+            } else {
+                $result['action'] = 'no_content';
             }
 
             return $result;

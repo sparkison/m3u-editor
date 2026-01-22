@@ -129,9 +129,6 @@ ffmpeg -y -ss 3600 -re -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 1
   - `cleanupSegments()` deletes old `.ts` segments
   - deleted network endpoints return `404`
 
-- `tests/Feature/NetworkBroadcastPromotionTest.php` — verifies:
-  - the `PromoteTmpPlaylist` command and `NetworkBroadcastService::promoteTmpPlaylistIfStable()` will promote `live.m3u8.tmp -> live.m3u8` only when the temporary playlist is stable (mtime older than the configured threshold)
-
 - `tests/Feature/NetworkReconnectAfterStopTest.php` — verifies:
   - a client that reconnects after `stop()` cannot resume playback; playlist/segment endpoints return `503` or `404`
   - segments are served with non-cacheable headers to prevent intermediaries/browsers from replaying stopped streams
@@ -163,8 +160,9 @@ This section summarizes what has already been implemented for the Network → HL
 
 ### Completed (✅)
 - **Controller guards**: playlist/segment endpoints and legacy stream endpoint now require the network to be actively broadcasting (`isBroadcasting()`) before serving content.
-- **Stop cleanup**: `NetworkBroadcastService::stop()` clears persisted broadcast refs, kills promoter (if running), and deletes `live.m3u8`, `*.m3u8.tmp`, and `*.ts` files to prevent stale playback.
-- **Playlist promotion**: `promoteTmpPlaylistIfStable()` + `php artisan network:promote-tmp-playlist {network}` command added; a small promoter loop is started on broadcast `start()` and its PID is stored in `{hlsPath}/promote_pid`.
+- **Stop cleanup**: `NetworkBroadcastService::stop()` clears persisted broadcast refs and deletes `live.m3u8`, `*.m3u8.tmp`, and `*.ts` files to prevent stale playback.
+- **Sequence tracking**: `broadcast_segment_sequence` and `broadcast_discontinuity_sequence` columns track HLS continuity across programme transitions. FFmpeg uses `-start_number` to continue segment numbering.
+- **Discontinuity markers**: `insertDiscontinuityMarker()` adds `#EXT-X-DISCONTINUITY` to playlists when transitioning between programmes.
 - **Non-cache headers**: segment and stream responses include `Cache-Control: no-cache, no-store, must-revalidate` (and related headers) to avoid proxies/browsers replaying stopped content.
 - **EPG programme images**: `NetworkScheduleService::getContentImage()` now tries multiple fallback sources (episode cover → info fields → series cover; channel logo → movie_data → info) to maximize image availability in generated EPG.
 - **EPG XMLTV icon fallback**: `NetworkEpgService::formatProgrammeXml()` falls back to contentable's image fields when `programme->image` is empty, ensuring programmes display icons even if they weren't stored during schedule generation.
@@ -182,11 +180,9 @@ This section summarizes what has already been implemented for the Network → HL
 
 ### Planned / Recommended (📝)
 - **High priority**
-  - Replace the simple `nohup` promoter loop with a managed worker (queue job, supervisor, or systemd service) for reliability and lifecycle control.
-  - Make FFmpeg write to `live.m3u8.tmp` and rely on the promoter to promote the file atomically (remove partial-playlist window at writer-level).
+  - Add monitoring & alerts for FFmpeg failures (metrics, uptime checks, Prometheus/Grafana dashboard panels, alert rules).
 - **Medium priority**
   - Add optional proxy cache invalidation or light restart on stop to guarantee no intermediary caches stale segments/playlists (use only when embedded proxy is used).
-  - Add monitoring & alerts for promoter / FFmpeg failures (metrics, uptime checks, Prometheus/Grafana dashboard panels, alert rules).
 - **Low priority**
   - Add more stress tests for rapid start/stop/reconnect and for race-condition coverage.
   - Harden file permissions/ownership and test idempotency of cleanup under concurrent stop/start calls.
@@ -194,15 +190,13 @@ This section summarizes what has already been implemented for the Network → HL
 ### Checklist (status | item)
 - [x] Controller guards implemented
 - [x] Stop cleanup (delete playlists/segments & clear persisted refs) implemented
-- [x] Playlist promotion command & service logic implemented
+- [x] Sequence tracking for HLS continuity implemented
 - [x] Segment/stream no-cache headers set
 - [x] EPG programme image fallbacks in schedule generation
 - [x] EPG XMLTV icon fallback to contentable images
 - [x] Tests added and passing (local container)
-- [ ] Replace promoter loop with managed worker
-- [ ] Make FFmpeg write atomically via `.tmp` then rename
 - [ ] Optional: proxy cache invalidation on stop
-- [ ] Monitoring & alerting for broadcast/promoter health
+- [ ] Monitoring & alerting for broadcast health
 - [ ] Add race-condition tests
 
 ### How to verify manually 🔍
@@ -211,10 +205,9 @@ This section summarizes what has already been implemented for the Network → HL
 3. Stop the broadcast via Filament action (**Stop Broadcast**) or `app(\App\Services\NetworkBroadcastService::class)->stop($network)`.
 4. Confirm playlist returns `503` (or `404` if files removed) and segment returns `503`/`404`.
 5. Confirm `storage/app/networks/<uuid>` no longer contains `live.m3u8`/`.ts` files for that network.
-6. Check Laravel logs for `HLS_METRIC: broadcast_stopped` and promoter termination logs, if present.
+6. Check Laravel logs for `HLS_METRIC: broadcast_stopped`.
 
 ### Ownership & ETA suggestions
-- Assign promoter rework and atomic-write changes to the infrastructure/ops owner (1–2 sprints depending on complexity).
 - Proxy invalidation is optional and should be implemented only for embedded proxy setups (1 sprint).
 
 ---

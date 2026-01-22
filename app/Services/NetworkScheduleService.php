@@ -29,7 +29,7 @@ class NetworkScheduleService
     /**
      * Generate the programme schedule for a network.
      */
-    public function generateSchedule(Network $network, ?Carbon $startFrom = null): void
+    public function generateSchedule(Network $network, ?Carbon $startFrom = null): int
     {
         $startFrom = $startFrom ?? Carbon::now();
         $scheduleWindowDays = $network->schedule_window_days ?? self::DEFAULT_SCHEDULE_WINDOW_DAYS;
@@ -47,21 +47,86 @@ class NetworkScheduleService
         if ($contentItems->isEmpty()) {
             Log::warning("No content found for network {$network->name}");
 
-            return;
+            return 0;
         }
 
-        DB::transaction(function () use ($network, $startFrom, $endAt, $contentItems) {
-            // Clear future programmes (keep past for history)
+        // Determine the starting content index BEFORE deleting anything.
+        // Look for the most recent programme to determine where we should continue from.
+        $startingContentIndex = $this->determineStartingContentIndex($network, $contentItems, $startFrom);
+
+        // Check if there's a currently airing programme - if so, we should skip to its end
+        $currentlyAiring = $network->programmes()
+            ->where('start_time', '<=', $startFrom)
+            ->where('end_time', '>', $startFrom)
+            ->first();
+
+        DB::transaction(function () use ($network, $startFrom, $endAt, $contentItems, $startingContentIndex, $currentlyAiring) {
+            // Clear future programmes (keep past for history) — exclude programmes that start exactly at the regeneration boundary
             $network->programmes()
-                ->where('start_time', '>=', $startFrom)
+                ->where('start_time', '>', $startFrom)
                 ->delete();
 
-            // Generate new schedule
-            $currentTime = $startFrom->copy();
-            $contentIndex = 0;
+            // If there's a currently airing programme, start from its end time
+            // This prevents creating overlapping programmes
+            if ($currentlyAiring) {
+                $currentTime = $currentlyAiring->end_time->copy();
+
+                // Find the content index for the item AFTER the currently airing one
+                $contentIndex = $startingContentIndex;
+                foreach ($contentItems as $idx => $item) {
+                    if ($item && get_class($item) === $currentlyAiring->contentable_type && $item->id === $currentlyAiring->contentable_id) {
+                        $contentIndex = $idx + 1;
+                        if ($contentIndex >= $contentItems->count()) {
+                            $contentIndex = $network->loop_content ? 0 : $contentItems->count();
+                        }
+                        break;
+                    }
+                }
+
+                Log::debug('Schedule regeneration: skipping currently airing programme', [
+                    'network_id' => $network->id,
+                    'current_programme_id' => $currentlyAiring->id,
+                    'current_programme_title' => $currentlyAiring->title,
+                    'current_end_time' => $currentlyAiring->end_time->toDateTimeString(),
+                    'next_content_index' => $contentIndex,
+                ]);
+            } else {
+                $currentTime = $startFrom->copy();
+                $contentIndex = $startingContentIndex;
+            }
+
             $contentCount = $contentItems->count();
 
             while ($currentTime->lt($endAt)) {
+                // If a programme already exists that starts exactly at this time, skip creating it
+                $existingProgramme = $network->programmes()->where('start_time', $currentTime)->first();
+                if ($existingProgramme) {
+                    // Advance to the end of the existing programme
+                    $currentTime = $existingProgramme->end_time->copy();
+
+                    // Try to advance the content index to the item after the existing programme's contentable if possible
+                    $foundIndex = null;
+                    foreach ($contentItems as $idx => $item) {
+                        if ($item && get_class($item) === $existingProgramme->contentable_type && $item->id === $existingProgramme->contentable_id) {
+                            $foundIndex = $idx;
+                            break;
+                        }
+                    }
+
+                    if ($foundIndex !== null) {
+                        $contentIndex = $foundIndex + 1;
+                        if ($contentIndex >= $contentCount) {
+                            if ($network->loop_content) {
+                                $contentIndex = 0;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    continue; // Skip creation for this time slot
+                }
+
                 $content = $contentItems[$contentIndex];
                 $duration = $this->getContentDuration($content);
 
@@ -93,9 +158,110 @@ class NetworkScheduleService
             $network->update(['schedule_generated_at' => Carbon::now()]);
         });
 
+        $generatedCount = $network->programmes()->where('start_time', '>=', $startFrom)->count();
+
         Log::info("Schedule generated for network {$network->name}", [
-            'programme_count' => $network->programmes()->count(),
+            'programme_count' => $generatedCount,
         ]);
+
+        return $generatedCount;
+    }
+
+    /**
+     * Determine the starting content index for schedule regeneration.
+     *
+     * This method looks at the most recent programme (currently airing or just finished)
+     * to determine which content item should come next. This prevents the schedule from
+     * resetting to the first content item when regeneration happens mid-broadcast.
+     */
+    protected function determineStartingContentIndex(Network $network, Collection $contentItems, Carbon $startFrom): int
+    {
+        $contentCount = $contentItems->count();
+
+        if ($contentCount === 0) {
+            return 0;
+        }
+
+        // First, check if there's a currently airing programme
+        $currentProgramme = $network->programmes()
+            ->where('start_time', '<=', $startFrom)
+            ->where('end_time', '>', $startFrom)
+            ->first();
+
+        if ($currentProgramme) {
+            // There's a programme currently airing - find its content index
+            // We'll continue from this programme's content, so the next will be +1
+            $foundIndex = $this->findContentIndex($contentItems, $currentProgramme);
+
+            if ($foundIndex !== null) {
+                Log::debug('Found currently airing programme for content index', [
+                    'network_id' => $network->id,
+                    'programme_id' => $currentProgramme->id,
+                    'programme_title' => $currentProgramme->title,
+                    'content_index' => $foundIndex,
+                ]);
+
+                // Since this programme is still airing, we start from this index
+                // (the existing programme will be skipped in the main loop)
+                return $foundIndex;
+            }
+        }
+
+        // No current programme - check for the most recently ended programme
+        // This handles the case where we're between programmes
+        $lastProgramme = $network->programmes()
+            ->where('end_time', '<=', $startFrom)
+            ->orderBy('end_time', 'desc')
+            ->first();
+
+        if ($lastProgramme) {
+            $foundIndex = $this->findContentIndex($contentItems, $lastProgramme);
+
+            if ($foundIndex !== null) {
+                // The last programme just finished, so start with the NEXT content item
+                $nextIndex = $foundIndex + 1;
+
+                if ($nextIndex >= $contentCount) {
+                    if ($network->loop_content) {
+                        $nextIndex = 0;
+                    } else {
+                        // No more content and not looping
+                        return 0;
+                    }
+                }
+
+                Log::debug('Continuing from most recently ended programme', [
+                    'network_id' => $network->id,
+                    'last_programme_id' => $lastProgramme->id,
+                    'last_programme_title' => $lastProgramme->title,
+                    'last_content_index' => $foundIndex,
+                    'next_content_index' => $nextIndex,
+                ]);
+
+                return $nextIndex;
+            }
+        }
+
+        // No programme history found - start from the beginning
+        Log::debug('No programme history found, starting from beginning', [
+            'network_id' => $network->id,
+        ]);
+
+        return 0;
+    }
+
+    /**
+     * Find the index of a programme's content within the content items collection.
+     */
+    protected function findContentIndex(Collection $contentItems, NetworkProgramme $programme): ?int
+    {
+        foreach ($contentItems as $idx => $item) {
+            if ($item && get_class($item) === $programme->contentable_type && $item->id === $programme->contentable_id) {
+                return $idx;
+            }
+        }
+
+        return null;
     }
 
     /**

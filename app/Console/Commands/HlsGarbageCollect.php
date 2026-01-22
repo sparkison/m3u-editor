@@ -230,20 +230,6 @@ class HlsGarbageCollect extends Command
                         $files->delete($file);
                     }
 
-                    // Kill promoter if still running
-                    $promotePidFile = "{$dir}/promote_pid";
-                    if ($files->exists($promotePidFile)) {
-                        try {
-                            $promotePid = (int) $files->get($promotePidFile);
-                            if ($promotePid > 0 && @posix_kill($promotePid, 0)) {
-                                posix_kill($promotePid, SIGKILL);
-                            }
-                            $files->delete($promotePidFile);
-                        } catch (\Throwable $e) {
-                            // Ignore errors
-                        }
-                    }
-
                     $cleaned++;
                 }
             }
