@@ -60,15 +60,16 @@ class XtreamService
         $this->xtream_config = $xtream_config;
 
         // Setup server, user, and pass
-        if ($playlist) {
+        // Prefer Xtream config if provided directly
+        if ($xtream_config) {
+            $this->server = $xtream_config['url'] ?? '';
+            $this->user = $xtream_config['username'] ?? '';
+            $this->pass = $xtream_config['password'] ?? '';
+        } elseif ($playlist) {
             $config = $playlist->xtream_config;
             $this->server = $config['url'] ?? '';
             $this->user = $config['username'] ?? '';
             $this->pass = $config['password'] ?? '';
-        } elseif ($xtream_config) {
-            $this->server = $xtream_config['url'] ?? '';
-            $this->user = $xtream_config['username'] ?? '';
-            $this->pass = $xtream_config['password'] ?? '';
         } else {
             return false;
         }

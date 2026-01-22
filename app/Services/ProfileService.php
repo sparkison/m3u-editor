@@ -377,7 +377,11 @@ class ProfileService
                 return false;
             }
 
-            $xtream = XtreamService::make(xtream_config: $xtreamConfig);
+            // Pass playlist for context (passes user agent, ssl settings, etc.)
+            $xtream = XtreamService::make(
+                playlist: $profile->playlist,
+                xtream_config: $xtreamConfig
+            );
 
             if (! $xtream) {
                 Log::warning("Cannot refresh profile {$profile->id}: failed to create XtreamService");
