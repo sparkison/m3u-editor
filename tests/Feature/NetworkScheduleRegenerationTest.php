@@ -1,9 +1,9 @@
 <?php
 
 use App\Models\Channel;
+use App\Models\Network;
 use App\Models\NetworkContent;
 use App\Models\NetworkProgramme;
-use App\Models\Network;
 use App\Services\NetworkScheduleService;
 use Carbon\Carbon;
 
