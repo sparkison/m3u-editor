@@ -159,7 +159,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(10)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
@@ -204,7 +204,7 @@ class M3uProxyService
 
         while ($attempt < $retries) {
             try {
-                $response = Http::timeout(10)->acceptJson()
+                $response = Http::timeout(5)->acceptJson()
                     ->withHeaders($service->apiToken ? [
                         'X-API-Token' => $service->apiToken,
                     ] : [])
@@ -265,7 +265,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(10)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
@@ -311,7 +311,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(10)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
