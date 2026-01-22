@@ -911,6 +911,22 @@ class NetworkBroadcastService
                     'broadcast_initial_offset_seconds' => null,
                     'broadcast_error' => null,
                 ]);
+
+                // Clean up HLS files from the completed programme
+                // This is critical: stale segments must be removed so the next programme
+                // starts with a clean slate. Without this, the append_list flag causes
+                // FFmpeg to append to the old playlist, serving stale content to players.
+                try {
+                    $this->cleanupHlsForNetwork($network);
+                    Log::info('Cleaned up HLS files after programme completion', [
+                        'network_id' => $network->id,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to cleanup HLS files after programme completion', [
+                        'network_id' => $network->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             } else {
                 // Unexpected crash - programme was still supposed to be airing
                 Log::warning('🔴 BROADCAST CRASHED: Process died unexpectedly', [
