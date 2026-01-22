@@ -68,6 +68,20 @@ class ReconcileProfileConnections extends Command
         // Get active streams from m3u-proxy for this playlist
         $activeStreams = M3uProxyService::getPlaylistActiveStreams($playlist);
 
+        // CRITICAL: If API call failed (returned null), skip reconciliation
+        // This prevents incorrectly zeroing out connection counts on timeout
+        if ($activeStreams === null) {
+            $this->error('    Failed to fetch streams from m3u-proxy - SKIPPING reconciliation for this playlist');
+            $this->warn('    This prevents incorrectly resetting connection counts to zero');
+
+            return;
+        }
+
+        // If we got an empty array, that's valid - there are legitimately no streams
+        if (empty($activeStreams)) {
+            $this->info('    No active streams found - will reset profile counts to 0');
+        }
+
         // Build a map of profile_id => active stream count
         $profileStreamCounts = [];
 
