@@ -41,6 +41,9 @@ class Network extends Model
         'broadcast_initial_offset_seconds' => 'integer',
         'broadcast_scheduled_start' => 'datetime',
         'broadcast_schedule_enabled' => 'boolean',
+        // HLS continuity tracking
+        'broadcast_segment_sequence' => 'integer',
+        'broadcast_discontinuity_sequence' => 'integer',
     ];
 
     /**
