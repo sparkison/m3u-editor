@@ -6,19 +6,14 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
+    $this->createdNetworkPaths = [];
 });
 
 afterEach(function () {
-    // Clean up any created test directories
-    $networksPath = storage_path('app/networks');
-    if (File::exists($networksPath)) {
-        // Only clean up test network directories (ones with 'test-' prefix or UUIDs)
-        foreach (File::directories($networksPath) as $dir) {
-            $dirName = basename($dir);
-            // Clean up our test network directories
-            if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $dirName)) {
-                File::deleteDirectory($dir);
-            }
+    // Clean up only the directories created by this test
+    foreach ($this->createdNetworkPaths ?? [] as $path) {
+        if (File::isDirectory($path)) {
+            File::deleteDirectory($path);
         }
     }
 });
@@ -52,6 +47,7 @@ describe('Network HLS Controller', function () {
             // Create the HLS storage directory and playlist
             $hlsPath = $network->getHlsStoragePath();
             File::ensureDirectoryExists($hlsPath);
+            $this->createdNetworkPaths[] = $hlsPath;
 
             $playlistContent = <<<'M3U8'
 #EXTM3U
@@ -85,6 +81,7 @@ M3U8;
             // Create the HLS storage directory and playlist
             $hlsPath = $network->getHlsStoragePath();
             File::ensureDirectoryExists($hlsPath);
+            $this->createdNetworkPaths[] = $hlsPath;
             File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n");
 
             $response = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
@@ -126,6 +123,7 @@ M3U8;
             // Create the HLS storage directory and a segment
             $hlsPath = $network->getHlsStoragePath();
             File::ensureDirectoryExists($hlsPath);
+            $this->createdNetworkPaths[] = $hlsPath;
 
             // Create a small dummy .ts file (just some bytes for testing)
             $dummyContent = str_repeat("\x00", 188 * 10);
@@ -145,6 +143,7 @@ M3U8;
             // Create the HLS storage directory and a segment
             $hlsPath = $network->getHlsStoragePath();
             File::ensureDirectoryExists($hlsPath);
+            $this->createdNetworkPaths[] = $hlsPath;
 
             // Create a small dummy .ts file (just some bytes for testing)
             $dummyContent = str_repeat("\x00", 188 * 10); // 188 bytes is TS packet size
@@ -175,6 +174,7 @@ M3U8;
 
             $hlsPath = $network->getHlsStoragePath();
             File::ensureDirectoryExists($hlsPath);
+            $this->createdNetworkPaths[] = $hlsPath;
 
             expect(File::isDirectory($hlsPath))->toBeTrue();
         });

@@ -1,29 +1,37 @@
 <?php
 
 use App\Models\Network;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    // We fake the disk just to ensure Laravel isolates the underlying
-    // storage location during the test run.
-    Storage::fake('networks');
+    $this->user = User::factory()->create();
+    $this->createdNetworkPaths = [];
+});
+
+afterEach(function () {
+    // Clean up only the directories created by this test
+    foreach ($this->createdNetworkPaths ?? [] as $path) {
+        if (File::isDirectory($path)) {
+            File::deleteDirectory($path);
+        }
+    }
 });
 
 it('reconnect after stop cannot resume HLS playlist or segments', function () {
     // 1. Fix the "Time Drift" - ensures now() in test matches now() in Controller
     Carbon::setTestNow(now());
 
-    $network = Network::factory()->create([
+    $network = Network::factory()->for($this->user)->create([
         'broadcast_enabled' => true,
         'enabled' => true,
     ]);
 
-    // 2. Use the real path, but because we called Storage::fake(),
-    // getHlsStoragePath() should point to a temporary test directory.
+    // Create the HLS storage directory and files at the real storage_path location
     $hlsPath = $network->getHlsStoragePath();
     File::ensureDirectoryExists($hlsPath);
+    $this->createdNetworkPaths[] = $hlsPath;
 
     // Create a playlist and a segment
     File::put("{$hlsPath}/live.m3u8", "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nlive000001.ts\n");
