@@ -1823,4 +1823,20 @@ class M3uProxyService
         // If here, return null
         return null;
     }
+
+    /**
+     * Get the broadcast callback URL for m3u-proxy to send broadcast events.
+     *
+     * @return string|null The broadcast callback endpoint URL, or null if not configured
+     */
+    public function getBroadcastCallbackUrl(): ?string
+    {
+        if (! empty($this->failoverResolverUrl)) {
+            // Use the configured failover resolver URL
+            return "$this->failoverResolverUrl/api/m3u-proxy/broadcast/callback";
+        }
+
+        // Build the broadcast callback path
+        return ProxyFacade::getBaseUrl().'/api/m3u-proxy/broadcast/callback';
+    }
 }

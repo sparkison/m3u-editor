@@ -36,6 +36,8 @@ Route::middleware(['proxy.throttle'])->prefix('m3u-proxy')->group(function () {
     Route::post('broadcast/callback', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'handleBroadcastCallback'])
         ->name('m3u-proxy.broadcast.callback')
         ->withoutMiddleware('proxy.throttle');
+
+    // Content access routes
     Route::get('channel/{id}/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'channel'])
         ->name('m3u-proxy.channel');
     Route::get('episode/{id}/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'episode'])
