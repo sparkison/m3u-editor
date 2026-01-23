@@ -620,6 +620,14 @@ class NetworkBroadcastService
             }
         }
 
+        // Optimization: Skip proxy status check for networks that aren't supposed to be broadcasting
+        // and don't have any lingering state that suggests they might be running
+        if (! $network->broadcast_requested && ! $network->broadcast_pid && ! $network->broadcast_started_at) {
+            $result['action'] = 'idle';
+
+            return $result;
+        }
+
         // Check if broadcast is running via proxy
         $isRunning = $this->isProcessRunning($network);
 
