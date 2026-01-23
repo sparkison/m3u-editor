@@ -260,7 +260,7 @@ class Preferences extends SettingsPage
                                                     ->helperText('Whether or not to use the URL override for logos and images too (default is enabled).'),
                                             ]),
 
-                                        Fieldset::make('Failover settings')
+                                        Fieldset::make('Resolver settings')
                                             ->schema([
                                                 Toggle::make('enable_failover_resolver')
                                                     ->label('Enable advanced failover logic')
@@ -282,10 +282,14 @@ class Preferences extends SettingsPage
                                                     ->helperText('Use to enable advanced failover checking and resolution.'),
 
                                                 TextInput::make('failover_resolver_url')
-                                                    ->label('Failover Resolver URL')
+                                                    ->label('Resolver URL')
                                                     ->columnSpanFull()
                                                     ->url()
                                                     ->live()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'The resolver URL is used for advanced failover logic, and Network Broadcasting features. This URL should point to the m3u-editor instance that the proxy can access.'
+                                                    )
                                                     ->prefixIcon('heroicon-m-link')
                                                     ->disabled(fn () => ! empty(config('proxy.resolver_url')))
                                                     ->hint(fn () => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
@@ -296,7 +300,6 @@ class Preferences extends SettingsPage
                                                         }
                                                     })
                                                     ->required(fn ($get) => (bool) $get('enable_failover_resolver'))
-                                                    ->hidden(fn ($get) => ! $get('enable_failover_resolver'))
                                                     ->dehydrated(fn () => empty(config('proxy.resolver_url')))
                                                     ->placeholder(fn () => $embedded ? 'http://127.0.0.1:'.config('app.port') : 'http://m3u-editor:36400')
                                                     ->helperText(fn () => $embedded
@@ -304,8 +307,9 @@ class Preferences extends SettingsPage
                                                         : 'Domain the proxy can use to access the editor for faillover resolution, e.g.: "http://m3u-editor:36400", "http://192.168.0.101:36400", "http://your-domain.dev", etc.'),
 
                                                 Action::make('test_failover_connection')
-                                                    ->label('Test failover resolver connection')
+                                                    ->label('Test resolver connection')
                                                     ->icon('heroicon-m-signal')
+                                                    ->disabled(fn ($get) => empty($get('failover_resolver_url')))
                                                     ->action(function ($get) use ($service) {
                                                         $configUrl = config('proxy.resolver_url');
                                                         $url = $configUrl ?? $get('failover_resolver_url');
@@ -334,7 +338,7 @@ class Preferences extends SettingsPage
                                                                 ->duration(10000)
                                                                 ->send();
                                                         }
-                                                    })->hidden(fn ($get) => ! $get('enable_failover_resolver')),
+                                                    }),
                                             ]),
 
                                         Fieldset::make('Stream limit settings')
