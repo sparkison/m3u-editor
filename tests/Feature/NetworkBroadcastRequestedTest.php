@@ -53,8 +53,13 @@ it('auto-starts broadcast when broadcast_requested is true', function () {
         'end_time' => now()->addMinutes(55),
     ]);
 
-    $service = Mockery::mock(NetworkBroadcastService::class)->makePartial();
-    $service->shouldReceive('start')->once()->andReturn(true);
+    // Create a real service instance, then mock the start method
+    $service = Mockery::mock(NetworkBroadcastService::class, function ($mock) {
+        $mock->makePartial();
+        $mock->shouldAllowMockingProtectedMethods();
+        $mock->shouldReceive('start')->once()->andReturn(true);
+        $mock->shouldReceive('isProcessRunning')->andReturn(false);
+    });
 
     // Swap in the mock
     app()->instance(NetworkBroadcastService::class, $service);

@@ -97,8 +97,12 @@ M3U8;
             // Should contain rewritten URLs pointing to our Laravel routes
             expect($content)->toContain($network->uuid);
             expect($content)->toContain('live000001');
-            // Should NOT contain raw .ts filenames anymore
-            expect($content)->not->toContain("live000001.ts\n");
+            // The .ts extension should be replaced with full route URLs
+            // Original format: "live000001.ts" becomes route URL like "/network/{uuid}/live000001.ts"
+            expect($content)->toContain(route('network.hls.segment', [
+                'network' => $network->uuid,
+                'segment' => 'live000001',
+            ]));
         })->group('serial');
 
         it('returns 503 when proxy is unavailable', function () {
