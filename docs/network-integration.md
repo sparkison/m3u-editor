@@ -61,9 +61,6 @@ Tip: Use `--dry-run` on `hls:gc` to preview deletions before actual cleanup. ✅
   - Support for returning networks as live streams (get_live_streams/get_live_categories/get_short_epg/get_simple_data_table).
   - `handleNetworkStream()` redirects `/live/{user}/{pass}/{network_id}.{ext}` to the network's HLS playlist.
 
-- HlsGarbageCollect (console command) - `hls:gc`
-  - Deletes old segments and stale playlists. Options include `--loop`, `--threshold`, `--interval` and `--dry-run`.
-
 ### FFmpeg seeking details (important) ⚠️
 
 - Use `-ss <seconds>` before `-i` for demuxer-level seek. This performs an actual seek into the input and is necessary for accurate resume behaviour.
@@ -230,7 +227,6 @@ This section summarizes what has already been implemented for the Network → HL
 - Commands:
   - `app/Console/Commands/NetworkBroadcastEnsure.php`
   - `app/Console/Commands/NetworkBroadcastHeal.php`
-  - `app/Console/Commands/HlsGarbageCollect.php`
   - `app/Console/Commands/RegenerateNetworkSchedulesCommand.php`
 - Xtream API:
   - `app/Http/Controllers/XtreamApiController.php`

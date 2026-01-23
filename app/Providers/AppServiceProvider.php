@@ -70,7 +70,6 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $this->commands([
-                \App\Console\Commands\HlsGarbageCollect::class,
                 \App\Console\Commands\NetworkBroadcastHeal::class,
                 \App\Console\Commands\NetworkBroadcastEnsure::class,
             ]);

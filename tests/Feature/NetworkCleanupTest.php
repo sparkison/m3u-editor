@@ -2,23 +2,17 @@
 
 use App\Models\Network;
 use App\Services\NetworkBroadcastService;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 
 use function Pest\Laravel\mock;
 
-const M3U_HEADER = "#EXTM3U\n";
-
 beforeEach(function () {
-    $this->createdNetworkPaths = [];
-});
-
-afterEach(function () {
-    // Clean up only the directories created by this test
-    foreach ($this->createdNetworkPaths ?? [] as $path) {
-        if (File::isDirectory($path)) {
-            File::deleteDirectory($path);
-        }
-    }
+    // Mock proxy HTTP calls - proxy handles HLS file management now
+    Http::fake([
+        '*/broadcast/*/status' => Http::response(['status' => 'stopped'], 404),
+        '*/broadcast/*/stop' => Http::response(['status' => 'stopped', 'final_segment_number' => 0], 200),
+        '*/broadcast/*' => Http::response([], 200), // DELETE cleanup
+    ]);
 });
 
 it('calls NetworkBroadcastService::stop when a network is deleted', function () {
@@ -38,70 +32,46 @@ it('calls NetworkBroadcastService::stop when a network is deleted', function () 
     $this->assertDatabaseMissing('networks', ['id' => $network->id]);
 });
 
-it('removes HLS storage directory when network is deleted', function () {
-    $network = Network::factory()->create();
-
-    $hlsPath = $network->getHlsStoragePath();
-
-    File::ensureDirectoryExists($hlsPath);
-    $this->createdNetworkPaths[] = $hlsPath;
-    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
-    File::put("{$hlsPath}/live000001.ts", 'segment');
-
-    expect(File::isDirectory($hlsPath))->toBeTrue();
-
-    $network->delete();
-
-    expect(File::isDirectory($hlsPath))->toBeFalse();
-    $this->assertDatabaseMissing('networks', ['id' => $network->id]);
-});
-
-it('stop removes lingering HLS files even when pid is null', function () {
+it('stop sends cleanup request to proxy', function () {
     $network = Network::factory()->activeBroadcast()->create();
-
-    $hlsPath = $network->getHlsStoragePath();
-    File::ensureDirectoryExists($hlsPath);
-    $this->createdNetworkPaths[] = $hlsPath;
-    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
-    File::put("{$hlsPath}/live000001.ts", 'segment');
-
-    // Simulate broadcast already stopped (no pid)
-    $network->update(['broadcast_pid' => null, 'broadcast_started_at' => null]);
 
     $service = app(NetworkBroadcastService::class);
     $service->stop($network);
 
-    expect(File::exists("{$hlsPath}/live.m3u8"))->toBeFalse();
-    expect(File::exists("{$hlsPath}/live000001.ts"))->toBeFalse();
+    // Verify proxy cleanup endpoint was called
+    Http::assertSent(function ($request) use ($network) {
+        return str_contains($request->url(), "/broadcast/{$network->uuid}") &&
+               $request->method() === 'DELETE';
+    });
 });
 
-it('stop removes lingering HLS files when pid exists but process not running', function () {
-    $network = Network::factory()->activeBroadcast()->create();
-
-    $hlsPath = $network->getHlsStoragePath();
-    File::ensureDirectoryExists($hlsPath);
-    $this->createdNetworkPaths[] = $hlsPath;
-    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
-    File::put("{$hlsPath}/live000001.ts", 'segment');
-
-    // Simulate PID set but process not running
-    $network->update(['broadcast_pid' => 999999, 'broadcast_started_at' => now()]);
+it('stop updates network state correctly', function () {
+    $network = Network::factory()->activeBroadcast()->create([
+        'broadcast_requested' => true,
+        'broadcast_pid' => 12345,
+        'broadcast_started_at' => now(),
+        'broadcast_segment_sequence' => 100,
+    ]);
 
     $service = app(NetworkBroadcastService::class);
     $service->stop($network);
 
-    expect(File::exists("{$hlsPath}/live.m3u8"))->toBeFalse();
-    expect(File::exists("{$hlsPath}/live000001.ts"))->toBeFalse();
+    $network->refresh();
+    expect($network->broadcast_requested)->toBeFalse();
+    expect($network->broadcast_pid)->toBeNull();
+    expect($network->broadcast_started_at)->toBeNull();
+    expect($network->broadcast_segment_sequence)->toBe(0);
 });
 
 it('deleted network endpoints return 404', function () {
+    Http::fake([
+        '*/broadcast/*/live.m3u8' => Http::response('Not found', 404),
+        '*/broadcast/*/status' => Http::response(['status' => 'stopped'], 404),
+        '*/broadcast/*/stop' => Http::response(['status' => 'stopped'], 200),
+        '*/broadcast/*' => Http::response([], 200),
+    ]);
+
     $network = Network::factory()->activeBroadcast()->create();
-    $hlsPath = $network->getHlsStoragePath();
-
-    File::ensureDirectoryExists($hlsPath);
-    $this->createdNetworkPaths[] = $hlsPath;
-    File::put("{$hlsPath}/live.m3u8", M3U_HEADER);
-
     $uuid = $network->uuid;
 
     $network->delete();

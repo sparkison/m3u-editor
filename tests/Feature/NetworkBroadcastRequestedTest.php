@@ -3,6 +3,16 @@
 use App\Models\Network;
 use App\Models\NetworkProgramme;
 use App\Services\NetworkBroadcastService;
+use Illuminate\Support\Facades\Http;
+
+beforeEach(function () {
+    // Mock proxy HTTP calls - proxy is not available in tests
+    Http::fake([
+        '*/broadcast/*/status' => Http::response(['status' => 'stopped'], 404),
+        '*/broadcast/*/stop' => Http::response(['status' => 'stopped', 'final_segment_number' => 0], 200),
+        '*' => Http::response([], 200),
+    ]);
+});
 
 it('does not auto-start broadcast when broadcast_requested is false', function () {
     $network = Network::factory()->create([
