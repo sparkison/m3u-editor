@@ -8,6 +8,7 @@ use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Episode;
 use App\Models\MergedPlaylist;
+use App\Models\Network;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
@@ -1322,6 +1323,21 @@ class M3uProxyService
 
             if ($response->successful()) {
                 Log::debug("Broadcast {$networkId} stopped successfully");
+
+                // Always update local state
+                $network = Network::where('uuid', $networkId)->first();
+                if ($network) {
+                    $network->update([
+                        'broadcast_started_at' => null,
+                        'broadcast_pid' => null,
+                        'broadcast_programme_id' => null,
+                        'broadcast_initial_offset_seconds' => null,
+                        'broadcast_requested' => false,
+                        // Reset sequences on explicit stop - next start will be a fresh broadcast
+                        'broadcast_segment_sequence' => 0,
+                        'broadcast_discontinuity_sequence' => 0,
+                    ]);
+                }
 
                 return true;
             }
