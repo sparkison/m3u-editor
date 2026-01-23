@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TranscodeMode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,7 +33,7 @@ class Network extends Model
         'broadcast_requested' => 'boolean',
         'segment_duration' => 'integer',
         'hls_list_size' => 'integer',
-        'transcode_on_server' => 'boolean',
+        'transcode_mode' => TranscodeMode::class,
         'video_bitrate' => 'integer',
         'audio_bitrate' => 'integer',
         'broadcast_started_at' => 'datetime',

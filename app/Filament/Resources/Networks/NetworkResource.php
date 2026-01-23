@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Networks;
 
+use App\Enums\TranscodeMode;
 use App\Filament\Resources\Networks\Pages\CreateNetwork;
 use App\Filament\Resources\Networks\Pages\EditNetwork;
 use App\Filament\Resources\Networks\Pages\ListNetworks;
@@ -17,6 +18,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -595,11 +597,17 @@ class NetworkResource extends Resource
                                 ->compact()
                                 ->description('Control how media is transcoded')
                                 ->schema([
-                                    Toggle::make('transcode_on_server')
-                                        ->label('Transcode on Media Server')
-                                        ->helperText('Let Jellyfin/Emby transcode with hardware acceleration.')
-                                        ->default(true)
-                                        ->live(),
+                                    Radio::make('transcode_mode')
+                                        ->label('Transcode Mode')
+                                        ->live()
+                                        ->options([
+                                            TranscodeMode::Direct->value => 'Direct (Passthrough)',
+                                            TranscodeMode::Server->value => 'Media Server (Jellyfin/Emby/Plex)',
+                                            TranscodeMode::Local->value => 'Local (FFmpeg on editor/proxy)',
+                                        ])
+                                        ->default(TranscodeMode::Local->value)
+                                        ->inline()
+                                        ->helperText('Choose where transcoding should occur.'),
 
                                     Grid::make(3)->schema([
                                         TextInput::make('video_bitrate')
@@ -627,7 +635,7 @@ class NetworkResource extends Resource
                                             ->placeholder('Source')
                                             ->native(false)
                                             ->nullable(),
-                                    ])->visible(fn (Get $get): bool => $get('transcode_on_server')),
+                                    ])->visible(fn (Get $get): bool => $get('transcode_mode') !== TranscodeMode::Direct->value),
                                 ])
                                 ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
 

@@ -250,7 +250,7 @@ class PlexService implements MediaServer
         );
     }
 
-    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts', array $transcodeOptions = []): string
     {
         try {
             $response = $this->client()->get("/library/metadata/{$itemId}");
@@ -285,7 +285,26 @@ class PlexService implements MediaServer
                         $params['subtitleStreamID'] = $request->input('SubtitleStreamIndex');
                     }
 
-                    // Return the full URL with query parameters
+                    // If transcode options are provided use Plex's transcode endpoint
+                    if (! empty($transcodeOptions)) {
+                        $videoBitrate = $transcodeOptions['video_bitrate'] ?? null;
+                        $audioBitrate = $transcodeOptions['audio_bitrate'] ?? null;
+                        $maxWidth = $transcodeOptions['max_width'] ?? null;
+                        $maxHeight = $transcodeOptions['max_height'] ?? null;
+
+                        $transcodeParams = array_filter([
+                            'url' => $streamUrl,
+                            'X-Plex-Token' => $this->apiKey,
+                            'videoBitrate' => $videoBitrate,
+                            'audioBitrate' => $audioBitrate,
+                            'maxWidth' => $maxWidth,
+                            'maxHeight' => $maxHeight,
+                        ]);
+
+                        return $this->baseUrl.'/video/:/transcode/universal/start.m3u8?'.http_build_query($transcodeParams);
+                    }
+
+                    // Return the full URL with query parameters for direct streaming
                     return $streamUrl.'?'.http_build_query($params);
                 }
             }

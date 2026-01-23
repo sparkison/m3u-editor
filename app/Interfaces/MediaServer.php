@@ -22,7 +22,7 @@ interface MediaServer
 
     public function getStreamUrl(string $itemId, string $container = 'ts'): string;
 
-    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string;
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts', array $transcodeOptions = []): string;
 
     public function getImageUrl(string $itemId, string $imageType = 'Primary'): string;
 

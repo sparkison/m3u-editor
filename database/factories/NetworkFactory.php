@@ -34,7 +34,7 @@ class NetworkFactory extends Factory
             'output_format' => 'hls',
             'segment_duration' => 6,
             'hls_list_size' => 10,
-            'transcode_on_server' => true,
+            'transcode_mode' => \App\Enums\TranscodeMode::Direct->value,
             'audio_bitrate' => 192,
         ];
     }

@@ -264,7 +264,7 @@ class EmbyJellyfinService implements MediaServer
      * @param  string  $itemId  The media server's item ID
      * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
-    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts'): string
+    public function getDirectStreamUrl(Request $request, string $itemId, string $container = 'ts', array $transcodeOptions = []): string
     {
         $streamUrl = "{$this->baseUrl}/Videos/{$itemId}/stream.{$container}";
 
@@ -279,6 +279,22 @@ class EmbyJellyfinService implements MediaServer
         foreach ($forwardParams as $param) {
             if ($request->has($param)) {
                 $params[$param] = $request->input($param);
+            }
+        }
+
+        // Include transcode options (VideoBitrate, AudioBitrate, MaxWidth, MaxHeight) if requested
+        if (! empty($transcodeOptions)) {
+            if (isset($transcodeOptions['video_bitrate'])) {
+                $params['VideoBitrate'] = (string) $transcodeOptions['video_bitrate'];
+            }
+            if (isset($transcodeOptions['audio_bitrate'])) {
+                $params['AudioBitrate'] = (string) $transcodeOptions['audio_bitrate'];
+            }
+            if (isset($transcodeOptions['max_width'])) {
+                $params['MaxWidth'] = (int) $transcodeOptions['max_width'];
+            }
+            if (isset($transcodeOptions['max_height'])) {
+                $params['MaxHeight'] = (int) $transcodeOptions['max_height'];
             }
         }
 

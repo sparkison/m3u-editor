@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\TranscodeMode;
 use App\Models\MediaServerIntegration;
 use App\Models\Network;
 use App\Models\NetworkProgramme;
@@ -203,7 +204,9 @@ class NetworkBroadcastService
             'add_discontinuity' => $addDiscontinuity,
             'segment_duration' => $network->segment_duration ?? 6,
             'hls_list_size' => $network->hls_list_size ?? 20,
-            'transcode' => ! $network->transcode_on_server, // Invert: if server transcodes, proxy copies
+            // transcode => true tells the proxy to run FFmpeg for this broadcast.
+            // Local mode -> proxy should transcode; Server/Direct -> proxy should passthrough
+            'transcode' => ($network->transcode_mode ?? null) === TranscodeMode::Local,
             'video_bitrate' => $network->video_bitrate ? (string) $network->video_bitrate : null,
             'audio_bitrate' => $network->audio_bitrate ?? 192,
             'video_resolution' => $network->video_resolution,
@@ -417,7 +420,30 @@ class NetworkBroadcastService
             ]);
         }
 
-        $streamUrl = $service->getDirectStreamUrl($request, $itemId, 'ts');
+        // If using server-side transcoding, attach transcode options to the request
+        $transcodeOptions = [];
+        if (($network->transcode_mode ?? null) === \App\Enums\TranscodeMode::Server) {
+            if ($network->video_bitrate) {
+                $transcodeOptions['video_bitrate'] = (int) $network->video_bitrate;
+            }
+            if ($network->audio_bitrate) {
+                $transcodeOptions['audio_bitrate'] = (int) $network->audio_bitrate;
+            }
+            if ($network->video_resolution) {
+                $parts = explode('x', $network->video_resolution);
+                $w = $parts[0] ?? null;
+                $h = $parts[1] ?? null;
+
+                if ($w) {
+                    $transcodeOptions['max_width'] = (int) $w;
+                }
+                if ($h) {
+                    $transcodeOptions['max_height'] = (int) $h;
+                }
+            }
+        }
+
+        $streamUrl = $service->getDirectStreamUrl($request, $itemId, 'ts', $transcodeOptions);
 
         return $streamUrl;
     }
