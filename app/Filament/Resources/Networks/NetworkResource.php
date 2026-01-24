@@ -636,6 +636,38 @@ class NetworkResource extends Resource
                                             ->native(false)
                                             ->nullable(),
                                     ])->visible(fn (Get $get): bool => $get('transcode_mode') !== TranscodeMode::Direct->value),
+
+                                    Grid::make(3)->schema([
+                                        TextInput::make('video_codec')
+                                            ->label('Video Codec')
+                                            ->helperText('e.g. libx264, h264_nvenc')
+                                            ->placeholder('libx264')
+                                            ->nullable(),
+
+                                        TextInput::make('audio_codec')
+                                            ->label('Audio Codec')
+                                            ->helperText('e.g. aac')
+                                            ->placeholder('aac')
+                                            ->nullable(),
+
+                                        TextInput::make('transcode_preset')
+                                            ->label('Encoder Preset')
+                                            ->helperText('e.g. veryfast, fast, medium')
+                                            ->placeholder('veryfast')
+                                            ->nullable(),
+                                    ])->visible(fn (Get $get): bool => $get('transcode_mode') === TranscodeMode::Local->value),
+
+                                    Select::make('hwaccel')
+                                        ->label('Hardware Acceleration')
+                                        ->placeholder('Auto/Default')
+                                        ->options([
+                                            'none' => 'None',
+                                            'cuda' => 'CUDA (NVIDIA)',
+                                            'vaapi' => 'VA-API',
+                                        ])
+                                        ->helperText('Hint for proxy to enable hardware acceleration if available')
+                                        ->nullable()
+                                        ->visible(fn (Get $get): bool => $get('transcode_mode') === TranscodeMode::Local->value),
                                 ])
                                 ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
 

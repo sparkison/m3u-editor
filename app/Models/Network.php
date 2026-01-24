@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 class Network extends Model
 {
@@ -70,46 +69,6 @@ class Network extends Model
 
         // Otherwise, fall back to current programme's seek position
         return $this->getCurrentSeekPosition();
-    }
-
-    /**
-     * Boot the model.
-     */
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        static::creating(function (Network $network) {
-            if (empty($network->uuid)) {
-                $network->uuid = Str::uuid()->toString();
-            }
-        });
-
-        // Sync network channels when network is updated
-        static::updated(function (Network $network) {
-            app(\App\Services\NetworkChannelSyncService::class)->refreshNetworkChannel($network);
-        });
-
-        // Remove network channels when network is deleted
-        static::deleting(function (Network $network) {
-            // Ensure any running broadcast is stopped and HLS files are removed
-            try {
-                app(\App\Services\NetworkBroadcastService::class)->stop($network);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to stop network broadcast during deletion', [
-                    'network_id' => $network->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            // Remove HLS storage directory to free disk space
-            $hlsPath = $network->getHlsStoragePath();
-            if (\Illuminate\Support\Facades\File::isDirectory($hlsPath)) {
-                \Illuminate\Support\Facades\File::deleteDirectory($hlsPath);
-            }
-
-            \App\Models\Channel::where('network_id', $network->id)->delete();
-        });
     }
 
     /**
@@ -239,14 +198,6 @@ class Network extends Model
     }
 
     /**
-     * Get the storage path for HLS segments.
-     */
-    public function getHlsStoragePath(): string
-    {
-        return storage_path("app/networks/{$this->uuid}");
-    }
-
-    /**
      * Get the current programme that should be playing now.
      */
     public function getCurrentProgramme(): ?NetworkProgramme
@@ -292,42 +243,5 @@ class Network extends Model
         }
 
         return (int) now()->diffInSeconds($current->end_time, false);
-    }
-
-    /**
-     * Count HLS segment files for this network.
-     */
-    public function getHlsSegmentCountAttribute(): int
-    {
-        $path = $this->getHlsStoragePath();
-
-        if (! is_dir($path)) {
-            return 0;
-        }
-
-        $files = glob($path.'/*.ts');
-
-        return $files === false ? 0 : count($files);
-    }
-
-    /**
-     * Total bytes used by HLS files for this network.
-     */
-    public function getHlsStorageBytesAttribute(): int
-    {
-        $path = $this->getHlsStoragePath();
-
-        if (! is_dir($path)) {
-            return 0;
-        }
-
-        $total = 0;
-        foreach (glob($path.'/*') as $file) {
-            if (is_file($file)) {
-                $total += filesize($file) ?: 0;
-            }
-        }
-
-        return (int) $total;
     }
 }

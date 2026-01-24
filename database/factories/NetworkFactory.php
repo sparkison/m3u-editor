@@ -36,6 +36,10 @@ class NetworkFactory extends Factory
             'hls_list_size' => 10,
             'transcode_mode' => \App\Enums\TranscodeMode::Direct->value,
             'audio_bitrate' => 192,
+            'video_codec' => null,
+            'audio_codec' => null,
+            'transcode_preset' => null,
+            'hwaccel' => null,
         ];
     }
 

@@ -296,6 +296,17 @@ class EmbyJellyfinService implements MediaServer
             if (isset($transcodeOptions['max_height'])) {
                 $params['MaxHeight'] = (int) $transcodeOptions['max_height'];
             }
+
+            // Optional codec/preset hints
+            if (! empty($transcodeOptions['video_codec'])) {
+                $params['VideoCodec'] = $transcodeOptions['video_codec'];
+            }
+            if (! empty($transcodeOptions['audio_codec'])) {
+                $params['AudioCodec'] = $transcodeOptions['audio_codec'];
+            }
+            if (! empty($transcodeOptions['preset'])) {
+                $params['EncoderPreset'] = $transcodeOptions['preset'];
+            }
         }
 
         // Return the full URL with query parameters

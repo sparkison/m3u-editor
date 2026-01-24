@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Network;
 use App\Models\User;
+use App\Services\M3uProxyService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -54,10 +56,17 @@ class NetworkPlaylistController extends Controller
      *
      * Route: /network/{network}/playlist.m3u
      */
-    public function single(Network $network): StreamedResponse
+    public function single(Network $network): RedirectResponse|StreamedResponse
     {
         if (! $network->enabled) {
             abort(404, 'Network is disabled');
+        }
+
+        $proxy = new M3uProxyService;
+
+        // If broadcasting is enabled, redirect clients to the proxy HLS playlist
+        if ($network->broadcast_enabled) {
+            return redirect()->to($proxy->getProxyBroadcastHlsUrl($network));
         }
 
         $baseUrl = url('/');
