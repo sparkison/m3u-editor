@@ -299,7 +299,7 @@ class PlexService implements MediaServer
                             'url' => $streamUrl,
                             'X-Plex-Token' => $this->apiKey,
                             'videoBitrate' => $videoBitrate,
-                            'musicBitrate' => $audioBitrate,
+                            'audioBitrate' => $audioBitrate,
                             'videoResolution' => $resolution,
                         ]);
 
