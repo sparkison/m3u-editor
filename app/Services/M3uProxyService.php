@@ -1943,9 +1943,17 @@ class M3uProxyService
     /**
      * Get the HLS URL from the proxy for a network.
      */
-    public function getProxyHlsUrl(Network $network): string
+    public function getProxyBroadcastHlsUrl(Network $network): string
     {
         return "{$this->getPublicUrl()}/broadcast/{$network->uuid}/live.m3u8";
+    }
+
+    /**
+     * Get the HLS Segment URL from the proxy for a network.
+     */
+    public function getProxyBroadcastSegmentUrl(Network $network, string $segment): string
+    {
+        return "{$this->getPublicUrl()}/broadcast/{$network->uuid}/segment/{$segment}.ts";
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Network;
+use App\Services\M3uProxyService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,12 +14,13 @@ class NetworkHlsController extends Controller
 
     protected ?string $proxyToken;
 
+    protected M3uProxyService $proxyService;
+
     public function __construct()
     {
-        $host = config('proxy.m3u_proxy_host', 'localhost');
-        $port = config('proxy.m3u_proxy_port', 8085);
-        $this->proxyBaseUrl = "http://{$host}:{$port}";
-        $this->proxyToken = config('proxy.m3u_proxy_token');
+        // Initialize the M3uProxyService
+        // We'll use this to communicate with the proxy for broadcast management
+        $this->proxyService = new M3uProxyService;
     }
 
     /**
@@ -35,7 +37,7 @@ class NetworkHlsController extends Controller
 
         // Don't check broadcast_requested here - let the proxy determine availability.
         // This allows playback to work even if Laravel's state is momentarily out of sync.
-        $proxyUrl = "{$this->proxyBaseUrl}/broadcast/{$network->uuid}/live.m3u8";
+        $proxyUrl = $this->proxyService->getProxyBroadcastHlsUrl($network);
 
         return redirect()->to($proxyUrl);
     }
@@ -51,7 +53,7 @@ class NetworkHlsController extends Controller
             return response('Broadcast not enabled for this network', 404);
         }
 
-        $proxyUrl = "{$this->proxyBaseUrl}/broadcast/{$network->uuid}/segment/{$segment}.ts";
+        $proxyUrl = $this->proxyService->getProxyBroadcastSegmentUrl($network, $segment);
 
         return redirect()->to($proxyUrl);
     }

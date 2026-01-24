@@ -510,7 +510,7 @@ class NetworkBroadcastService
             'running' => $isRunning,
             'pid' => $network->broadcast_pid,
             'started_at' => $network->broadcast_started_at?->toIso8601String(),
-            'hls_url' => $this->proxyService->getProxyHlsUrl($network),
+            'hls_url' => $this->proxyService->getProxyBroadcastHlsUrl($network),
         ];
 
         if ($isRunning) {
