@@ -346,7 +346,7 @@ class M3uProxyStreamMonitor extends Page
                     'clients' => [],
                     'has_failover' => false,
                     'error_count' => 0,
-                    'segments_served' => $bcast['segments_served'] ?? 0,
+                    'segments_served' => $bcast['current_segment_number'] ?? 0,
                     'transcoding' => false,
                     'transcoding_format' => null,
                     'using_failover' => false,
