@@ -196,9 +196,15 @@ class NetworkBroadcastService
 
         // Get the callback URL
         $callbackUrl = $this->proxyService->getBroadcastCallbackUrl();
+
+        // Check if the stream URL already has seeking built in (e.g., Plex's offset= or StartTimeTicks=)
+        // If so, don't also add FFmpeg's -ss seeking (double-seeking causes corruption, especially with AC3 audio)
+        $urlHasSeeking = preg_match('/[?&](offset|StartTimeTicks)=/', $streamUrl);
+        $ffmpegSeekSeconds = $urlHasSeeking ? 0 : $seekPosition;
+
         $payload = [
             'stream_url' => $streamUrl,
-            'seek_seconds' => $seekPosition,
+            'seek_seconds' => $ffmpegSeekSeconds,
             'duration_seconds' => $remainingDuration,
             'segment_start_number' => $startNumber,
             'add_discontinuity' => $addDiscontinuity,
