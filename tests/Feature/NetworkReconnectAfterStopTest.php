@@ -30,8 +30,8 @@ it('playlist returns 503 after broadcast is stopped', function () {
     // Stop the broadcast
     app(\App\Services\NetworkBroadcastService::class)->stop($network);
 
-    // Verify playlist returns 503 (proxy returns 404)
-    $playlistResp = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
+    // Verify playlist returns 503/404 (proxy returns 404)
+    $playlistResp = $this->followingRedirects()->get(route('network.hls.playlist', ['network' => $network->uuid]));
     expect(in_array($playlistResp->getStatusCode(), [503, 404]))->toBeTrue();
 
     Carbon::setTestNow();
@@ -59,7 +59,7 @@ it('segment returns error after broadcast is stopped', function () {
     app(\App\Services\NetworkBroadcastService::class)->stop($network);
 
     // Verify segment returns error (proxy returns 404)
-    $segmentResp = $this->get(route('network.hls.segment', ['network' => $network->uuid, 'segment' => 'live000001']));
+    $segmentResp = $this->followingRedirects()->get(route('network.hls.segment', ['network' => $network->uuid, 'segment' => 'live000001']));
     expect(in_array($segmentResp->getStatusCode(), [503, 404]))->toBeTrue();
 
     Carbon::setTestNow();
@@ -81,9 +81,15 @@ it('playlist works while broadcast is running', function () {
         'broadcast_pid' => 999999,
     ]);
 
-    // Verify playlist works
+    // Verify playlist redirects to proxy and proxy serves playlist
     $playlistResp = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
-    $playlistResp->assertStatus(200);
+    $playlistResp->assertStatus(302);
+    $location = $playlistResp->headers->get('Location');
+    expect(str_contains($location, "/broadcast/{$network->uuid}/live.m3u8"))->toBeTrue();
+
+    // Hit the proxy URL directly (Http is faked above)
+    $proxyResp = Http::get($location);
+    expect($proxyResp->status())->toBe(200);
 
     Carbon::setTestNow();
 })->group('serial');
