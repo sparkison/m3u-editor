@@ -81,15 +81,15 @@ it('playlist works while broadcast is running', function () {
         'broadcast_pid' => 999999,
     ]);
 
-    // Verify playlist redirects to proxy and proxy serves playlist
+    // Verify playlist endpoint proxies content from the proxy service
     $playlistResp = $this->get(route('network.hls.playlist', ['network' => $network->uuid]));
-    $playlistResp->assertStatus(302);
-    $location = $playlistResp->headers->get('Location');
-    expect(str_contains($location, "/broadcast/{$network->uuid}/live.m3u8"))->toBeTrue();
+    $playlistResp->assertStatus(200);
+    $playlistResp->assertHeader('Content-Type', 'application/vnd.apple.mpegurl');
 
-    // Hit the proxy URL directly (Http is faked above)
-    $proxyResp = Http::get($location);
-    expect($proxyResp->status())->toBe(200);
+    // Verify the playlist contains valid HLS content (proxied from the mock)
+    $content = $playlistResp->getContent();
+    expect(str_contains($content, '#EXTM3U'))->toBeTrue();
+    expect(str_contains($content, '#EXT-X-TARGETDURATION'))->toBeTrue();
 
     Carbon::setTestNow();
 })->group('serial');
