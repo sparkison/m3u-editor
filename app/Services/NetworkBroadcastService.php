@@ -422,7 +422,7 @@ class NetworkBroadcastService
 
         // If using server-side transcoding, attach transcode options to the request
         $transcodeOptions = [];
-        if (($network->transcode_mode ?? null) === \App\Enums\TranscodeMode::Server) {
+        if (($network->transcode_mode ?? null) === TranscodeMode::Server) {
             if ($network->video_bitrate) {
                 $transcodeOptions['video_bitrate'] = (int) $network->video_bitrate;
             }

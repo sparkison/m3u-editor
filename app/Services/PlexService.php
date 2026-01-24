@@ -291,16 +291,19 @@ class PlexService implements MediaServer
                         $audioBitrate = $transcodeOptions['audio_bitrate'] ?? null;
                         $maxWidth = $transcodeOptions['max_width'] ?? null;
                         $maxHeight = $transcodeOptions['max_height'] ?? null;
+                        $resolution = $maxWidth && $maxHeight
+                            ? "{$maxWidth}x{$maxHeight}"
+                            : null;
 
                         $transcodeParams = array_filter([
                             'url' => $streamUrl,
                             'X-Plex-Token' => $this->apiKey,
                             'videoBitrate' => $videoBitrate,
-                            'audioBitrate' => $audioBitrate,
-                            'maxWidth' => $maxWidth,
-                            'maxHeight' => $maxHeight,
+                            'musicBitrate' => $audioBitrate,
+                            'videoResolution' => $resolution,
                         ]);
 
+                        // Format: https://{IP-description}.{identifier}.plex.direct:{port}/video/:/transcode/universal/start.*
                         return $this->baseUrl.'/video/:/transcode/universal/start.m3u8?'.http_build_query($transcodeParams);
                     }
 
