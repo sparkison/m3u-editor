@@ -809,12 +809,12 @@ class NetworkResource extends Resource
                         default => 'gray',
                     })
                     ->icon(fn (string $state): string => match ($state) {
-                        'Live' => 'heroicon-o-signal',
-                        'Starting' => 'heroicon-o-arrow-path',
-                        'Scheduled' => 'heroicon-o-clock',
-                        'Stopped' => 'heroicon-o-stop',
-                        'Disabled' => 'heroicon-o-no-symbol',
-                        default => 'heroicon-o-question-mark-circle',
+                        'Live' => 'heroicon-s-signal',
+                        'Starting' => 'heroicon-s-arrow-path',
+                        'Scheduled' => 'heroicon-s-clock',
+                        'Stopped' => 'heroicon-s-stop',
+                        'Disabled' => 'heroicon-s-no-symbol',
+                        default => 'heroicon-s-question-mark-circle',
                     }),
             ])
             ->filters([
@@ -858,7 +858,7 @@ class NetworkResource extends Resource
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
                 Action::make('startBroadcast')
                     ->label('Start Broadcast')
-                    ->icon('heroicon-o-play')
+                    ->icon('heroicon-s-play')
                     ->color('success')
                     ->requiresConfirmation()
                     ->modalHeading('Start Broadcasting')
@@ -919,7 +919,7 @@ class NetworkResource extends Resource
 
                 Action::make('stopBroadcast')
                     ->label('Stop Broadcast')
-                    ->icon('heroicon-o-stop')
+                    ->icon('heroicon-s-stop')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('Stop Broadcasting')

@@ -48,11 +48,11 @@ class NetworkHlsController extends Controller
             $playlist = $response->body();
 
             // Rewrite segment URLs to go through our proxy route
-            // The playlist contains relative URLs like "segment/live000000.ts"
-            // We need to make them absolute so they route through nginx to the proxy
-            $baseUrl = url("/m3u-proxy/broadcast/{$network->uuid}");
+            // FFmpeg outputs segment names like "live000001.ts" in the playlist
+            // We need to rewrite them to full URLs: /m3u-proxy/broadcast/{uuid}/segment/live000001.ts
+            $baseUrl = url("/m3u-proxy/broadcast/{$network->uuid}/segment");
             $playlist = preg_replace(
-                '/^(segment\/[^\s]+\.ts)$/m',
+                '/^(live\d+\.ts)$/m',
                 $baseUrl.'/$1',
                 $playlist
             );
