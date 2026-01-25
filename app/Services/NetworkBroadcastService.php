@@ -202,6 +202,20 @@ class NetworkBroadcastService
         $urlHasSeeking = preg_match('/[?&](offset|StartTimeTicks)=/', $streamUrl);
         $ffmpegSeekSeconds = $urlHasSeeking ? 0 : $seekPosition;
 
+        // If using server-side transcoding, ensure we have a valid transcode start URL from the media server
+        if ((($network->transcode_mode ?? null) === TranscodeMode::Server) && empty($streamUrl)) {
+            Log::error('Failed to construct transcode start URL for server-side transcoding', [
+                'network_id' => $network->id,
+                'network_uuid' => $network->uuid,
+            ]);
+
+            $network->update([
+                'broadcast_error' => 'Failed to obtain transcode start URL from media server.',
+            ]);
+
+            return false;
+        }
+
         $payload = [
             'stream_url' => $streamUrl,
             'seek_seconds' => $ffmpegSeekSeconds,
@@ -219,10 +233,56 @@ class NetworkBroadcastService
             'callback_url' => $callbackUrl,
         ];
 
+        // Attach provider-specific headers if we can determine them (e.g., Plex requires X-Plex-* headers)
+        try {
+            $integration = $network->mediaServerIntegration;
+            if ($integration && $integration->isPlex()) {
+                $parsed = parse_url($streamUrl);
+                parse_str($parsed['query'] ?? '', $qs);
+
+                $headers = [
+                    'X-Plex-Product' => 'Plex Web',
+                    'X-Plex-Client-Identifier' => 'm3u-proxy',
+                    'X-Plex-Platform' => 'Chrome',
+                    'X-Plex-Device' => 'OSX',
+                ];
+
+                if (! empty($qs['X-Plex-Token'])) {
+                    $headers['X-Plex-Token'] = $qs['X-Plex-Token'];
+                }
+
+                // Add playback session headers if present
+                if (! empty($qs['session'])) {
+                    $headers['X-Plex-Session-Identifier'] = $qs['session'];
+                    $headers['X-Plex-Playback-Session-Id'] = $qs['session'];
+                }
+
+                // Set Accept header based on likely format
+                if (str_contains($streamUrl, 'start.mpd')) {
+                    $headers['Accept'] = 'application/dash+xml';
+                } else {
+                    $headers['Accept'] = 'application/vnd.apple.mpegurl';
+                }
+
+                $payload['headers'] = $headers;
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to attach provider-specific headers for broadcast', [
+                'network_id' => $network->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
         Log::info('Starting broadcast via proxy', [
             'network_id' => $network->id,
             'network_uuid' => $network->uuid,
             'payload' => array_merge($payload, ['stream_url' => '***']), // Hide URL in logs
+        ]);
+
+        // Debug: log the unmasked stream URL at debug level so we can diagnose start failures
+        Log::debug('Broadcast stream URL (debug only)', [
+            'network_id' => $network->id,
+            'stream_url' => $streamUrl,
         ]);
 
         try {

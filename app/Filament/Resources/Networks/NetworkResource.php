@@ -18,11 +18,11 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -597,17 +597,28 @@ class NetworkResource extends Resource
                                 ->compact()
                                 ->description('Control how media is transcoded')
                                 ->schema([
-                                    Radio::make('transcode_mode')
+                                    ToggleButtons::make('transcode_mode')
                                         ->label('Transcode Mode')
+                                        ->grouped()
                                         ->live()
                                         ->options([
                                             TranscodeMode::Direct->value => 'Direct (Passthrough)',
                                             TranscodeMode::Server->value => 'Media Server (Jellyfin/Emby/Plex)',
-                                            TranscodeMode::Local->value => 'Local (FFmpeg on editor/proxy)',
+                                            TranscodeMode::Local->value => 'Local (FFmpeg via Proxy)',
+                                        ])
+                                        ->icons([
+                                            TranscodeMode::Direct->value => 'heroicon-s-check',
+                                            TranscodeMode::Server->value => 'heroicon-s-server-stack',
+                                            TranscodeMode::Local->value => 'heroicon-s-arrows-right-left',
+                                        ])
+                                        ->colors([
+                                            TranscodeMode::Direct->value => 'gray',
+                                            TranscodeMode::Server->value => 'success',
+                                            TranscodeMode::Local->value => 'primary',
                                         ])
                                         ->default(TranscodeMode::Local->value)
                                         ->inline()
-                                        ->helperText('Choose where transcoding should occur.'),
+                                        ->helperText('Choose if and where transcoding should occur.'),
 
                                     Grid::make(3)->schema([
                                         TextInput::make('video_bitrate')
