@@ -136,6 +136,12 @@ class MediaServerIntegrationResource extends Resource
                 Section::make('Import Settings')
                     ->description('Control what content is synced from the media server')
                     ->schema([
+                        Toggle::make('enabled')
+                            ->label('Enabled')
+                            ->live()
+                            ->helperText('Disable to pause syncing without deleting the integration')
+                            ->default(true),
+
                         Grid::make(2)->schema([
                             Toggle::make('import_movies')
                                 ->label('Import Movies')
@@ -146,7 +152,7 @@ class MediaServerIntegrationResource extends Resource
                                 ->label('Import Series')
                                 ->helperText('Sync TV series with episodes')
                                 ->default(true),
-                        ]),
+                        ])->visible(fn (callable $get) => $get('enabled')),
 
                         Select::make('genre_handling')
                             ->label('Genre Handling')
@@ -156,12 +162,8 @@ class MediaServerIntegrationResource extends Resource
                             ])
                             ->default('primary')
                             ->helperText('How to handle content with multiple genres')
-                            ->native(false),
-
-                        Toggle::make('enabled')
-                            ->label('Enabled')
-                            ->helperText('Disable to pause syncing without deleting the integration')
-                            ->default(true),
+                            ->native(false)
+                            ->visible(fn (callable $get) => $get('enabled')),
                     ]),
 
                 Section::make('Sync Schedule')
@@ -169,6 +171,8 @@ class MediaServerIntegrationResource extends Resource
                     ->schema([
                         Grid::make(2)->schema([
                             Toggle::make('auto_sync')
+                                ->inline(false)
+                                ->live()
                                 ->label('Auto Sync')
                                 ->helperText('Automatically sync content on schedule')
                                 ->default(true),
@@ -184,7 +188,8 @@ class MediaServerIntegrationResource extends Resource
                                     '0 0 * * 0' => 'Once weekly (Sunday)',
                                 ])
                                 ->default('0 */6 * * *')
-                                ->native(false),
+                                ->native(false)
+                                ->disabled(fn (callable $get) => ! $get('auto_sync')),
                         ]),
                     ]),
 
@@ -239,7 +244,18 @@ class MediaServerIntegrationResource extends Resource
                                 ? route('networks.playlist', ['user' => $record->user_id])
                                 : 'Save integration first'
                             )
-                            ->copyable()
+                            ->hintAction(
+                                Action::make('qrCode')
+                                    ->label('QR Code')
+                                    ->icon('heroicon-o-qr-code')
+                                    ->modalHeading('Integration Playlist URL')
+                                    ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('networks.playlist', ['user' => $record->user_id]) : 'Save integration first']))
+                                    ->modalWidth('sm')
+                                    ->modalSubmitAction(false)
+                                    ->modalCancelAction(fn ($action) => $action->label('Close'))
+                                    ->visible(fn ($record) => $record?->user_id !== null)
+                            )
+                            ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('networks.playlist', ['user' => $record->user_id]), 'position' => 'left']) : null)
                             ->helperText('M3U playlist containing all your Networks as live channels'),
 
                         TextInput::make('networks_epg_url')
@@ -250,7 +266,18 @@ class MediaServerIntegrationResource extends Resource
                                 ? route('networks.epg', ['user' => $record->user_id])
                                 : 'Save integration first'
                             )
-                            ->copyable()
+                            ->hintAction(
+                                Action::make('qrCode')
+                                    ->label('QR Code')
+                                    ->icon('heroicon-o-qr-code')
+                                    ->modalHeading('Integration EPG URL')
+                                    ->modalContent(fn ($record) => view('components.qr-code-display', ['text' => $record ? route('networks.epg', ['user' => $record->user_id]) : 'Save integration first']))
+                                    ->modalWidth('sm')
+                                    ->modalSubmitAction(false)
+                                    ->modalCancelAction(fn ($action) => $action->label('Close'))
+                                    ->visible(fn ($record) => $record?->user_id !== null)
+                            )
+                            ->hint(fn ($record) => $record ? view('components.copy-to-clipboard', ['text' => route('networks.epg', ['user' => $record->user_id]), 'position' => 'left']) : null)
                             ->helperText('EPG data for your Networks'),
 
                         TextInput::make('networks_count')
