@@ -151,6 +151,9 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
                 ->first();
 
             if ($existingSeries) {
+                if ($this->autoEnable && ! $existingSeries->enabled) {
+                    $existingSeries->update(['enabled' => true]);
+                }
                 // If the series already exists, skip it
                 continue;
             }
