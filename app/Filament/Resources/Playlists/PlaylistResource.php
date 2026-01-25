@@ -1921,6 +1921,11 @@ class PlaylistResource extends Resource
                 ->collapsed($creating)
                 ->columns(2)
                 ->schema([
+                    Toggle::make('enable_series')
+                        ->label('Enable new series')
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
                     Toggle::make('auto_fetch_series_metadata')
                         ->label('Fetch metadata & sync stream files')
                         ->inline(false)
