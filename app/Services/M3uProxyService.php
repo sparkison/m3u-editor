@@ -159,7 +159,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(3)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
@@ -187,41 +187,69 @@ class M3uProxyService
 
     /**
      * Get active streams for a specific playlist using metadata filtering
+     * Returns null on failure to distinguish from legitimately empty results
      */
-    public static function getPlaylistActiveStreams($playlist): array
+    public static function getPlaylistActiveStreams($playlist, int $retries = 2): ?array
     {
         $service = new self;
 
         if (empty($service->apiBaseUrl)) {
-            return [];
+            Log::warning('Cannot fetch playlist streams: m3u-proxy API URL not configured');
+
+            return null;
         }
 
-        try {
-            $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(3)->acceptJson()
-                ->withHeaders($service->apiToken ? [
-                    'X-API-Token' => $service->apiToken,
-                ] : [])
-                ->get($endpoint, [
-                    'field' => 'playlist_uuid',
-                    'value' => $playlist->uuid,
-                    'active_only' => true,
+        $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
+        $attempt = 0;
+
+        while ($attempt < $retries) {
+            try {
+                $response = Http::timeout(5)->acceptJson()
+                    ->withHeaders($service->apiToken ? [
+                        'X-API-Token' => $service->apiToken,
+                    ] : [])
+                    ->get($endpoint, [
+                        'field' => 'playlist_uuid',
+                        'value' => $playlist->uuid,
+                        'active_only' => true,
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    return $data['matching_streams'] ?? [];
+                }
+
+                Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP '.$response->status(), [
+                    'attempt' => $attempt + 1,
+                    'max_attempts' => $retries,
                 ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
+                $attempt++;
+                if ($attempt < $retries) {
+                    sleep(1); // Wait 1 second before retry
+                }
 
-                return $data['matching_streams'] ?? [];
+            } catch (Exception $e) {
+                Log::warning('Failed to fetch playlist streams from m3u-proxy: '.$e->getMessage(), [
+                    'attempt' => $attempt + 1,
+                    'max_attempts' => $retries,
+                ]);
+
+                $attempt++;
+                if ($attempt < $retries) {
+                    sleep(1); // Wait 1 second before retry
+                }
             }
-
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP '.$response->status());
-
-            return [];
-        } catch (Exception $e) {
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: '.$e->getMessage());
-
-            return [];
         }
+
+        // All retries failed
+        Log::error('All attempts to fetch playlist streams from m3u-proxy failed', [
+            'playlist_uuid' => $playlist->uuid,
+            'attempts' => $retries,
+        ]);
+
+        return null;
     }
 
     /**
@@ -237,7 +265,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(2)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
@@ -283,7 +311,7 @@ class M3uProxyService
 
         try {
             $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
-            $response = Http::timeout(3)->acceptJson()
+            $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
                 ] : [])
