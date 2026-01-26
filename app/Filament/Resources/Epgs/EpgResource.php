@@ -526,6 +526,7 @@ class EpgResource extends Resource
                                 ->label('Enable Debugging')
                                 ->helperText('This should be false unless directed by SchedulesDirect support')
                                 ->default(false)
+                                ->hiddenOn('create')
                                 ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                         ]),
 
