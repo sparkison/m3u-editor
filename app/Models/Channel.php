@@ -47,6 +47,7 @@ class Channel extends Model
         'movie_data' => 'array',
         'sync_settings' => 'array',
         'last_metadata_fetch' => 'datetime',
+        'epg_map_enabled' => 'boolean',
         'logo_type' => ChannelLogoType::class,
     ];
 

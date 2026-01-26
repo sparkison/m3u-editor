@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use JsonMachine\Items;
 
 /**
- * Service to interact with the Schedules Direct API for EPG data.
+ * Service to interact with the SchedulesDirect API for EPG data.
  */
 class SchedulesDirectService
 {
@@ -59,7 +59,7 @@ class SchedulesDirectService
     }
 
     /**
-     * Build HTTP headers for Schedules Direct API requests.
+     * Build HTTP headers for SchedulesDirect API requests.
      * Includes RouteTo:debug header when sd_debug is enabled on the current EPG.
      */
     private function buildHeaders(?string $token = null): array
@@ -75,7 +75,7 @@ class SchedulesDirectService
         // Add debug routing header if sd_debug is enabled
         if ($this->currentEpg && $this->currentEpg->sd_debug) {
             $headers['RouteTo'] = 'debug';
-            Log::debug('Adding RouteTo:debug header for Schedules Direct request');
+            Log::debug('Adding RouteTo:debug header for SchedulesDirect request');
         }
 
         return $headers;
@@ -88,7 +88,7 @@ class SchedulesDirectService
     private function handleDebugNotEnabledError(): void
     {
         if ($this->currentEpg && $this->currentEpg->sd_debug) {
-            Log::warning('Schedules Direct returned code 2055 - disabling sd_debug to prevent user from being blocked', [
+            Log::warning('SchedulesDirect returned code 2055 - disabling sd_debug to prevent user from being blocked', [
                 'epg_id' => $this->currentEpg->id,
             ]);
 
@@ -166,7 +166,7 @@ class SchedulesDirectService
     }
 
     /**
-     * Authenticate with Schedules Direct and get a token
+     * Authenticate with SchedulesDirect and get a token
      */
     public function authenticate(string $username, string $password): array
     {
@@ -200,7 +200,7 @@ class SchedulesDirectService
     public function authenticateFromEpg(Epg $epg): array
     {
         if (! $epg->sd_username || ! $epg->sd_password) {
-            throw new \Exception('Schedules Direct credentials not configured');
+            throw new \Exception('SchedulesDirect credentials not configured');
         }
 
         // Set the current EPG for debug header tracking
@@ -268,7 +268,7 @@ class SchedulesDirectService
             ])->get(self::BASE_URL.'/'.self::API_VERSION.'/available/countries');
 
             if ($response->failed()) {
-                throw new Exception('Failed to get countries from Schedules Direct');
+                throw new Exception('Failed to get countries from SchedulesDirect');
             }
 
             return $response->json();
@@ -396,12 +396,12 @@ class SchedulesDirectService
             return [];
         }
 
-        // Schedules Direct has a limit of 500 program IDs per request
+        // SchedulesDirect has a limit of 500 program IDs per request
         $maxBatchSize = 500;
         $allArtwork = [];
 
         try {
-            Log::debug('Fetching program artwork from Schedules Direct', [
+            Log::debug('Fetching program artwork from SchedulesDirect', [
                 'program_count' => count($programIds),
                 'batches_needed' => ceil(count($programIds) / $maxBatchSize),
             ]);
@@ -621,7 +621,7 @@ class SchedulesDirectService
     }
 
     /**
-     * Map Schedules Direct artwork categories to XMLTV image types
+     * Map SchedulesDirect artwork categories to XMLTV image types
      */
     private function mapSchedulesDirectCategoryToXMLTV(string $category): string
     {
@@ -730,14 +730,14 @@ class SchedulesDirectService
     }
 
     /**
-     * Fetch Schedules Direct EPG data and update the EPG record
+     * Fetch SchedulesDirect EPG data and update the EPG record
      */
     public function syncEpgData(Epg $epg): void
     {
         // Set the current EPG for debug header tracking
         $this->setCurrentEpg($epg);
 
-        Log::debug('Starting Schedules Direct sync', [
+        Log::debug('Starting SchedulesDirect sync', [
             'epg_id' => $epg->id,
             'chunk_size' => self::STATIONS_PER_CHUNK,
             'sd_debug' => $epg->sd_debug,
@@ -750,7 +750,7 @@ class SchedulesDirectService
 
             // Get lineup data
             if (! $epg->hasSchedulesDirectLineup()) {
-                throw new \Exception('No lineup configured for Schedules Direct EPG');
+                throw new \Exception('No lineup configured for SchedulesDirect EPG');
             }
 
             // Set the metadata fetching flag
@@ -768,7 +768,7 @@ class SchedulesDirectService
                 $lineupData = $this->getLineup($epg->sd_token, $epg->sd_lineup_id);
             } catch (Exception $e) {
                 if (str_contains($e->getMessage(), 'Lineup not in account') || str_contains($e->getMessage(), 'not subscribed')) {
-                    Log::debug("Adding lineup {$epg->sd_lineup_id} to Schedules Direct account", ['epg_id' => $epg->id]);
+                    Log::debug("Adding lineup {$epg->sd_lineup_id} to SchedulesDirect account", ['epg_id' => $epg->id]);
                     $this->addLineup($epg->sd_token, $epg->sd_lineup_id);
                     $lineupData = $this->getLineup($epg->sd_token, $epg->sd_lineup_id);
                 } else {
@@ -787,7 +787,7 @@ class SchedulesDirectService
                 ? array_slice($epg->sd_station_ids, 0, self::MAX_STATIONS_PER_SYNC)
                 : $epg->sd_station_ids;
 
-            Log::debug('Starting Schedules Direct sync', [
+            Log::debug('Starting SchedulesDirect sync', [
                 'epg_id' => $epg->id,
                 'station_count' => count($stationIds),
                 'chunk_size' => self::STATIONS_PER_CHUNK,
@@ -808,7 +808,7 @@ class SchedulesDirectService
                 'sd_errors' => null,
                 'sd_progress' => 100,
             ]);
-            Log::debug('Successfully completed Schedules Direct sync', [
+            Log::debug('Successfully completed SchedulesDirect sync', [
                 'epg_id' => $epg->id,
                 'stations_processed' => count($stationIds),
                 'file_path' => $xmlFilePath,
@@ -821,7 +821,7 @@ class SchedulesDirectService
             ];
 
             $epg->update(['sd_errors' => $errors]);
-            Log::error('Failed to sync Schedules Direct EPG data', [
+            Log::error('Failed to sync SchedulesDirect EPG data', [
                 'epg_id' => $epg->id,
                 'error' => $e->getMessage(),
             ]);
@@ -892,7 +892,7 @@ class SchedulesDirectService
     private function writeXMLTVHeader($file, array $lineupData, array $artworkCache = []): void
     {
         fwrite($file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        fwrite($file, "<tv generator-info-name=\"m3u editor Schedules Direct Integration\" generator-info-url=\"https://github.com/sparkison/m3u-editor\">\n");
+        fwrite($file, "<tv generator-info-name=\"m3u editor SchedulesDirect Integration\" generator-info-url=\"https://github.com/sparkison/m3u-editor\">\n");
 
         // Write channels
         $stationsById = [];
@@ -1282,7 +1282,7 @@ class SchedulesDirectService
     }
 
     /**
-     * Make authenticated request to Schedules Direct API with improved error handling
+     * Make authenticated request to SchedulesDirect API with improved error handling
      */
     private function makeRequest(string $method, string $endpoint, array $data = [], ?string $token = null): Response
     {
@@ -1317,7 +1317,7 @@ class SchedulesDirectService
                 'allow_redirects' => ['strict' => true],
             ]);
 
-        Log::debug('Making Schedules Direct API request', [
+        Log::debug('Making SchedulesDirect API request', [
             'method' => $method,
             'endpoint' => $endpoint,
             'timeout' => $timeout,
@@ -1337,7 +1337,7 @@ class SchedulesDirectService
                 $response = $request->send($method, $url, ['json' => $data]);
             }
             $duration = round(microtime(true) - $startTime, 2);
-            Log::debug('Schedules Direct API request completed', [
+            Log::debug('SchedulesDirect API request completed', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'duration_seconds' => $duration,
@@ -1345,14 +1345,14 @@ class SchedulesDirectService
                 'response_size' => strlen($response->body()),
             ]);
         } catch (\Exception $e) {
-            Log::error('Schedules Direct API request failed', [
+            Log::error('SchedulesDirect API request failed', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'timeout' => $timeout,
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),
             ]);
-            throw new Exception("Schedules Direct API request failed: {$e->getMessage()}");
+            throw new Exception("SchedulesDirect API request failed: {$e->getMessage()}");
         }
         // Check response body for error codes (API may return error codes in successful HTTP responses)
         $body = $response->json();
@@ -1397,7 +1397,7 @@ class SchedulesDirectService
             $message = $body['message'] ?? $body['response'] ?? 'Unknown error';
             $code = $responseCode ?? $response->status();
 
-            Log::error('Schedules Direct API error response', [
+            Log::error('SchedulesDirect API error response', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
@@ -1405,7 +1405,7 @@ class SchedulesDirectService
                 'message' => $message,
                 'full_response' => $response->body(),
             ]);
-            throw new Exception("Schedules Direct API error: {$message} (Code: {$code})");
+            throw new Exception("SchedulesDirect API error: {$message} (Code: {$code})");
         }
 
         return $response;
