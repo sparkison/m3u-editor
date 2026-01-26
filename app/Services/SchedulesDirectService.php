@@ -211,15 +211,23 @@ class SchedulesDirectService
             'password' => hash('sha1', $epg->sd_password),
         ]);
 
-        if ($response->failed()) {
-            throw new Exception('Authentication failed: '.$response->body());
-        }
-
         $data = $response->json();
 
-        // Handle code 2055: debug not enabled - disable sd_debug to prevent user from being blocked
+        // Handle code 2055: debug not enabled - disable sd_debug and retry without debug header
         if (isset($data['code']) && $data['code'] === self::DEBUG_NOT_ENABLED_CODE) {
             $this->handleDebugNotEnabledError();
+
+            // Retry authentication without the debug header
+            Log::debug('Retrying authentication without debug header');
+            $response = Http::withHeaders($this->buildHeaders())->post(self::BASE_URL.'/'.self::API_VERSION.'/token', [
+                'username' => $epg->sd_username,
+                'password' => hash('sha1', $epg->sd_password),
+            ]);
+            $data = $response->json();
+        }
+
+        if ($response->failed()) {
+            throw new Exception('Authentication failed: '.$response->body());
         }
 
         if (isset($data['code']) && $data['code'] !== 0) {
@@ -412,13 +420,17 @@ class SchedulesDirectService
 
                 $artworkData = $response->json();
 
-                // Handle code 2055: debug not enabled - disable sd_debug to prevent user from being blocked
+                // Handle code 2055: debug not enabled - disable sd_debug and retry without debug header
                 if (isset($artworkData['code']) && $artworkData['code'] === self::DEBUG_NOT_ENABLED_CODE) {
                     $this->handleDebugNotEnabledError();
+
+                    // Retry the request without the debug header
+                    Log::debug('Retrying artwork request without debug header');
+                    $response = Http::withHeaders($this->buildHeaders($token))->timeout(30)->post(self::BASE_URL.'/'.self::API_VERSION.'/metadata/programs/', $batch);
+                    $artworkData = $response->json();
                 }
 
                 if ($response->successful()) {
-
                     foreach ($artworkData as $programArtwork) {
                         $programId = $programArtwork['programID'] ?? null;
                         $artworkItems = $programArtwork['data'] ?? [];
@@ -1103,6 +1115,20 @@ class SchedulesDirectService
 
             // Stream the API response directly to a file
             $response = Http::withHeaders($this->buildHeaders($token))->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL.'/'.self::API_VERSION.'/programs', $programBatch);
+
+            // Check for error code 2055 in the response file (API returns error as JSON even on failure)
+            if (! $response->successful() && file_exists($tempResponseFile)) {
+                $errorContent = file_get_contents($tempResponseFile);
+                $errorData = json_decode($errorContent, true);
+                if (isset($errorData['code']) && $errorData['code'] === self::DEBUG_NOT_ENABLED_CODE) {
+                    $this->handleDebugNotEnabledError();
+
+                    // Retry the request without the debug header
+                    Log::debug('Retrying program batch request without debug header');
+                    $response = Http::withHeaders($this->buildHeaders($token))->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL.'/'.self::API_VERSION.'/programs', $programBatch);
+                }
+            }
+
             if ($response->successful()) {
                 // Stream through the program response and match with schedules immediately
                 $programs = Items::fromFile($tempResponseFile);
@@ -1332,9 +1358,39 @@ class SchedulesDirectService
         $body = $response->json();
         $responseCode = $body['code'] ?? null;
 
-        // Handle code 2055: debug not enabled - disable sd_debug to prevent user from being blocked
+        // Handle code 2055: debug not enabled - disable sd_debug and retry without debug header
         if ($responseCode === self::DEBUG_NOT_ENABLED_CODE) {
             $this->handleDebugNotEnabledError();
+
+            // Retry the request without the debug header
+            Log::debug('Retrying request without debug header', [
+                'method' => $method,
+                'endpoint' => $endpoint,
+            ]);
+
+            $headers = $this->buildHeaders($token);
+            $request = Http::withHeaders($headers)
+                ->timeout($timeout)
+                ->retry(2, 1000)
+                ->withOptions([
+                    'verify' => true,
+                    'stream' => false,
+                    'max_redirects' => 3,
+                    'allow_redirects' => ['strict' => true],
+                ]);
+
+            if ($method === 'GET' && ! empty($data)) {
+                $response = $request->get($url);
+            } elseif ($method === 'POST') {
+                $response = $request->post($url, $data);
+            } elseif ($method === 'PUT') {
+                $response = $request->put($url, $data);
+            } else {
+                $response = $request->send($method, $url, ['json' => $data]);
+            }
+
+            $body = $response->json();
+            $responseCode = $body['code'] ?? null;
         }
 
         if ($response->failed()) {
