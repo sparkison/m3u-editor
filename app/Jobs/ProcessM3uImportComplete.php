@@ -247,7 +247,12 @@ class ProcessM3uImportComplete implements ShouldQueue
         if ($createEpg) {
             // Configure the EPG url
             try {
-                $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
+                $baseUrl = $playlist->getXtreamUrls()[0] ?? null;
+                if (! $baseUrl) {
+                    throw new Exception('Xtream API URL missing for EPG creation.');
+                }
+
+                $baseUrl = str($baseUrl)->replace(' ', '%20')->toString();
                 $username = urlencode($playlist->xtream_config['username']);
                 $password = urlencode($playlist->xtream_config['password']);
                 $epgUrl = "$baseUrl/xmltv.php?username=$username&password=$password";

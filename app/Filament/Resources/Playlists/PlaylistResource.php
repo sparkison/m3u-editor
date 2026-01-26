@@ -1091,6 +1091,19 @@ class PlaylistResource extends Resource
                         ->columnSpan(2)
                         ->required()
                         ->hidden(fn (Get $get): bool => ! $get('xtream')),
+                    Repeater::make('xtream_config.fallback_urls')
+                        ->label('Fallback Xtream API URLs')
+                        ->helperText('Optional: add fallback URLs to try if the primary URL fails.')
+                        ->addActionLabel('Add fallback URL')
+                        ->simple(
+                            TextInput::make('url')
+                                ->label('Fallback URL')
+                                ->prefixIcon('heroicon-m-globe-alt')
+                                ->maxLength(4000)
+                                ->url()
+                        )
+                        ->columnSpan(2)
+                        ->hidden(fn (Get $get): bool => ! $get('xtream')),
                     Grid::make()
                         ->columnSpanFull()
                         ->schema([

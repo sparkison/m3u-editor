@@ -257,15 +257,27 @@ class PlaylistService
 
     public static function getChannelBaseUrl(Playlist|PlaylistAlias $source, $channelId): string
     {
-        $config = $source instanceof PlaylistAlias
-            ? $source->getPrimaryXtreamConfig()
-            : $source->xtream_config;
+        if ($source instanceof PlaylistAlias) {
+            $config = $source->getPrimaryXtreamConfig();
+        } else {
+            $config = $source->xtream_config;
+        }
 
         if (! $config) {
             return '';
         }
 
-        $baseUrl = rtrim($config['url'], '/');
+        if ($source instanceof PlaylistAlias) {
+            $baseUrl = rtrim((string) ($config['url'] ?? ''), '/');
+
+            if ($baseUrl === '') {
+                $playlistBase = $source->playlist?->getXtreamUrls()[0] ?? '';
+                $baseUrl = rtrim((string) $playlistBase, '/');
+            }
+        } else {
+            $baseUrl = rtrim((string) (($source->getXtreamUrls()[0] ?? $config['url'] ?? '')), '/');
+        }
+
         $username = $config['username'];
         $password = $config['password'];
 
@@ -274,15 +286,27 @@ class PlaylistService
 
     public static function getSeriesBaseUrl(Playlist|PlaylistAlias $source, $seriesId): string
     {
-        $config = $source instanceof PlaylistAlias
-            ? $source->getPrimaryXtreamConfig()
-            : $source->xtream_config;
+        if ($source instanceof PlaylistAlias) {
+            $config = $source->getPrimaryXtreamConfig();
+        } else {
+            $config = $source->xtream_config;
+        }
 
         if (! $config) {
             return '';
         }
 
-        $baseUrl = rtrim($config['url'], '/');
+        if ($source instanceof PlaylistAlias) {
+            $baseUrl = rtrim((string) ($config['url'] ?? ''), '/');
+
+            if ($baseUrl === '') {
+                $playlistBase = $source->playlist?->getXtreamUrls()[0] ?? '';
+                $baseUrl = rtrim((string) $playlistBase, '/');
+            }
+        } else {
+            $baseUrl = rtrim((string) (($source->getXtreamUrls()[0] ?? $config['url'] ?? '')), '/');
+        }
+
         $username = $config['username'];
         $password = $config['password'];
 

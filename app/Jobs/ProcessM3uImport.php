@@ -257,14 +257,22 @@ class ProcessM3uImport implements ShouldQueue
             $batchNo = Str::orderedUuid()->toString();
 
             // Get the Xtream API credentials
-            $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
             $user = $playlist->xtream_config['username'];
             $password = $playlist->xtream_config['password'];
             $output = $playlist->xtream_config['output'] ?? 'ts';
             $categoriesToImport = $playlist->xtream_config['import_options'] ?? [];
 
+            // Setup the user agent and SSL verification
+            $verify = ! $playlist->disable_ssl_verification;
+            $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
+
+            $baseUrl = $this->resolveXtreamBaseUrl($playlist, $user, $password, $userAgent, $verify);
+            if (! $baseUrl) {
+                return;
+            }
+
+            // Get the user info with provider throttling (used to validate the provider and cache status)
             // Setup the category and stream URLs
-            $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
             $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories";
             $liveStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
             $vodCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_categories";
@@ -275,21 +283,6 @@ class ProcessM3uImport implements ShouldQueue
             $liveStreamsEnabled = in_array('live', $categoriesToImport);
             $vodStreamsEnabled = in_array('vod', $categoriesToImport);
             $seriesStreamsEnabled = in_array('series', $categoriesToImport);
-
-            // Setup the user agent and SSL verification
-            $verify = ! $playlist->disable_ssl_verification;
-            $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
-
-            // Get the user info with provider throttling
-            $userInfoResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
-                ->withOptions(['verify' => $verify])
-                ->timeout(30)
-                ->throw()->get($userInfo));
-            if ($userInfoResponse->ok()) {
-                $playlist->update([
-                    'xtream_status' => $userInfoResponse->json(),
-                ]);
-            }
 
             // If including Live streams, get the categories and streams
             if ($liveStreamsEnabled) {
@@ -939,6 +932,43 @@ class ProcessM3uImport implements ShouldQueue
             event(new SyncCompleted($this->playlist));
         }
 
+    }
+
+    private function resolveXtreamBaseUrl(
+        Playlist $playlist,
+        string $user,
+        string $password,
+        string $userAgent,
+        bool $verify
+    ): ?string {
+        $baseUrls = $playlist->getXtreamUrls();
+
+        foreach ($baseUrls as $baseUrl) {
+            $normalized = str($baseUrl)->replace(' ', '%20')->toString();
+            $userInfo = "{$normalized}/player_api.php?username={$user}&password={$password}";
+
+            try {
+                $response = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(30)
+                    ->throw()
+                    ->get($userInfo));
+            } catch (Exception $exception) {
+                continue;
+            }
+
+            if ($response->ok()) {
+                $playlist->update([
+                    'xtream_status' => $response->json(),
+                ]);
+
+                return $normalized;
+            }
+        }
+
+        $this->sendError('Unable to connect to Xtream API provider using configured URLs.', 'No provider responded.');
+
+        return null;
     }
 
     /**
