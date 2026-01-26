@@ -27,7 +27,6 @@ class EpgMap extends Model
         'mapped_count' => 'integer',
         'settings' => 'array',
         'channels' => 'array',
-        'skip_missing_epg_id' => 'boolean',
         'status' => Status::class,
     ];
 
