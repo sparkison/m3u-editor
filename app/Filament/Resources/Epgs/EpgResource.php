@@ -516,14 +516,18 @@ class EpgResource extends Resource
                                 ->maxValue(14)
                                 ->helperText('Number of days to import from Schedules Direct (1-14)')
                                 ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
-                        ]),
+                            Toggle::make('sd_metadata.enabled')
+                                ->label('Import  Metadata')
+                                ->helperText('Enable to import additional program images (NOTE: this can significantly increase import time)')
+                                ->default(false)
+                                ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
 
-                    Toggle::make('sd_metadata.enabled')
-                        ->label('Import  Metadata')
-                        ->helperText('Enable to import additional program images (NOTE: this can significantly increase import time)')
-                        ->default(false)
-                        ->columnSpanFull()
-                        ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                            Toggle::make('sd_debug')
+                                ->label('Enable Debugging')
+                                ->helperText('This should be false unless directed by SchedulesDirect support')
+                                ->default(false)
+                                ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                        ]),
 
                     Grid::make()
                         ->columns(2)
