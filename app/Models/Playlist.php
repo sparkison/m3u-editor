@@ -59,6 +59,34 @@ class Playlist extends Model
         'source_type' => PlaylistSourceType::class,
     ];
 
+    public function getXtreamUrls(): array
+    {
+        $config = $this->xtream_config ?? [];
+        $primary = $config['url'] ?? null;
+        $fallbacks = $config['fallback_urls'] ?? [];
+
+        $urls = array_merge(
+            $primary ? [$primary] : [],
+            is_array($fallbacks) ? $fallbacks : [],
+        );
+
+        $normalized = [];
+        foreach ($urls as $url) {
+            if (! is_string($url)) {
+                continue;
+            }
+
+            $trimmed = trim($url);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $normalized[] = rtrim($trimmed, '/');
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     public function getFolderPathAttribute(): string
     {
         return "playlist/{$this->uuid}";

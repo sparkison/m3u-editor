@@ -316,13 +316,7 @@ class AppServiceProvider extends ServiceProvider
                 if (! $playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
-                if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
-                    // Remove trailing slash from Xtream URL
-                    $playlist->xtream_config = [
-                        ...$playlist->xtream_config,
-                        'url' => rtrim($playlist->xtream_config['url'], '/'),
-                    ];
-                }
+                $playlist->xtream_config = self::normalizeXtreamConfig($playlist->xtream_config);
                 $playlist->uuid = Str::orderedUuid()->toString();
 
                 return $playlist;
@@ -331,13 +325,7 @@ class AppServiceProvider extends ServiceProvider
                 if (! $playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
-                if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
-                    // Remove trailing slash from Xtream URL
-                    $playlist->xtream_config = [
-                        ...$playlist->xtream_config,
-                        'url' => rtrim($playlist->xtream_config['url'], '/'),
-                    ];
-                }
+                $playlist->xtream_config = self::normalizeXtreamConfig($playlist->xtream_config);
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
                 }
@@ -501,25 +489,13 @@ class AppServiceProvider extends ServiceProvider
                 if (! $playlistAlias->user_id) {
                     $playlistAlias->user_id = auth()->id();
                 }
-                if (($playlistAlias->xtream_config['url'] ?? false) && Str::endsWith($playlistAlias->xtream_config['url'], '/')) {
-                    // Remove trailing slash from Xtream URL
-                    $playlistAlias->xtream_config = [
-                        ...$playlistAlias->xtream_config,
-                        'url' => rtrim($playlistAlias->xtream_config['url'], '/'),
-                    ];
-                }
+                $playlistAlias->xtream_config = self::normalizeXtreamConfig($playlistAlias->xtream_config);
                 $playlistAlias->uuid = Str::orderedUuid()->toString();
 
                 return $playlistAlias;
             });
             PlaylistAlias::updating(function (PlaylistAlias $playlistAlias) {
-                if (($playlistAlias->xtream_config['url'] ?? false) && Str::endsWith($playlistAlias->xtream_config['url'], '/')) {
-                    // Remove trailing slash from Xtream URL
-                    $playlistAlias->xtream_config = [
-                        ...$playlistAlias->xtream_config,
-                        'url' => rtrim($playlistAlias->xtream_config['url'], '/'),
-                    ];
-                }
+                $playlistAlias->xtream_config = self::normalizeXtreamConfig($playlistAlias->xtream_config);
                 if ($playlistAlias->isDirty('short_urls_enabled')) {
                     $playlistAlias->generateShortUrl();
                 }
@@ -658,6 +634,44 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the TMDB search component
         Livewire::component('tmdb-search', TmdbSearch::class);
+    }
+
+    private static function normalizeXtreamConfig(?array $config): ?array
+    {
+        if (! $config) {
+            return $config;
+        }
+
+        if (array_key_exists('url', $config)) {
+            return self::normalizeXtreamConfigEntry($config);
+        }
+
+        $normalized = [];
+        foreach ($config as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = self::normalizeXtreamConfigEntry($item);
+        }
+
+        return $normalized;
+    }
+
+    private static function normalizeXtreamConfigEntry(array $config): array
+    {
+        if (isset($config['url']) && is_string($config['url'])) {
+            $config['url'] = rtrim($config['url'], '/');
+        }
+
+        if (isset($config['fallback_urls']) && is_array($config['fallback_urls'])) {
+            $config['fallback_urls'] = array_values(array_filter(array_map(
+                fn ($url) => is_string($url) ? rtrim(trim($url), '/') : null,
+                $config['fallback_urls'],
+            )));
+        }
+
+        return $config;
     }
 
     /**

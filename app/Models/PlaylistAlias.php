@@ -47,7 +47,7 @@ class PlaylistAlias extends Model
                 if (is_array($raw)) {
                     $configs = [];
                     foreach ($raw as $index => $item) {
-                        if (is_array($item) && ! empty($item['url'])) {
+                        if (is_array($item) && array_filter($item) !== []) {
                             $configs[] = $item;
                         }
                     }
@@ -81,6 +81,16 @@ class PlaylistAlias extends Model
             // If URLs match, return this config
             if ($cfgUrl !== '' && $cfgUrl === $needle) {
                 return $cfg;
+            }
+
+            $fallbacks = $cfg['fallback_urls'] ?? [];
+            if (is_array($fallbacks)) {
+                foreach ($fallbacks as $fallbackUrl) {
+                    $fallback = rtrim((string) strtolower($fallbackUrl), '/');
+                    if ($fallback !== '' && $fallback === $needle) {
+                        return $cfg;
+                    }
+                }
             }
         }
 
@@ -435,6 +445,10 @@ class PlaylistAlias extends Model
         $aliasBaseUrl = rtrim((string) ($aliasConfig['url'] ?? ''), '/');
         $aliasUsername = (string) ($aliasConfig['username'] ?? '');
         $aliasPassword = (string) ($aliasConfig['password'] ?? '');
+
+        if ($aliasBaseUrl === '') {
+            $aliasBaseUrl = $sourceBaseUrl;
+        }
 
         // If any required value is missing, do not attempt to transform
         if (

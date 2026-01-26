@@ -14,6 +14,8 @@ class XtreamService
 {
     protected string $server;
 
+    protected array $servers = [];
+
     protected string $user;
 
     protected string $pass;
@@ -62,14 +64,20 @@ class XtreamService
         // Setup server, user, and pass
         if ($playlist) {
             $config = $playlist->xtream_config;
-            $this->server = $config['url'] ?? '';
+            $this->servers = $playlist->getXtreamUrls();
+            $this->server = $this->servers[0] ?? '';
             $this->user = $config['username'] ?? '';
             $this->pass = $config['password'] ?? '';
         } elseif ($xtream_config) {
-            $this->server = $xtream_config['url'] ?? '';
+            $this->servers = $this->normalizeUrls($xtream_config);
+            $this->server = $this->servers[0] ?? '';
             $this->user = $xtream_config['username'] ?? '';
             $this->pass = $xtream_config['password'] ?? '';
         } else {
+            return false;
+        }
+
+        if ($this->server === '') {
             return false;
         }
 
@@ -78,29 +86,91 @@ class XtreamService
         return $this;
     }
 
+    protected function normalizeUrls(array $xtreamConfig): array
+    {
+        $primary = $xtreamConfig['url'] ?? null;
+        $fallbacks = $xtreamConfig['fallback_urls'] ?? [];
+
+        $urls = array_merge(
+            $primary ? [$primary] : [],
+            is_array($fallbacks) ? $fallbacks : [],
+        );
+
+        $normalized = [];
+        foreach ($urls as $url) {
+            if (! is_string($url)) {
+                continue;
+            }
+
+            $trimmed = trim($url);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $normalized[] = rtrim($trimmed, '/');
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     protected function call(string $url, int $timeout = 60 * 15)
     {
         if (! ($this->playlist || $this->xtream_config)) {
             throw new Exception('Config not initialized. Call init() first with Playlist or Xtream config array.');
         }
-        $attempts = 0;
-        do {
-            $user_agent = $this->playlist?->user_agent ?? 'VLC/3.0.21 LibVLC/3.0.21';
-            $verify = ! ($this->playlist?->disable_ssl_verification ?? false);
-            $response = Http::timeout($timeout) // defaults to 15 minutes
-                ->withOptions(['verify' => $verify])
-                ->withHeaders(['User-Agent' => $user_agent])
-                ->get($url);
-
-            if ($response->ok()) {
-                return $response->json();
+        $user_agent = $this->playlist?->user_agent ?? 'VLC/3.0.21 LibVLC/3.0.21';
+        $verify = ! ($this->playlist?->disable_ssl_verification ?? false);
+        $servers = $this->servers ?: [$this->server];
+        $lastResponse = null;
+        $lastException = null;
+        $relativeUrl = $url;
+        $parsed = parse_url($url);
+        if ($parsed !== false && isset($parsed['path'])) {
+            $relativeUrl = $parsed['path'];
+            if (isset($parsed['query'])) {
+                $relativeUrl .= '?'.$parsed['query'];
             }
+            if (isset($parsed['fragment'])) {
+                $relativeUrl .= '#'.$parsed['fragment'];
+            }
+        }
 
-            $attempts++;
-            sleep(1);
-        } while ($attempts < $this->retryLimit);
+        foreach ($servers as $server) {
+            $this->server = $this->ensureScheme($server);
+            $requestUrl = $relativeUrl === $url
+                ? $relativeUrl
+                : rtrim($this->server, '/').$relativeUrl;
+            $attempts = 0;
+            do {
+                try {
+                    $response = Http::timeout($timeout) // defaults to 15 minutes
+                        ->withOptions(['verify' => $verify])
+                        ->withHeaders(['User-Agent' => $user_agent])
+                        ->get($requestUrl);
+                    $lastResponse = $response;
+                } catch (Exception $exception) {
+                    $lastException = $exception;
+                    $attempts++;
+                    sleep(1);
+                    continue;
+                }
 
-        $response->throw(); // if we exhausted retries, let it bubble up
+                if ($response->ok()) {
+                    return $response->json();
+                }
+
+                $attempts++;
+                sleep(1);
+            } while ($attempts < $this->retryLimit);
+        }
+
+        if ($lastResponse) {
+            $lastResponse->throw(); // if we exhausted retries, let it bubble up
+        }
+
+        if ($lastException) {
+            throw $lastException;
+        }
     }
 
     protected function makeUrl(string $action, array $extra = []): string
@@ -111,17 +181,25 @@ class XtreamService
             'action' => $action,
         ], $extra);
 
-        if (! Str::startsWith($this->server, 'http://') && ! Str::startsWith($this->server, 'https://')) {
-            $this->server = 'http://'.$this->server; // ensure server URL starts with http:// or https://
-        }
+        $this->server = $this->ensureScheme($this->server);
 
         return $this->server
             .'/player_api.php?'.http_build_query($params);
     }
 
+    protected function ensureScheme(string $server): string
+    {
+        if (! Str::startsWith($server, 'http://') && ! Str::startsWith($server, 'https://')) {
+            return 'http://'.$server;
+        }
+
+        return $server;
+    }
+
     public function authenticate(): array
     {
-        $url = $this->server
+        $server = $this->ensureScheme($this->server);
+        $url = $server
             ."/player_api.php?username={$this->user}&password={$this->pass}";
 
         return $this->call(url: $url, timeout: 5)['user_info'] ?? []; // set short timeout
@@ -129,7 +207,8 @@ class XtreamService
 
     public function userInfo($timeout = 5): array
     {
-        $url = $this->server
+        $server = $this->ensureScheme($this->server);
+        $url = $server
             ."/player_api.php?username={$this->user}&password={$this->pass}";
 
         return $this->call(url: $url, timeout: $timeout) ?? []; // set short timeout

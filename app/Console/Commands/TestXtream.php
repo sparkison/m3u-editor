@@ -50,9 +50,10 @@ class TestXtream extends Command implements PromptsForMissingInput
 
         $this->playlist = $playlist;
         $xtream_config = $playlist->xtream_config;
+        $baseUrl = $playlist->getXtreamUrls()[0] ?? ($xtream_config['url'] ?? '');
 
         $this->info('Xtream helper');
-        $this->info('Connecting to: '.$xtream_config['url'].'...');
+        $this->info('Connecting to: '.$baseUrl.'...');
 
         $xtream = $xtream->init(
             playlist: $playlist,

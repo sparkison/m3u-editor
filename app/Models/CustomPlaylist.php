@@ -177,7 +177,7 @@ class CustomPlaylist extends Model
     {
         return $this->getSourcePlaylists()
             ->map(function (Playlist $playlist) {
-                $url = $playlist->xtream_config['url'] ?? null;
+                $url = $playlist->getXtreamUrls()[0] ?? null;
 
                 return [
                     'id' => $playlist->id,

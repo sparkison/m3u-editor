@@ -331,17 +331,29 @@ class PlaylistAliasResource extends Resource
                         ->maxItems(fn ($get) => $get('custom_playlist_id') ? null : 1)
                         ->minItems(1)
                         ->collapsible()
-                        ->itemLabel(fn (array $state): ?string => 'Provider: '.parse_url($state['url'] ?? '', PHP_URL_HOST))
+                        ->itemLabel(fn (array $state): ?string => 'Provider: '.(parse_url($state['url'] ?? '', PHP_URL_HOST) ?: 'Source playlist'))
                         ->schema([
                             Forms\Components\TextInput::make('url')
                                 ->label('Xtream API URL')
                                 ->live()
-                                ->helperText(text: 'Enter the full URL using <url>:<port> format - without trailing slash (/).')
+                                ->helperText(text: 'Enter the full URL using <url>:<port> format - without trailing slash (/). Leave blank to use the source playlist URL.')
                                 ->prefixIcon('heroicon-m-globe-alt')
                                 ->maxLength(4000)
                                 ->url()
                                 ->columnSpan(2)
-                                ->required(),
+                                ->required(fn (Get $get) => (bool) $get('custom_playlist_id')),
+                            Forms\Components\Repeater::make('fallback_urls')
+                                ->label('Fallback Xtream API URLs')
+                                ->helperText('Optional: add fallback URLs to try if the primary URL fails.')
+                                ->addActionLabel('Add fallback URL')
+                                ->simple(
+                                    Forms\Components\TextInput::make('url')
+                                        ->label('Fallback URL')
+                                        ->prefixIcon('heroicon-m-globe-alt')
+                                        ->maxLength(4000)
+                                        ->url()
+                                )
+                                ->columnSpan(2),
                             Forms\Components\TextInput::make('username')
                                 ->label('Xtream API Username')
                                 ->required(),
