@@ -56,8 +56,7 @@ class ProcessVodChannelsChunk implements ShouldQueue
 
         // Get the channels for this chunk
         $channels = $playlist->channels()
-            ->whereIn('id', $this->channelIds)
-            ->select(['id', 'name', 'source_id']);
+            ->whereIn('id', $this->channelIds);
 
         $totalChannels = count($this->channelIds);
 
