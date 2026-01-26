@@ -192,7 +192,7 @@ class ListChannels extends ListRecords
                     ])
                     ->action(function (array $data): void {
                         $playlist = Playlist::find($data['playlist_id']);
-                        $playlist->channels()->update(['epg_channel_id' => null]);
+                        $playlist->live_channels()->update(['epg_channel_id' => null]);
                     })->after(function () {
                         Notification::make()
                             ->success()
