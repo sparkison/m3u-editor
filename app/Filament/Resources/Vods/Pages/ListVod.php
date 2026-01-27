@@ -4,12 +4,10 @@ namespace App\Filament\Resources\Vods\Pages;
 
 use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
-use App\Filament\Resources\EpgMaps\EpgMapResource;
 use App\Filament\Resources\Vods\VodResource;
 use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\FetchTmdbIds;
-use App\Jobs\MapPlaylistChannelsToEpg;
 use App\Jobs\MergeChannels;
 use App\Jobs\ProcessVodChannels;
 use App\Jobs\SyncVodStrmFiles;
@@ -32,7 +30,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
@@ -294,33 +291,6 @@ class ListVod extends ListRecords
                     ->modalIcon('heroicon-o-document-arrow-down')
                     ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
                     ->modalSubmitActionLabel('Yes, sync now'),
-
-                Action::make('map')
-                    ->label('Map EPG to Playlist')
-                    ->schema(EpgMapResource::getForm())
-                    ->action(function (array $data): void {
-                        app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new MapPlaylistChannelsToEpg(
-                                epg: (int) $data['epg_id'],
-                                playlist: $data['playlist_id'],
-                                force: $data['override'],
-                                recurring: $data['recurring'],
-                                settings: $data['settings'] ?? [],
-                            ));
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('EPG to Channel mapping')
-                            ->body('Channel mapping started, you will be notified when the process is complete.')
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-link')
-                    ->color('gray')
-                    ->modalIcon('heroicon-o-link')
-                    ->modalWidth(Width::FourExtraLarge)
-                    ->modalDescription('Map the selected EPG to the selected Playlist channels.')
-                    ->modalSubmitActionLabel('Map now'),
 
                 Action::make('find-replace')
                     ->label('Find & Replace')

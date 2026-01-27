@@ -191,6 +191,11 @@ class ChannelResource extends Resource
                 ->toggleable()
                 ->tooltip('Toggle channel status')
                 ->sortable(),
+            ToggleColumn::make('can_merge')
+                ->label('Merge Enabled')
+                ->toggleable()
+                ->tooltip('Toggle channel merge status during "Merge Same ID" jobs')
+                ->sortable(),
             TextColumn::make('failovers_count')
                 ->label('Failovers')
                 ->counts('failovers')
@@ -850,7 +855,7 @@ class ChannelResource extends Resource
                     ->modalDescription('Allow mapping EPG to selected channels when running EPG mapping jobs.')
                     ->modalSubmitActionLabel('Enable now'),
                 BulkAction::make('disable-epg-mapping')
-                    ->label('Disabled EPG mapping')
+                    ->label('Disable EPG mapping')
                     ->color('warning')
                     ->action(function (Collection $records, array $data): void {
                         $records->each(fn ($channel) => $channel->update([
@@ -869,6 +874,47 @@ class ChannelResource extends Resource
                     ->icon('heroicon-o-calendar')
                     ->modalIcon('heroicon-o-calendar')
                     ->modalDescription('Don\'t map EPG to selected channels when running EPG mapping jobs.')
+                    ->modalSubmitActionLabel('Disable now'),
+                BulkAction::make('enable-merge')
+                    ->label('Enable Merge')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => true,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge re-enabled for selected channels')
+                            ->body('The merge has been re-enabled for the selected channels. They can now be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Allow merging for selected channels when running "Merge Same ID" jobs.')
+                    ->modalSubmitActionLabel('Enable now'),
+                BulkAction::make('disable-merge')
+                    ->label('Disable Merge')
+                    ->color('warning')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => false,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge disabled for selected channels')
+                            ->body('The merge has been disabled for the selected channels. They will not be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Don\'t allow merging for selected channels when running "Merge Same ID" jobs.')
                     ->modalSubmitActionLabel('Disable now'),
                 BulkAction::make('enable')
                     ->label('Enable selected')

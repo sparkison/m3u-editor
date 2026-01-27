@@ -63,8 +63,10 @@ class MergeChannels implements ShouldQueue
         // Exclude channels that are already configured as failovers (unless we're re-merging everything)
         $shouldExcludeExistingFailovers = ! empty($existingFailoverChannelIds) && ! $this->forceCompleteRemerge;
 
-        $allChannels = Channel::where('user_id', $this->user->id)
-            ->whereIn('playlist_id', $playlistIds)
+        $allChannels = Channel::where([
+            ['user_id', $this->user->id],
+            ['can_merge', true],
+        ])->whereIn('playlist_id', $playlistIds)
             ->where(function ($query) {
                 $query->where('stream_id_custom', '!=', '')
                     ->orWhere('stream_id', '!=', '');
@@ -72,8 +74,7 @@ class MergeChannels implements ShouldQueue
             ->when($shouldExcludeExistingFailovers, function ($query) use ($existingFailoverChannelIds) {
                 // Only exclude existing failovers if we're not forcing a complete re-merge
                 $query->whereNotIn('id', $existingFailoverChannelIds);
-            })
-            ->cursor();
+            })->cursor();
 
         // Group channels by stream ID using LazyCollection
         $groupedChannels = $allChannels->groupBy(function ($channel) {
