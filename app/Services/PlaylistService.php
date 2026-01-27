@@ -541,26 +541,26 @@ class PlaylistService
                 ->where('password', $password)
                 ->where('enabled', true)
                 ->first();
-    
+
             // If found, return the custom expiration timestamp
             return $playlistAuth?->expires_at?->timestamp ?? 0;
         }
-    
+
         // Alias login
         if ($authMethod === 'alias_auth' && $authRecord instanceof PlaylistAlias) {
             return $authRecord?->expires_at?->timestamp ?? 0;
         }
-    
+
         // Legacy (owner_auth) optional override
         if ($authMethod === 'owner_auth' && $username && $password) {
             $legacyOverride = PlaylistAuth::where('username', $username)
                 ->where('password', $password)
                 ->where('enabled', true)
                 ->first();
-    
+
             return $legacyOverride?->expires_at?->timestamp ?? 0;
         }
-    
+
         // Default fallback
         return 0;
     }
