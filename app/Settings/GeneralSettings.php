@@ -46,6 +46,11 @@ class GeneralSettings extends Settings
 
     public ?int $default_vod_stream_profile_id = null;
 
+    // Default stream file setting profile IDs
+    public ?int $default_series_stream_file_setting_id = null;
+
+    public ?int $default_vod_stream_file_setting_id = null;
+
     public ?string $url_override = null;
 
     public ?bool $url_override_include_logos = true;

@@ -91,6 +91,11 @@ class Channel extends Model
         return $this->belongsTo(Group::class);
     }
 
+    public function streamFileSetting(): BelongsTo
+    {
+        return $this->belongsTo(StreamFileSetting::class);
+    }
+
     public function epgChannel(): BelongsTo
     {
         return $this->belongsTo(EpgChannel::class)

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Episode;
 use App\Models\Series;
+use App\Models\StreamFileSetting;
 use App\Models\StrmFileMapping;
 use App\Models\User;
 use App\Services\NfoService;
@@ -280,34 +281,13 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
         // Only load relations if not already loaded (bulk mode pre-loads them)
         if (! $series->relationLoaded('enabled_episodes')) {
-            $series->load('enabled_episodes', 'playlist', 'user', 'category');
+            $series->load('enabled_episodes', 'playlist', 'user', 'category', 'streamFileSetting', 'category.streamFileSetting');
         }
 
         $playlist = $series->playlist;
         try {
-            // Get playlist sync settings
-            $sync_settings = $series->sync_settings;
-
-            // Get global sync settings
-            $global_sync_settings = [
-                'enabled' => $settings->stream_file_sync_enabled ?? false,
-                'include_category' => $settings->stream_file_sync_include_category ?? true,
-                'include_series' => $settings->stream_file_sync_include_series ?? true,
-                'include_season' => $settings->stream_file_sync_include_season ?? true,
-                'sync_location' => $series->sync_location ?? $settings->stream_file_sync_location ?? null,
-                'path_structure' => $settings->stream_file_sync_path_structure ?? ['category', 'series', 'season'],
-                'filename_metadata' => $settings->stream_file_sync_filename_metadata ?? [],
-                'tmdb_id_format' => $settings->stream_file_sync_tmdb_id_format ?? 'square',
-                'clean_special_chars' => $settings->stream_file_sync_clean_special_chars ?? false,
-                'remove_consecutive_chars' => $settings->stream_file_sync_remove_consecutive_chars ?? false,
-                'replace_char' => $settings->stream_file_sync_replace_char ?? 'space',
-                'name_filter_enabled' => $settings->stream_file_sync_name_filter_enabled ?? false,
-                'name_filter_patterns' => $settings->stream_file_sync_name_filter_patterns ?? [],
-                'generate_nfo' => $settings->stream_file_sync_generate_nfo ?? false,
-            ];
-
-            // Merge global settings with series specific settings
-            $sync_settings = array_merge($global_sync_settings, $sync_settings ?? []);
+            // Resolve settings with priority chain: Series > Category > Global Profile > Legacy Settings
+            $sync_settings = $this->resolveSeriesSyncSettings($series, $settings);
 
             // Check if sync is enabled
             if (! $sync_settings['enabled'] ?? false) {
@@ -588,5 +568,59 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
         }
+    }
+
+    /**
+     * Resolve sync settings with priority chain: Series > Category > Global Profile > Legacy Settings
+     */
+    protected function resolveSeriesSyncSettings(Series $series, GeneralSettings $settings): array
+    {
+        // Priority 1: Series-level StreamFileSetting
+        $streamFileSetting = $series->streamFileSetting;
+
+        // Priority 2: Category-level StreamFileSetting
+        if (! $streamFileSetting && $series->category) {
+            $streamFileSetting = $series->category->streamFileSetting;
+        }
+
+        // Priority 3: Global StreamFileSetting from GeneralSettings
+        if (! $streamFileSetting && $settings->default_series_stream_file_setting_id) {
+            $streamFileSetting = StreamFileSetting::find($settings->default_series_stream_file_setting_id);
+        }
+
+        // If we have a StreamFileSetting model, use its settings
+        if ($streamFileSetting) {
+            $sync_settings = $streamFileSetting->toSyncSettings();
+
+            // Allow series-level sync_location override
+            if ($series->sync_location) {
+                $sync_settings['sync_location'] = $series->sync_location;
+            }
+
+            return $sync_settings;
+        }
+
+        // Priority 4: Legacy settings from GeneralSettings (backwards compatibility)
+        $legacy_sync_settings = $series->sync_settings ?? [];
+
+        $global_sync_settings = [
+            'enabled' => $settings->stream_file_sync_enabled ?? false,
+            'include_category' => $settings->stream_file_sync_include_category ?? true,
+            'include_series' => $settings->stream_file_sync_include_series ?? true,
+            'include_season' => $settings->stream_file_sync_include_season ?? true,
+            'sync_location' => $series->sync_location ?? $settings->stream_file_sync_location ?? null,
+            'path_structure' => $settings->stream_file_sync_path_structure ?? ['category', 'series', 'season'],
+            'filename_metadata' => $settings->stream_file_sync_filename_metadata ?? [],
+            'tmdb_id_format' => $settings->stream_file_sync_tmdb_id_format ?? 'square',
+            'clean_special_chars' => $settings->stream_file_sync_clean_special_chars ?? false,
+            'remove_consecutive_chars' => $settings->stream_file_sync_remove_consecutive_chars ?? false,
+            'replace_char' => $settings->stream_file_sync_replace_char ?? 'space',
+            'name_filter_enabled' => $settings->stream_file_sync_name_filter_enabled ?? false,
+            'name_filter_patterns' => $settings->stream_file_sync_name_filter_patterns ?? [],
+            'generate_nfo' => $settings->stream_file_sync_generate_nfo ?? false,
+        ];
+
+        // Merge global settings with series-specific legacy settings
+        return array_merge($global_sync_settings, $legacy_sync_settings);
     }
 }

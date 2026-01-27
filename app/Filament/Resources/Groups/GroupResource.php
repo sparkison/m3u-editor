@@ -3,10 +3,9 @@
 namespace App\Filament\Resources\Groups;
 
 use App\Facades\SortFacade;
+use App\Filament\Resources\Groups\Pages\EditGroup;
 use App\Filament\Resources\Groups\Pages\ListGroups;
-use App\Filament\Resources\Groups\Pages\ViewGroup;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
-use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
@@ -16,12 +15,14 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group as ComponentsGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -332,6 +333,8 @@ class GroupResource extends Resource
                     DeleteAction::make()
                         ->hidden(fn ($record) => ! $record->custom),
                 ])->button()->hiddenLabel()->size('sm'),
+                EditAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -581,38 +584,21 @@ class GroupResource extends Resource
         return [
             'index' => ListGroups::route('/'),
             // 'create' => Pages\CreateGroup::route('/create'),
-            'view' => ViewGroup::route('/{record}'),
-            // 'edit' => Pages\EditGroup::route('/{record}/edit'),
+            'edit' => EditGroup::route('/{record}/edit'),
         ];
-    }
-
-    public static function infolist(Schema $schema): Schema
-    {
-        // return parent::infolist($infolist);
-        return $schema
-            ->components([
-                Section::make('Group Details')
-                    ->collapsible(true)
-                    ->collapsed(true)
-                    ->compact()
-                    ->columns(2)
-                    ->schema([
-                        TextEntry::make('name')
-                            ->badge(),
-                        TextEntry::make('playlist.name')
-                            ->label('Playlist')
-                            // ->badge(),
-                            ->url(fn ($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
-                    ]),
-            ]);
     }
 
     public static function getForm(): array
     {
-        return [
+        $fields = [
             TextInput::make('name')
                 ->required()
                 ->maxLength(255),
+            Toggle::make('enabled')
+                ->inline(false)
+                ->label('Auto Enable New Channels')
+                ->helperText('Automatically enable newly added channels to this group.')
+                ->default(true),
             Select::make('playlist_id')
                 ->required()
                 ->label('Playlist')
@@ -627,6 +613,20 @@ class GroupResource extends Resource
                 ->default(9999)
                 ->helperText('Enter a number to define the sort order (e.g., 1, 2, 3). Lower numbers appear first.')
                 ->rules(['integer', 'min:0']),
+        ];
+
+        return [
+            Section::make('Group Settings')
+                ->compact()
+                ->columns(2)
+                ->icon('heroicon-s-cog')
+                ->collapsed(true)
+                ->schema($fields)
+                ->hiddenOn(['create']),
+            ComponentsGroup::make($fields)
+                ->columnSpanFull()
+                ->columns(2)
+                ->hiddenOn(['edit']),
         ];
     }
 }
