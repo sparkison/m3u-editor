@@ -403,7 +403,20 @@ class SyncMediaServer implements ShouldQueue
                 // Update progress every 5 series or on last series
                 if (($index + 1) % 5 === 0 || ($index + 1) === $totalSeries) {
                     $progress = $totalSeries > 0 ? (int) ((($index + 1) / $totalSeries) * 100) : 100;
-                    $integration->update(['series_progress' => $progress]);
+
+                    // Read current DB value and only update if computed progress is greater
+                    $currentDbProgress = MediaServerIntegration::find($integration->id)->series_progress;
+
+                    if ($progress > $currentDbProgress) {
+                        $integration->update(['series_progress' => $progress]);
+                    } else {
+                        // Keep a single sparse debug log for unexpected regressions
+                        Log::debug('SyncMediaServer: Skipping series_progress update because computed progress <= current DB value', [
+                            'integration_id' => $integration->id,
+                            'computed' => $progress,
+                            'current_db' => $currentDbProgress,
+                        ]);
+                    }
                 }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Series '{$seriesData['Name']}': {$e->getMessage()}";
