@@ -157,6 +157,7 @@ class XtreamService
                     $lastException = $exception;
                     $attempts++;
                     sleep(1);
+
                     continue;
                 }
 
