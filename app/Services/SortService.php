@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Group;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class SortService
@@ -97,6 +98,50 @@ class SortService
 
         $casesSql = implode(' ', $cases);
         $idsSql = implode(',', $ids);
+
+        DB::statement("UPDATE channels SET channel = CASE id {$casesSql} END WHERE id IN ({$idsSql})");
+    }
+
+    public function bulkRecountChannels(Collection $channels, $start = 1): void
+    {
+        $offset = max(0, $start - 1);
+        $driver = DB::getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        $ids = $channels->sortBy('sort')->pluck('id')->all();
+        if (empty($ids)) {
+            return;
+        }
+
+        $ids = array_map('intval', $ids);
+        $idsSql = implode(',', $ids);
+
+        if ($driver === 'mysql') {
+            DB::statement("UPDATE channels c JOIN (SELECT id, ROW_NUMBER() OVER (ORDER BY sort) AS rn FROM channels WHERE id IN ({$idsSql})) t ON c.id = t.id SET c.channel = t.rn + ?", [$offset]);
+
+            return;
+        }
+
+        if (str_starts_with($driver, 'pgsql') || $driver === 'postgresql' || $driver === 'postgres') {
+            DB::statement("UPDATE channels SET channel = t.rn + ? FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY sort) AS rn FROM channels WHERE id IN ({$idsSql})) t WHERE channels.id = t.id", [$offset]);
+
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            DB::statement("WITH ranked AS (SELECT id, ROW_NUMBER() OVER (ORDER BY sort) AS rn FROM channels WHERE id IN ({$idsSql})) UPDATE channels SET channel = (SELECT rn FROM ranked WHERE ranked.id = channels.id) + ? WHERE id IN ({$idsSql})", [$offset]);
+
+            return;
+        }
+
+        // Fallback: CASE update
+        $cases = [];
+        $i = $start;
+        foreach ($ids as $id) {
+            $cases[] = "WHEN {$id} THEN {$i}";
+            $i++;
+        }
+
+        $casesSql = implode(' ', $cases);
 
         DB::statement("UPDATE channels SET channel = CASE id {$casesSql} END WHERE id IN ({$idsSql})");
     }

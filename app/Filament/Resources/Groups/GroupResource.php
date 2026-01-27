@@ -261,7 +261,7 @@ class GroupResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->modalIcon('heroicon-o-hashtag')
-                        ->modalDescription('Recount all channels in this group sequentially?'),
+                        ->modalDescription('Recount all channels in this group sequentially? Channel numbers will be assigned based on the current sort order.'),
                     Action::make('sort_alpha')
                         ->label('Sort Alpha')
                         ->icon('heroicon-o-bars-arrow-down')

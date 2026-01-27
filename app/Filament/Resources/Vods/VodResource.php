@@ -4,13 +4,12 @@ namespace App\Filament\Resources\Vods;
 
 use App\Facades\LogoFacade;
 use App\Facades\ProxyFacade;
-use App\Filament\Resources\EpgMaps\EpgMapResource;
+use App\Facades\SortFacade;
 use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\Vods\Pages\ListVod;
 use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\FetchTmdbIds;
-use App\Jobs\MapPlaylistChannelsToEpg;
 use App\Jobs\ProcessVodChannels;
 use App\Jobs\SyncVodStrmFiles;
 use App\Models\Channel;
@@ -50,7 +49,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\SelectColumn;
@@ -201,6 +199,11 @@ class VodResource extends Resource
                 ->toggleable()
                 ->tooltip('Toggle channel status')
                 ->sortable(),
+            ToggleColumn::make('can_merge')
+                ->label('Merge Enabled')
+                ->toggleable()
+                ->tooltip('Toggle channel merge status during "Merge Same ID" jobs')
+                ->sortable(),
             TextColumn::make('failovers_count')
                 ->label('Failovers')
                 ->counts('failovers')
@@ -324,16 +327,6 @@ class VodResource extends Resource
                             return $query->orWhere(DB::raw('LOWER(group)'), 'LIKE', "%{$search}%");
                     }
                 })
-                ->sortable(),
-            TextColumn::make('epgChannel.name')
-                ->label('EPG Channel')
-                ->toggleable()
-                ->searchable(query: function (Builder $query, string $search): Builder {
-                    return $query->orWhereHas('epgChannel', function (Builder $query) use ($search) {
-                        $query->whereRaw('LOWER(epg_channels.name) LIKE ?', ['%'.strtolower($search).'%']);
-                    });
-                })
-                ->limit(40)
                 ->sortable(),
             TextInputColumn::make('tvg_shift')
                 ->label('EPG Shift')
@@ -791,132 +784,6 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrows-right-left')
                     ->modalDescription('Move the selected channel(s) to the chosen group.')
                     ->modalSubmitActionLabel('Move now'),
-                BulkAction::make('process_vod')
-                    ->label('Fetch Metadata')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->schema([
-                        Toggle::make('overwrite_existing')
-                            ->label('Overwrite Existing Metadata')
-                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
-                            ->default(false),
-                    ])
-                    ->action(function ($records, $data) {
-                        $count = 0;
-                        foreach ($records as $record) {
-                            if ($record->is_vod) {
-                                $count++;
-                                app('Illuminate\Contracts\Bus\Dispatcher')
-                                    ->dispatch(new ProcessVodChannels(
-                                        channel: $record,
-                                        force: $data['overwrite_existing'] ?? false
-                                    ));
-                            }
-                        }
-
-                        Notification::make()
-                            ->success()
-                            ->title("Fetching VOD metadata for {$count} channel(s)")
-                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
-                            ->duration(10000)
-                            ->send();
-                    })
-                    ->deselectRecordsAfterCompletion()
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->modalIcon('heroicon-o-arrow-down-tray')
-                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only enabled VOD channels will be processed.')
-                    ->modalSubmitActionLabel('Yes, process now'),
-                BulkAction::make('fetch_tmdb_ids')
-                    ->label('Fetch TMDB IDs')
-                    ->icon('heroicon-o-magnifying-glass')
-                    ->schema([
-                        Toggle::make('overwrite_existing')
-                            ->label('Overwrite Existing IDs')
-                            ->helperText('Overwrite existing TMDB/IMDB IDs? If disabled, it will only fetch IDs for items that don\'t already have them.')
-                            ->default(false),
-                    ])
-                    ->action(function ($records, $data) {
-                        $settings = app(GeneralSettings::class);
-                        if (empty($settings->tmdb_api_key)) {
-                            Notification::make()
-                                ->danger()
-                                ->title('TMDB API Key Required')
-                                ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
-                                ->duration(10000)
-                                ->send();
-
-                            return;
-                        }
-
-                        $vodIds = $records->pluck('id')->toArray();
-
-                        app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new FetchTmdbIds(
-                                vodChannelIds: $vodIds,
-                                seriesIds: null,
-                                overwriteExisting: $data['overwrite_existing'] ?? false,
-                                user: auth()->user(),
-                            ));
-
-                        Notification::make()
-                            ->success()
-                            ->title('Fetching TMDB IDs for '.count($vodIds).' VOD channel(s)')
-                            ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
-                            ->duration(10000)
-                            ->send();
-                    })
-                    ->deselectRecordsAfterCompletion()
-                    ->requiresConfirmation()
-                    ->modalIcon('heroicon-o-magnifying-glass')
-                    ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for the selected VOD channels? This enables Trash Guides compatibility for Radarr/Sonarr.')
-                    ->modalSubmitActionLabel('Yes, fetch IDs now'),
-                BulkAction::make('sync')
-                    ->label('Sync VOD .strm files')
-                    ->action(function ($records) {
-                        foreach ($records as $record) {
-                            app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new SyncVodStrmFiles(
-                                    channel: $record,
-                                ));
-                        }
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('.strm files are being synced for selected VOD channels')
-                            ->body('You will be notified once complete.')
-                            ->duration(10000)
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->modalIcon('heroicon-o-document-arrow-down')
-                    ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
-                    ->modalSubmitActionLabel('Yes, sync now'),
-                BulkAction::make('map')
-                    ->label('Map EPG to selected')
-                    ->schema(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
-                    ->action(function (Collection $records, array $data): void {
-                        app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new MapPlaylistChannelsToEpg(
-                                epg: (int) $data['epg_id'],
-                                channels: $records->pluck('id')->toArray(),
-                                force: $data['override'],
-                                settings: $data['settings'] ?? [],
-                            ));
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('EPG to Channel mapping')
-                            ->body('Mapping started, you will be notified when the process is complete.')
-                            ->send();
-                    })
-                    ->deselectRecordsAfterCompletion()
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-link')
-                    ->modalIcon('heroicon-o-link')
-                    ->modalWidth(Width::FourExtraLarge)
-                    ->modalDescription('Map the selected EPG to the selected channel(s).')
-                    ->modalSubmitActionLabel('Map now'),
                 BulkAction::make('preferred_logo')
                     ->label('Update preferred icon')
                     ->schema([
@@ -1044,6 +911,131 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path-rounded-square')
                     ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
                     ->modalSubmitActionLabel('Add failovers now'),
+                BulkAction::make('recount')
+                    ->label('Recount Channels')
+                    ->icon('heroicon-o-hashtag')
+                    ->schema([
+                        TextInput::make('start')
+                            ->label('Start Number')
+                            ->numeric()
+                            ->default(1)
+                            ->required(),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        $start = (int) $data['start'];
+                        SortFacade::bulkRecountChannels($records, $start);
+                    })
+                    ->after(function ($livewire) {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels Recounted')
+                            ->body('The selected channels have been recounted.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-hashtag')
+                    ->modalDescription('Recount the selected channels sequentially? Channel numbers will be assigned based on the current sort order.'),
+                BulkAction::make('process_vod')
+                    ->label('Fetch Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, $data) {
+                        $count = 0;
+                        foreach ($records as $record) {
+                            if ($record->is_vod) {
+                                $count++;
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new ProcessVodChannels(
+                                        channel: $record,
+                                        force: $data['overwrite_existing'] ?? false
+                                    ));
+                            }
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching VOD metadata for {$count} channel(s)")
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only enabled VOD channels will be processed.')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                BulkAction::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB IDs')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing IDs')
+                            ->helperText('Overwrite existing TMDB/IMDB IDs? If disabled, it will only fetch IDs for items that don\'t already have them.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, $data) {
+                        $settings = app(GeneralSettings::class);
+                        if (empty($settings->tmdb_api_key)) {
+                            Notification::make()
+                                ->danger()
+                                ->title('TMDB API Key Required')
+                                ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
+                                ->duration(10000)
+                                ->send();
+
+                            return;
+                        }
+
+                        $vodIds = $records->pluck('id')->toArray();
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                vodChannelIds: $vodIds,
+                                seriesIds: null,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title('Fetching TMDB IDs for '.count($vodIds).' VOD channel(s)')
+                            ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-magnifying-glass')
+                    ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for the selected VOD channels? This enables Trash Guides compatibility for Radarr/Sonarr.')
+                    ->modalSubmitActionLabel('Yes, fetch IDs now'),
+                BulkAction::make('sync')
+                    ->label('Sync VOD .strm files')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new SyncVodStrmFiles(
+                                    channel: $record,
+                                ));
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('.strm files are being synced for selected VOD channels')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 BulkAction::make('find-replace')
                     ->label('Find & Replace')
                     ->schema([
@@ -1138,6 +1130,47 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-uturn-left')
                     ->modalDescription('Reset Find & Replace results back to playlist defaults for the selected channels. This will remove any custom values set in the selected column.')
                     ->modalSubmitActionLabel('Reset now'),
+                BulkAction::make('enable-merge')
+                    ->label('Enable Merge')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => true,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge re-enabled for selected channels')
+                            ->body('The merge has been re-enabled for the selected channels. They can now be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Allow merging for selected channels when running "Merge Same ID" jobs.')
+                    ->modalSubmitActionLabel('Enable now'),
+                BulkAction::make('disable-merge')
+                    ->label('Disable Merge')
+                    ->color('warning')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => false,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge disabled for selected channels')
+                            ->body('The merge has been disabled for the selected channels. They will not be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Don\'t allow merging for selected channels when running "Merge Same ID" jobs.')
+                    ->modalSubmitActionLabel('Disable now'),
                 BulkAction::make('enable')
                     ->label('Enable selected')
                     ->action(function (Collection $records): void {

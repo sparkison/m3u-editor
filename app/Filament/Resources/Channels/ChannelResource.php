@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Channels;
 
 use App\Facades\LogoFacade;
 use App\Facades\ProxyFacade;
+use App\Facades\SortFacade;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\Channels\Pages\ListChannels;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
@@ -189,6 +190,11 @@ class ChannelResource extends Resource
             ToggleColumn::make('enabled')
                 ->toggleable()
                 ->tooltip('Toggle channel status')
+                ->sortable(),
+            ToggleColumn::make('can_merge')
+                ->label('Merge Enabled')
+                ->toggleable()
+                ->tooltip('Toggle channel merge status during "Merge Same ID" jobs')
                 ->sortable(),
             TextColumn::make('failovers_count')
                 ->label('Failovers')
@@ -669,6 +675,30 @@ class ChannelResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path-rounded-square')
                     ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
                     ->modalSubmitActionLabel('Add failovers now'),
+                BulkAction::make('recount')
+                    ->label('Recount Channels')
+                    ->icon('heroicon-o-hashtag')
+                    ->schema([
+                        TextInput::make('start')
+                            ->label('Start Number')
+                            ->numeric()
+                            ->default(1)
+                            ->required(),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        $start = (int) $data['start'];
+                        SortFacade::bulkRecountChannels($records, $start);
+                    })
+                    ->after(function ($livewire) {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels Recounted')
+                            ->body('The selected channels have been recounted.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-hashtag')
+                    ->modalDescription('Recount the selected channels sequentially? Channel numbers will be assigned based on the current sort order.'),
                 BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->schema(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
@@ -825,7 +855,7 @@ class ChannelResource extends Resource
                     ->modalDescription('Allow mapping EPG to selected channels when running EPG mapping jobs.')
                     ->modalSubmitActionLabel('Enable now'),
                 BulkAction::make('disable-epg-mapping')
-                    ->label('Disabled EPG mapping')
+                    ->label('Disable EPG mapping')
                     ->color('warning')
                     ->action(function (Collection $records, array $data): void {
                         $records->each(fn ($channel) => $channel->update([
@@ -844,6 +874,47 @@ class ChannelResource extends Resource
                     ->icon('heroicon-o-calendar')
                     ->modalIcon('heroicon-o-calendar')
                     ->modalDescription('Don\'t map EPG to selected channels when running EPG mapping jobs.')
+                    ->modalSubmitActionLabel('Disable now'),
+                BulkAction::make('enable-merge')
+                    ->label('Enable Merge')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => true,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge re-enabled for selected channels')
+                            ->body('The merge has been re-enabled for the selected channels. They can now be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Allow merging for selected channels when running "Merge Same ID" jobs.')
+                    ->modalSubmitActionLabel('Enable now'),
+                BulkAction::make('disable-merge')
+                    ->label('Disable Merge')
+                    ->color('warning')
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn ($channel) => $channel->update([
+                            'can_merge' => false,
+                        ]));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Merge disabled for selected channels')
+                            ->body('The merge has been disabled for the selected channels. They will not be merged during "Merge Same ID" jobs.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Don\'t allow merging for selected channels when running "Merge Same ID" jobs.')
                     ->modalSubmitActionLabel('Disable now'),
                 BulkAction::make('enable')
                     ->label('Enable selected')
