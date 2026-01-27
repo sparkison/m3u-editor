@@ -3,9 +3,8 @@
 namespace App\Filament\Resources\VodGroups;
 
 use App\Facades\SortFacade;
-use App\Filament\Resources\Playlists\PlaylistResource;
+use App\Filament\Resources\VodGroups\Pages\EditVodGroup;
 use App\Filament\Resources\VodGroups\Pages\ListVodGroups;
-use App\Filament\Resources\VodGroups\Pages\ViewVodGroup;
 use App\Filament\Resources\VodGroups\RelationManagers\VodRelationManager;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
@@ -16,12 +15,14 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group as ComponentsGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -333,6 +334,8 @@ class VodGroupResource extends Resource
                     DeleteAction::make()
                         ->hidden(fn ($record) => ! $record->custom),
                 ])->button()->hiddenLabel()->size('sm'),
+                EditAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -547,38 +550,21 @@ class VodGroupResource extends Resource
         return [
             'index' => ListVodGroups::route('/'),
             // 'create' => Pages\CreateVodGroup::route('/create'),
-            'view' => ViewVodGroup::route('/{record}'),
-            // 'edit' => Pages\EditVodGroup::route('/{record}/edit'),
+            'edit' => EditVodGroup::route('/{record}/edit'),
         ];
-    }
-
-    public static function infolist(Schema $schema): Schema
-    {
-        // return parent::infolist($infolist);
-        return $schema
-            ->components([
-                Section::make('Group Details')
-                    ->collapsible(true)
-                    ->collapsed(true)
-                    ->compact()
-                    ->columns(2)
-                    ->schema([
-                        TextEntry::make('name')
-                            ->badge(),
-                        TextEntry::make('playlist.name')
-                            ->label('Playlist')
-                            // ->badge(),
-                            ->url(fn ($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
-                    ]),
-            ]);
     }
 
     public static function getForm(): array
     {
-        return [
+        $fields = [
             TextInput::make('name')
                 ->required()
                 ->maxLength(255),
+            Toggle::make('enabled')
+                ->inline(false)
+                ->label('Auto Enable New Channels')
+                ->helperText('Automatically enable newly added channels to this group.')
+                ->default(true),
             Select::make('playlist_id')
                 ->required()
                 ->label('Playlist')
@@ -593,6 +579,27 @@ class VodGroupResource extends Resource
                 ->default(9999)
                 ->helperText('Enter a number to define the sort order (e.g., 1, 2, 3). Lower numbers appear first.')
                 ->rules(['integer', 'min:0']),
+            Select::make('stream_file_setting_id')
+                ->label('Stream File Setting')
+                ->searchable()
+                ->relationship('streamFileSetting', 'name', fn ($query) => $query->forVod()->where('user_id', auth()->id())
+                )
+                ->nullable()
+                ->helperText('Select a Stream File Setting profile for all VOD channels in this group. VOD-level settings take priority. Leave empty to use global settings.'),
+        ];
+
+        return [
+            Section::make('Group Settings')
+                ->compact()
+                ->columns(2)
+                ->icon('heroicon-s-cog')
+                ->collapsed(true)
+                ->schema($fields)
+                ->hiddenOn(['create']),
+            ComponentsGroup::make($fields)
+                ->columnSpanFull()
+                ->columns(2)
+                ->hiddenOn(['edit']),
         ];
     }
 }

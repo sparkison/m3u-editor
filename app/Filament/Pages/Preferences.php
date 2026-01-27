@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
 use App\Models\StreamProfile;
-use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\M3uProxyService;
 use App\Services\PlaylistService;
@@ -13,7 +12,6 @@ use Cron\CronExpression;
 use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
-use Filament\Forms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -27,7 +25,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Artisan;
@@ -616,350 +613,62 @@ class Preferences extends SettingsPage
                                             ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
                                     ]),
                                 Section::make('Series stream file settings')
-                                    ->description('Generate .strm files and sync them to a local file path. Options can be overriden per Series on the Series edit page.')
+                                    ->description('Select a Stream File Setting for series .strm file generation.')
                                     ->columnSpan('full')
                                     ->columns(1)
                                     ->collapsible(false)
                                     ->schema([
-                                        Toggle::make('stream_file_sync_enabled')
-                                            ->live()
-                                            ->label('Enable .strm file generation'),
-                                        TextInput::make('stream_file_sync_location')
-                                            ->label('Series Sync Location')
-                                            ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                            ->helperText(function ($get) use ($seriesExample) {
-                                                $path = $get('stream_file_sync_location') ?? '';
-                                                $pathStructure = $get('stream_file_sync_path_structure') ?? [];
-                                                $filenameMetadata = $get('stream_file_sync_filename_metadata') ?? [];
-                                                $tmdbIdFormat = $get('stream_file_sync_tmdb_id_format') ?? 'square';
-
-                                                // Build path preview
-                                                $preview = 'Preview: '.$path;
-
-                                                if (in_array('category', $pathStructure)) {
-                                                    $preview .= '/'.$seriesExample->category;
-                                                }
-                                                if (in_array('series', $pathStructure)) {
-                                                    $preview .= '/'.$seriesExample->series->metadata['name'];
-                                                }
-                                                if (in_array('season', $pathStructure)) {
-                                                    $preview .= '/Season '.str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
-                                                }
-
-                                                // Build filename preview
-                                                $season = str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
-                                                $episode = str_pad($seriesExample->episode_num, 2, '0', STR_PAD_LEFT);
-                                                $filename = PlaylistService::makeFilesystemSafe("S{$season}E{$episode} - {$seriesExample->title}", $get('stream_file_sync_replace_char') ?? ' ');
-
-                                                // Add metadata to filename
-                                                if (in_array('year', $filenameMetadata) && ! empty($seriesExample->series->release_date)) {
-                                                    $year = substr($seriesExample->series->release_date, 0, 4);
-                                                    $filename .= " ({$year})";
-                                                }
-                                                if (in_array('tmdb_id', $filenameMetadata) && ! empty($seriesExample->info->tmdb_id)) {
-                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
-                                                    $filename .= " {$bracket[0]}tmdb-{$seriesExample->info->tmdb_id}{$bracket[1]}";
-                                                }
-
-                                                $preview .= '/'.$filename.'.strm';
-
-                                                return $preview;
+                                        Select::make('default_series_stream_file_setting_id')
+                                            ->label('Default Series Stream File Setting')
+                                            ->searchable()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Stream File Settings can be created and managed in Playlist > Stream File Settings. Settings can be overridden at the Category level or per-Series.'
+                                            )
+                                            ->options(function () {
+                                                return \App\Models\StreamFileSetting::where('user_id', auth()->id())
+                                                    ->forSeries()
+                                                    ->pluck('name', 'id');
                                             })
-                                            ->maxLength(255)
-                                            ->required()
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled'))
-                                            ->placeholder('/Series'),
-                                        Forms\Components\ToggleButtons::make('stream_file_sync_path_structure')
-                                            ->label('Path structure (folders)')
-                                            ->live()
-                                            ->multiple()
-                                            ->grouped()
-                                            ->options([
-                                                'category' => 'Category',
-                                                'series' => 'Series',
-                                                'season' => 'Season',
-                                            ])
-                                            ->dehydrateStateUsing(function ($state, Set $set) {
-                                                // Update the old boolean fields for backwards compatibility
-                                                $state = $state ?? [];
-                                                $set('stream_file_sync_include_category', in_array('category', $state));
-                                                $set('stream_file_sync_include_series', in_array('series', $state));
-                                                $set('stream_file_sync_include_season', in_array('season', $state));
-
-                                                return $state;
-                                            })
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
-                                        Fieldset::make('Include Metadata')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Forms\Components\ToggleButtons::make('stream_file_sync_filename_metadata')
-                                                    ->label('Filename metadata')
-                                                    ->live()
-                                                    ->inline()
-                                                    ->multiple()
-                                                    ->columnSpanFull()
-                                                    ->options([
-                                                        'year' => 'Year',
-                                                        // 'resolution' => 'Resolution',
-                                                        // 'codec' => 'Codec',
-                                                        'tmdb_id' => 'TMDB ID',
-                                                    ])
-                                                    ->dehydrateStateUsing(function ($state, Set $set) {
-                                                        // Update the old boolean fields for backwards compatibility
-                                                        $state = $state ?? [];
-                                                        $set('stream_file_sync_filename_year', in_array('year', $state));
-                                                        $set('stream_file_sync_filename_resolution', in_array('resolution', $state));
-                                                        $set('stream_file_sync_filename_codec', in_array('codec', $state));
-                                                        $set('stream_file_sync_filename_tmdb_id', in_array('tmdb_id', $state));
-
-                                                        return $state;
-                                                    }),
-                                                Forms\Components\ToggleButtons::make('stream_file_sync_tmdb_id_format')
-                                                    ->label('TMDB ID format')
-                                                    ->inline()
-                                                    ->grouped()
-                                                    ->live()
-                                                    ->options([
-                                                        'square' => '[square]',
-                                                        'curly' => '{curly}',
-                                                    ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? [])),
-
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
-                                        Fieldset::make('Filename Cleansing')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('stream_file_sync_clean_special_chars')
-                                                    ->label('Clean special characters')
-                                                    ->helperText('Remove or replace special characters in filenames')
-                                                    ->inline(false),
-                                                Toggle::make('stream_file_sync_remove_consecutive_chars')
-                                                    ->label('Remove consecutive replacement characters')
-                                                    ->inline(false)
-                                                    ->live(),
-                                                Forms\Components\ToggleButtons::make('stream_file_sync_replace_char')
-                                                    ->label('Replace with')
-                                                    ->live()
-                                                    ->inline()
-                                                    ->grouped()
-                                                    ->columnSpanFull()
-                                                    ->options([
-                                                        'space' => 'Space',
-                                                        'dash' => '-',
-                                                        'underscore' => '_',
-                                                        'period' => '.',
-                                                        'remove' => 'Remove',
-                                                    ]),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
-                                        Fieldset::make('Name Filtering')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('stream_file_sync_name_filter_enabled')
-                                                    ->label('Enable name filtering')
-                                                    ->helperText('Remove specific words or symbols from folder and file names (e.g. "DE • " from "DE • Action" → "Action")')
-                                                    ->inline(false)
-                                                    ->live(),
-                                                Forms\Components\TagsInput::make('stream_file_sync_name_filter_patterns')
-                                                    ->label('Patterns to remove')
-                                                    ->placeholder('Add pattern (e.g. "DE • " or "EN |")')
-                                                    ->helperText('Enter words, symbols or prefixes to remove from category, series and episode names. Press Enter after each pattern.')
-                                                    ->columnSpanFull()
-                                                    ->hidden(fn ($get) => ! $get('stream_file_sync_name_filter_enabled')),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
-                                        Fieldset::make('NFO File Generation')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('stream_file_sync_generate_nfo')
-                                                    ->label('Generate NFO files')
-                                                    ->helperText('Create tvshow.nfo and episode.nfo files alongside .strm files for Kodi, Emby, and Jellyfin compatibility. These files contain metadata like TMDB/TVDB/IMDB IDs, plot, year, and poster URLs.')
-                                                    ->inline(false),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
+                                            ->hintAction(
+                                                Action::make('manage_series_settings')
+                                                    ->label('Manage Stream File Settings')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-file-settings')
+                                                    ->openUrlInNewTab(false)
+                                            )
+                                            ->helperText('Leave empty to disable .strm file generation for series. Priority: Series > Category > Global.'),
                                     ]),
                                 Section::make('VOD stream file settings')
-                                    ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
+                                    ->description('Select a Stream File Setting for VOD .strm file generation. ')
                                     ->columnSpan('full')
                                     ->columns(1)
                                     ->collapsible(false)
                                     ->schema([
-                                        Toggle::make('vod_stream_file_sync_enabled')
-                                            ->live()
-                                            ->label('Enable .strm file generation'),
-                                        TextInput::make('vod_stream_file_sync_location')
-                                            ->label('VOD Sync Location')
-                                            ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                            ->helperText(function ($get) use ($vodExample) {
-                                                $path = $get('vod_stream_file_sync_location') ?? '';
-                                                $pathStructure = $get('vod_stream_file_sync_path_structure') ?? [];
-                                                $filenameMetadata = $get('vod_stream_file_sync_filename_metadata') ?? [];
-                                                $tmdbIdFormat = $get('vod_stream_file_sync_tmdb_id_format') ?? 'square';
-                                                $replaceChar = $get('vod_stream_file_sync_replace_char') ?? ' ';
-                                                $titleFolderEnabled = in_array('title', $pathStructure);
-
-                                                // Build path preview
-                                                $preview = 'Preview: '.$path;
-
-                                                if (in_array('group', $pathStructure)) {
-                                                    $groupName = $vodExample->group->name ?? $vodExample->group ?? 'Uncategorized';
-                                                    $preview .= '/'.PlaylistService::makeFilesystemSafe($groupName, $replaceChar);
-                                                }
-                                                if ($titleFolderEnabled) {
-                                                    $titleFolder = PlaylistService::makeFilesystemSafe($vodExample->title, $replaceChar);
-                                                    // Add year to folder if available
-                                                    if (! empty($vodExample->year) && strpos($titleFolder, "({$vodExample->year})") === false) {
-                                                        $titleFolder .= " ({$vodExample->year})";
-                                                    }
-                                                    // Add TMDB/IMDB ID to folder for Trash Guides compatibility
-                                                    $tmdbId = $vodExample->info['tmdb_id'] ?? $vodExample->info['tmdb'] ?? $vodExample->movie_data['tmdb_id'] ?? $vodExample->movie_data['tmdb'] ?? null;
-                                                    $imdbId = $vodExample->info['imdb_id'] ?? $vodExample->info['imdb'] ?? $vodExample->movie_data['imdb_id'] ?? $vodExample->movie_data['imdb'] ?? null;
-                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
-                                                    if (! empty($tmdbId)) {
-                                                        $titleFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
-                                                    } elseif (! empty($imdbId)) {
-                                                        $titleFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
-                                                    }
-                                                    $preview .= '/'.$titleFolder;
-                                                }
-
-                                                // Build filename preview
-                                                $filename = PlaylistService::makeFilesystemSafe($vodExample->title, $replaceChar);
-
-                                                // Add year to filename
-                                                if (in_array('year', $filenameMetadata) && ! empty($vodExample->year)) {
-                                                    if (strpos($filename, "({$vodExample->year})") === false) {
-                                                        $filename .= " ({$vodExample->year})";
-                                                    }
-                                                }
-
-                                                // Only add TMDB/IMDB ID to filename if title folder is NOT enabled
-                                                // (If title folder exists, ID is already in the folder name)
-                                                $tmdbId = $vodExample->info['tmdb_id'] ?? $vodExample->info['tmdb'] ?? $vodExample->movie_data['tmdb_id'] ?? $vodExample->movie_data['tmdb'] ?? null;
-                                                $imdbId = $vodExample->info['imdb_id'] ?? $vodExample->info['imdb'] ?? $vodExample->movie_data['imdb_id'] ?? $vodExample->movie_data['imdb'] ?? null;
-                                                if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderEnabled) {
-                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
-                                                    if (! empty($tmdbId)) {
-                                                        $filename .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
-                                                    } elseif (! empty($imdbId)) {
-                                                        $filename .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
-                                                    }
-                                                }
-
-                                                $preview .= '/'.$filename.'.strm';
-
-                                                return $preview;
+                                        Select::make('default_vod_stream_file_setting_id')
+                                            ->label('Default VOD Stream File Setting')
+                                            ->searchable()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Stream File Settings can be created and managed in Playlist > Stream File Settings. Settings can be overridden at the Group level or per-VOD channel.'
+                                            )
+                                            ->options(function () {
+                                                return \App\Models\StreamFileSetting::where('user_id', auth()->id())
+                                                    ->forVod()
+                                                    ->pluck('name', 'id');
                                             })
-                                            ->maxLength(255)
-                                            ->required()
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled'))
-                                            ->placeholder('/VOD/movies'),
-                                        Forms\Components\ToggleButtons::make('vod_stream_file_sync_path_structure')
-                                            ->label('Path structure (folders)')
-                                            ->live()
-                                            ->inline()
-                                            ->multiple()
-                                            ->grouped()
-                                            ->options([
-                                                'group' => 'Group',
-                                                'title' => 'Title',
-                                            ])
-                                            ->dehydrateStateUsing(function ($state, Set $set) {
-                                                // Update the old boolean field for backwards compatibility
-                                                $state = $state ?? [];
-                                                $set('vod_stream_file_sync_include_season', in_array('group', $state));
-
-                                                return $state;
-                                            })
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
-                                        Fieldset::make('Include Metadata')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Forms\Components\ToggleButtons::make('vod_stream_file_sync_filename_metadata')
-                                                    ->label('Filename metadata')
-                                                    ->live()
-                                                    ->inline()
-                                                    ->multiple()
-                                                    ->columnSpanFull()
-                                                    ->options([
-                                                        'year' => 'Year',
-                                                        // 'resolution' => 'Resolution',
-                                                        // 'codec' => 'Codec',
-                                                        'tmdb_id' => 'TMDB ID',
-                                                    ])
-                                                    ->dehydrateStateUsing(function ($state, Set $set) {
-                                                        // Update the old boolean fields for backwards compatibility
-                                                        $state = $state ?? [];
-                                                        $set('vod_stream_file_sync_filename_year', in_array('year', $state));
-                                                        $set('vod_stream_file_sync_filename_resolution', in_array('resolution', $state));
-                                                        $set('vod_stream_file_sync_filename_codec', in_array('codec', $state));
-                                                        $set('vod_stream_file_sync_filename_tmdb_id', in_array('tmdb_id', $state));
-
-                                                        return $state;
-                                                    }),
-                                                Forms\Components\ToggleButtons::make('vod_stream_file_sync_tmdb_id_format')
-                                                    ->label('TMDB ID format')
-                                                    ->inline()
-                                                    ->grouped()
-                                                    ->live()
-                                                    ->options([
-                                                        'square' => '[square]',
-                                                        'curly' => '{curly}',
-                                                    ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
-                                        Fieldset::make('Filename Cleansing')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('vod_stream_file_sync_clean_special_chars')
-                                                    ->label('Clean special characters')
-                                                    ->helperText('Remove or replace special characters in filenames')
-                                                    ->inline(false),
-                                                Toggle::make('vod_stream_file_sync_remove_consecutive_chars')
-                                                    ->label('Remove consecutive replacement characters')
-                                                    ->inline(false)
-                                                    ->live(),
-                                                Forms\Components\ToggleButtons::make('vod_stream_file_sync_replace_char')
-                                                    ->label('Replace with')
-                                                    ->inline()
-                                                    ->grouped()
-                                                    ->columnSpanFull()
-                                                    ->options([
-                                                        'space' => 'Space',
-                                                        'dash' => '-',
-                                                        'underscore' => '_',
-                                                        'period' => '.',
-                                                        'remove' => 'Remove',
-                                                    ]),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
-                                        Fieldset::make('Name Filtering')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('vod_stream_file_sync_name_filter_enabled')
-                                                    ->label('Enable name filtering')
-                                                    ->helperText('Remove specific words or symbols from folder and file names (e.g. "DE • " from "DE • Action" → "Action")')
-                                                    ->inline(false)
-                                                    ->live(),
-                                                Forms\Components\TagsInput::make('vod_stream_file_sync_name_filter_patterns')
-                                                    ->label('Patterns to remove')
-                                                    ->placeholder('Add pattern (e.g. "DE • " or "EN |")')
-                                                    ->helperText('Enter words, symbols or prefixes to remove from group and file names. Press Enter after each pattern.')
-                                                    ->columnSpanFull()
-                                                    ->hidden(fn ($get) => ! $get('vod_stream_file_sync_name_filter_enabled')),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
-                                        Fieldset::make('NFO File Generation')
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Toggle::make('vod_stream_file_sync_generate_nfo')
-                                                    ->label('Generate NFO files')
-                                                    ->helperText('Create movie.nfo files alongside .strm files for Kodi, Emby, and Jellyfin compatibility. These files contain metadata like TMDB/IMDB IDs, plot, year, rating, cast, and poster URLs.')
-                                                    ->inline(false),
-                                            ])
-                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
+                                            ->hintAction(
+                                                Action::make('manage_vod_settings')
+                                                    ->label('Manage Stream File Settings')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-file-settings')
+                                                    ->openUrlInNewTab(false)
+                                            )
+                                            ->helperText('Leave empty to disable .strm file generation for VOD. Priority: VOD > Group > Global.'),
                                     ]),
                             ]),
 

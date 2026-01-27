@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\Playlist;
+use App\Models\StreamFileSetting;
 use App\Models\StrmFileMapping;
 use App\Services\NfoService;
 use App\Services\PlaylistService;
@@ -37,29 +38,15 @@ class SyncVodStrmFiles implements ShouldQueue
     public function handle(GeneralSettings $settings): void
     {
         try {
-            // Get global sync settings
-            $global_sync_settings = [
-                'enabled' => $settings->vod_stream_file_sync_enabled ?? false,
-                'include_season' => $settings->vod_stream_file_sync_include_season ?? true,
-                'sync_location' => $settings->vod_stream_file_sync_location ?? null,
-                'path_structure' => $settings->vod_stream_file_sync_path_structure ?? ['group'],
-                'filename_metadata' => $settings->vod_stream_file_sync_filename_metadata ?? [],
-                'tmdb_id_format' => $settings->vod_stream_file_sync_tmdb_id_format ?? 'square',
-                'clean_special_chars' => $settings->vod_stream_file_sync_clean_special_chars ?? false,
-                'remove_consecutive_chars' => $settings->vod_stream_file_sync_remove_consecutive_chars ?? false,
-                'replace_char' => $settings->vod_stream_file_sync_replace_char ?? 'space',
-                'name_filter_enabled' => $settings->vod_stream_file_sync_name_filter_enabled ?? false,
-                'name_filter_patterns' => $settings->vod_stream_file_sync_name_filter_patterns ?? [],
-                'generate_nfo' => $settings->vod_stream_file_sync_generate_nfo ?? false,
-            ];
-
-            // NFO service for generating movie.nfo files
-            $nfoService = ($global_sync_settings['generate_nfo'] ?? false) ? app(NfoService::class) : null;
+            // Cache the global StreamFileSetting if configured
+            $globalStreamFileSetting = $settings->default_vod_stream_file_setting_id
+                ? StreamFileSetting::find($settings->default_vod_stream_file_setting_id)
+                : null;
 
             // Setup our channels to sync
             $channels = $this->channels ?? collect();
             if ($this->channel) {
-                $this->channel->load('group');
+                $this->channel->load('group', 'streamFileSetting');
                 $channels->push($this->channel);
             } elseif ($this->playlist) {
                 $channels = $this->playlist->channels()
@@ -68,13 +55,16 @@ class SyncVodStrmFiles implements ShouldQueue
                         ['enabled', true],
                         ['source_id', '!=', null],
                     ])
-                    ->with('group')
+                    ->with(['group', 'group.streamFileSetting', 'streamFileSetting'])
                     ->get();
             }
 
+            // Get the default sync location for bulk mapping cache
+            $defaultSyncLocation = $globalStreamFileSetting?->location ?? $settings->vod_stream_file_sync_location ?? '';
+
             // PERFORMANCE OPTIMIZATION: Bulk load all existing mappings for these channels
             // This reduces N queries (one per channel) to 1 query for all channels
-            $syncLocation = rtrim($global_sync_settings['sync_location'] ?? '', '/');
+            $syncLocation = rtrim($defaultSyncLocation, '/');
             $mappingCache = null;
             if ($channels->count() > 1 && ! empty($syncLocation)) {
                 $channelIds = $channels->pluck('id')->toArray();
@@ -85,9 +75,18 @@ class SyncVodStrmFiles implements ShouldQueue
                 );
             }
 
+            // NFO service instance (lazy-loaded per channel if needed)
+            $nfoService = null;
+
             // Loop through each channel and sync
             foreach ($channels as $channel) {
-                $sync_settings = array_merge($global_sync_settings, $channel->sync_settings ?? []);
+                // Resolve settings with priority chain: Channel > Group > Global Profile > Legacy Settings
+                $sync_settings = $this->resolveVodSyncSettings($channel, $settings, $globalStreamFileSetting);
+
+                // Initialize NFO service if needed for this channel
+                if (($sync_settings['generate_nfo'] ?? false) && ! $nfoService) {
+                    $nfoService = app(NfoService::class);
+                }
                 if (! $sync_settings['enabled'] ?? false) {
                     continue;
                 }
@@ -298,18 +297,76 @@ class SyncVodStrmFiles implements ShouldQueue
 
             // Clean up orphaned files for disabled/deleted channels
             // Run cleanup whenever we're syncing with a valid sync location
-            if ($syncLocation = $global_sync_settings['sync_location'] ?? null) {
+            $cleanupLocation = $globalStreamFileSetting?->location ?? $settings->vod_stream_file_sync_location ?? null;
+            if ($cleanupLocation) {
                 StrmFileMapping::cleanupOrphaned(
                     Channel::class,
-                    $syncLocation
+                    $cleanupLocation
                 );
 
                 // Clean up empty directories after orphaned cleanup
-                StrmFileMapping::cleanupEmptyDirectoriesInLocation($syncLocation);
+                StrmFileMapping::cleanupEmptyDirectoriesInLocation($cleanupLocation);
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
             Log::error('Error syncing VOD .strm files: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Resolve sync settings with priority chain: Channel > Group > Global Profile > Legacy Settings
+     */
+    protected function resolveVodSyncSettings(Channel $channel, GeneralSettings $settings, ?StreamFileSetting $globalStreamFileSetting): array
+    {
+        // Priority 1: Channel-level StreamFileSetting
+        $streamFileSetting = $channel->streamFileSetting;
+
+        // Priority 2: Group-level StreamFileSetting
+        if (! $streamFileSetting && $channel->group) {
+            // Note: $channel->group is a string column (not a relation) containing the group name
+            //       Use the related Group model if loaded instead
+            $groupModel = $channel->getRelation('group');
+            if ($groupModel) {
+                $streamFileSetting = $groupModel->streamFileSetting;
+            }
+        }
+
+        // Priority 3: Global StreamFileSetting
+        if (! $streamFileSetting) {
+            $streamFileSetting = $globalStreamFileSetting;
+        }
+
+        // If we have a StreamFileSetting model, use its settings
+        if ($streamFileSetting) {
+            $sync_settings = $streamFileSetting->toSyncSettings();
+
+            // Allow channel-level sync_location override
+            if ($channel->sync_location) {
+                $sync_settings['sync_location'] = $channel->sync_location;
+            }
+
+            return $sync_settings;
+        }
+
+        // Priority 4: Legacy settings from GeneralSettings (backwards compatibility)
+        $legacy_sync_settings = $channel->sync_settings ?? [];
+
+        $global_sync_settings = [
+            'enabled' => $settings->vod_stream_file_sync_enabled ?? false,
+            'include_season' => $settings->vod_stream_file_sync_include_season ?? true,
+            'sync_location' => $channel->sync_location ?? $settings->vod_stream_file_sync_location ?? null,
+            'path_structure' => $settings->vod_stream_file_sync_path_structure ?? ['group'],
+            'filename_metadata' => $settings->vod_stream_file_sync_filename_metadata ?? [],
+            'tmdb_id_format' => $settings->vod_stream_file_sync_tmdb_id_format ?? 'square',
+            'clean_special_chars' => $settings->vod_stream_file_sync_clean_special_chars ?? false,
+            'remove_consecutive_chars' => $settings->vod_stream_file_sync_remove_consecutive_chars ?? false,
+            'replace_char' => $settings->vod_stream_file_sync_replace_char ?? 'space',
+            'name_filter_enabled' => $settings->vod_stream_file_sync_name_filter_enabled ?? false,
+            'name_filter_patterns' => $settings->vod_stream_file_sync_name_filter_patterns ?? [],
+            'generate_nfo' => $settings->vod_stream_file_sync_generate_nfo ?? false,
+        ];
+
+        // Merge global settings with channel-specific legacy settings
+        return array_merge($global_sync_settings, $legacy_sync_settings);
     }
 }
