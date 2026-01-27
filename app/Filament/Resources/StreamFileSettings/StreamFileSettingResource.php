@@ -59,6 +59,7 @@ class StreamFileSettingResource extends Resource
                     ])
                     ->required()
                     ->live()
+                    ->disabledOn('edit')
                     ->helperText('Determines which path structure options are available and where this profile can be assigned'),
 
                 Textarea::make('description')
