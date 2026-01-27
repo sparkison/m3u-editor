@@ -57,6 +57,8 @@ class Playlist extends Model
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
         'source_type' => PlaylistSourceType::class,
+        'enable_channels' => 'boolean',
+        'enable_series' => 'boolean',
     ];
 
     public function getXtreamUrls(): array
