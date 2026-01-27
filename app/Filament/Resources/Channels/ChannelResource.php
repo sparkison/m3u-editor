@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Channels;
 
 use App\Facades\LogoFacade;
 use App\Facades\ProxyFacade;
+use App\Facades\SortFacade;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\Channels\Pages\ListChannels;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
@@ -669,6 +670,30 @@ class ChannelResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path-rounded-square')
                     ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
                     ->modalSubmitActionLabel('Add failovers now'),
+                BulkAction::make('recount')
+                    ->label('Recount Channels')
+                    ->icon('heroicon-o-hashtag')
+                    ->schema([
+                        TextInput::make('start')
+                            ->label('Start Number')
+                            ->numeric()
+                            ->default(1)
+                            ->required(),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        $start = (int) $data['start'];
+                        SortFacade::bulkRecountChannels($records, $start);
+                    })
+                    ->after(function ($livewire) {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels Recounted')
+                            ->body('The selected channels have been recounted.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-hashtag')
+                    ->modalDescription('Recount the selected channels sequentially? Channel numbers will be assigned based on the current sort order.'),
                 BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->schema(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
