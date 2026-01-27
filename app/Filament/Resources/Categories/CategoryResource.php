@@ -153,7 +153,6 @@ class CategoryResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    ViewAction::make(),
                     Action::make('add')
                         ->label('Add to Custom Playlist')
                         ->schema([
