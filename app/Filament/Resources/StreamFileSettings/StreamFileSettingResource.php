@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StreamFileSettings;
 use App\Models\StreamFileSetting;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\PlaylistService;
+use App\Traits\HasUserFiltering;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
@@ -23,6 +24,8 @@ use Filament\Tables\Table;
 
 class StreamFileSettingResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = StreamFileSetting::class;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Playlist';
