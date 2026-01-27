@@ -248,7 +248,20 @@ class SyncMediaServer implements ShouldQueue
                 // Update progress every 10 movies or on last movie
                 if (($index + 1) % 10 === 0 || ($index + 1) === $totalMovies) {
                     $progress = $totalMovies > 0 ? (int) ((($index + 1) / $totalMovies) * 100) : 100;
-                    $integration->update(['movie_progress' => $progress]);
+
+                    // Read current DB value and only update if computed progress is greater
+                    $currentDbProgress = MediaServerIntegration::find($integration->id)->movie_progress;
+
+                    if ($progress > $currentDbProgress) {
+                        $integration->update(['movie_progress' => $progress]);
+                    } else {
+                        // Sparse debug log for unexpected regressions
+                        Log::debug('SyncMediaServer: Skipping movie_progress update because computed progress <= current DB value', [
+                            'integration_id' => $integration->id,
+                            'computed' => $progress,
+                            'current_db' => $currentDbProgress,
+                        ]);
+                    }
                 }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Movie '{$movie['Name']}': {$e->getMessage()}";
