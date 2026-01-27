@@ -67,6 +67,13 @@ class CategoryResource extends Resource
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),
+                Select::make('stream_file_setting_id')
+                    ->label('Stream File Setting Profile')
+                    ->searchable()
+                    ->relationship('streamFileSetting', 'name', fn ($query) => $query->forSeries()->where('user_id', auth()->id())
+                    )
+                    ->nullable()
+                    ->helperText('Select a Stream File Setting profile for all series in this category. Series-level settings take priority. Leave empty to use global settings.'),
             ]);
     }
 
