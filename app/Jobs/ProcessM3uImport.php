@@ -1288,7 +1288,8 @@ class ProcessM3uImport implements ShouldQueue
             $seriesCategories->each(function ($category, $index) use (&$jobs, $playlistId, $batchNo, $categoryCount) {
                 if (! $this->preprocess || $this->shouldIncludeSeries($category['category_name'] ?? '')) {
                     // Check if category is auto-enabled
-                    $autoEnable = $this->enabledCategories->contains($category['category_name'] ?? '');
+                    $autoEnable = (bool) ($this->playlist->enable_series
+                        || $this->enabledCategories->contains($category['category_name'] ?? ''));
 
                     // Create a job for each series category
                     $jobs[] = new ProcessM3uImportSeriesChunk(
