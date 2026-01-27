@@ -273,3 +273,45 @@ it('sets playlist_id to null when playlist is deleted', function () {
 
     expect($integration->playlist_id)->toBeNull();
 });
+
+it('can reset status and progress fields', function () {
+    $integration = MediaServerIntegration::create([
+        'name' => 'Test Server',
+        'type' => 'jellyfin',
+        'host' => '192.168.1.100',
+        'api_key' => 'test-key',
+        'user_id' => $this->user->id,
+        'status' => 'processing',
+        'progress' => 50,
+        'movie_progress' => 75,
+        'series_progress' => 25,
+        'total_movies' => 100,
+        'total_series' => 50,
+    ]);
+
+    expect($integration->status)->toBe('processing');
+    expect($integration->progress)->toBe(50);
+    expect($integration->movie_progress)->toBe(75);
+    expect($integration->series_progress)->toBe(25);
+    expect($integration->total_movies)->toBe(100);
+    expect($integration->total_series)->toBe(50);
+
+    // Reset the status
+    $integration->update([
+        'status' => 'idle',
+        'progress' => 0,
+        'movie_progress' => 0,
+        'series_progress' => 0,
+        'total_movies' => 0,
+        'total_series' => 0,
+    ]);
+
+    $integration->refresh();
+
+    expect($integration->status)->toBe('idle');
+    expect($integration->progress)->toBe(0);
+    expect($integration->movie_progress)->toBe(0);
+    expect($integration->series_progress)->toBe(0);
+    expect($integration->total_movies)->toBe(0);
+    expect($integration->total_series)->toBe(0);
+});

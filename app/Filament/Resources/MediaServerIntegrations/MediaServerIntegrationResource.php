@@ -470,6 +470,33 @@ class MediaServerIntegrationResource extends Resource
                         })
                         ->visible(fn ($record) => $record->playlist_id !== null),
 
+                    Action::make('reset')
+                        ->label('Reset status')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->action(function (MediaServerIntegration $record) {
+                            $record->update([
+                                'status' => 'idle',
+                                'progress' => 0,
+                                'movie_progress' => 0,
+                                'series_progress' => 0,
+                                'total_movies' => 0,
+                                'total_series' => 0,
+                            ]);
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Media server status reset')
+                                ->body('Media server status has been reset.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset media server status so it can be synced again. Only perform this action if you are having problems with the media server syncing.')
+                        ->modalSubmitActionLabel('Yes, reset now'),
+
                     DeleteAction::make()
                         ->before(function (MediaServerIntegration $record) {
                             // Optionally delete the associated playlist
@@ -497,6 +524,36 @@ class MediaServerIntegrationResource extends Resource
                                 ->body('Syncing '.$records->count().' media servers.')
                                 ->send();
                         }),
+
+                    BulkAction::make('reset')
+                        ->label('Reset status')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'status' => 'idle',
+                                    'progress' => 0,
+                                    'movie_progress' => 0,
+                                    'series_progress' => 0,
+                                    'total_movies' => 0,
+                                    'total_series' => 0,
+                                ]);
+                            }
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Media server status reset')
+                                ->body('Status has been reset for the selected media servers.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset status for the selected media servers so they can be synced again.')
+                        ->modalSubmitActionLabel('Yes, reset now'),
 
                     DeleteBulkAction::make(),
                 ]),
