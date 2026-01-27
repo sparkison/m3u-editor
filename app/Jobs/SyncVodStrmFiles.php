@@ -323,7 +323,12 @@ class SyncVodStrmFiles implements ShouldQueue
 
         // Priority 2: Group-level StreamFileSetting
         if (! $streamFileSetting && $channel->group) {
-            $streamFileSetting = $channel->group->streamFileSetting;
+            // Note: $channel->group is a string column (not a relation) containing the group name
+            //       Use the related Group model if loaded instead
+            $groupModel = $channel->getRelation('group');
+            if ($groupModel) {
+                $streamFileSetting = $groupModel->streamFileSetting;
+            }
         }
 
         // Priority 3: Global StreamFileSetting
