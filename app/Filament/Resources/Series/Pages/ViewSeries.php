@@ -47,6 +47,11 @@ class ViewSeries extends ViewRecord
                 ->icon('heroicon-s-arrow-left')
                 ->color('gray')
                 ->size('sm'),
+            Actions\EditAction::make()
+                ->label('Edit Series')
+                ->slideOver()
+                ->color('gray')
+                ->icon('heroicon-s-pencil'),
             Actions\Action::make('toggle_enabled')
                 ->label(fn () => $this->record->enabled ? 'Disable Series' : 'Enable Series')
                 ->icon(fn () => $this->record->enabled ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
@@ -56,9 +61,6 @@ class ViewSeries extends ViewRecord
                     $this->refreshFormData(['enabled']);
                 })
                 ->requiresConfirmation(),
-            Actions\EditAction::make()
-                ->slideOver()
-                ->icon('heroicon-o-pencil'),
         ];
     }
 

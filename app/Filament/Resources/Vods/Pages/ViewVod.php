@@ -54,6 +54,11 @@ class ViewVod extends ViewRecord
                 ->icon('heroicon-s-arrow-left')
                 ->color('gray')
                 ->size('sm'),
+            Actions\EditAction::make()
+                ->label('Edit VOD')
+                ->slideOver()
+                ->color('gray')
+                ->icon('heroicon-s-pencil'),
             Actions\Action::make('toggle_enabled')
                 ->label(fn () => $this->record->enabled ? 'Disable VOD' : 'Enable VOD')
                 ->icon(fn () => $this->record->enabled ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
@@ -65,7 +70,7 @@ class ViewVod extends ViewRecord
                 ->requiresConfirmation(),
             Actions\Action::make('play')
                 ->label('Play')
-                ->icon('heroicon-o-play')
+                ->icon('heroicon-s-play')
                 ->color('primary')
                 ->dispatch('openFloatingStream', [[
                     'id' => $this->record->id,
@@ -74,9 +79,6 @@ class ViewVod extends ViewRecord
                     'format' => $this->record->container_extension ?? 'ts',
                     'type' => 'channel',
                 ]]),
-            Actions\EditAction::make()
-                ->slideOver()
-                ->icon('heroicon-o-pencil'),
         ];
     }
 }
