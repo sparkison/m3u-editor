@@ -268,14 +268,10 @@ class PlexService implements MediaServer
                     // Start with the API key
                     $params = ['X-Plex-Token' => $this->apiKey];
 
-                    // Handle seeking (StartTimeTicks from Emby/Jellyfin needs to be converted to seconds for Plex)
-                    if ($request->has('StartTimeTicks')) {
-                        $ticks = (int) $request->input('StartTimeTicks');
-                        $seconds = $this->ticksToSeconds($ticks);
-                        if ($seconds !== null) {
-                            $params['offset'] = $seconds;
-                        }
-                    }
+                    // NOTE: Do NOT add 'offset' parameter to direct file URLs.
+                    // Plex's direct file endpoint (/library/parts/...) does not support offset.
+                    // Seeking for direct files should be handled by FFmpeg's -ss flag or HTTP range requests.
+                    // The 'offset' parameter only works with Plex's transcode endpoints.
 
                     // Forward audio and subtitle stream indexes if provided
                     if ($request->has('AudioStreamIndex')) {
