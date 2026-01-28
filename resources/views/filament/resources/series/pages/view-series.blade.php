@@ -212,31 +212,39 @@
                         $totalEpisodes = $record->episodes()->where('season', $season->season_number)->count();
                         $enabledEpisodes = $record->episodes()->where('season', $season->season_number)->where('enabled', true)->count();
                     @endphp
-                    <div
-                        class="group bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden hover:ring-primary-500 dark:hover:ring-primary-500 transition-all">
-                        @if($cover)
-                            <div class="aspect-[2/3] overflow-hidden">
-                                <img src="{{ $cover }}" alt="{{ $season->name }}"
-                                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            </div>
-                        @else
-                            <div class="aspect-[2/3] bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                <x-heroicon-o-tv class="w-8 h-8 text-gray-400" />
-                            </div>
-                        @endif
-                        <div class="p-3">
-                            <div class="font-medium text-sm truncate">{{ $season->name }}</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ $enabledEpisodes }}/{{ $totalEpisodes }} episodes
-                            </div>
-                            @if($totalEpisodes > 0)
-                                <div class="mt-2 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary-500 rounded-full"
-                                        style="width: {{ ($enabledEpisodes / $totalEpisodes) * 100 }}%"></div>
+                    <x-filament::modal>
+                        <x-slot name="trigger">
+                            <div
+                                class="w-60 h-full cursor-pointer group bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden hover:ring-primary-500 dark:hover:ring-primary-500 transition-all">
+                                @if($cover)
+                                    <div class="aspect-[2/3] overflow-hidden">
+                                        <img src="{{ $cover }}" alt="{{ $season->name }}"
+                                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                    </div>
+                                @else
+                                    <div class="aspect-[2/3] bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                        <x-heroicon-o-tv class="w-8 h-8 text-gray-400" />
+                                    </div>
+                                @endif
+                                <div class="p-3">
+                                    <div class="font-medium text-sm truncate">{{ $season->name }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $enabledEpisodes }}/{{ $totalEpisodes }} episodes
+                                    </div>
+                                    @if($totalEpisodes > 0)
+                                        <div class="mt-2 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                                            <div class="h-full bg-primary-500 rounded-full"
+                                                style="width: {{ ($enabledEpisodes / $totalEpisodes) * 100 }}%"></div>
+                                        </div>
+                                    @endif
                                 </div>
-                            @endif
-                        </div>
-                    </div>
+                            </div>
+                        </x-slot>
+
+                        {{-- Episodes list... --}}
+                        Episodes for {{ $season->name }} go here.
+                    </x-filament::modal>
+
                 @endforeach
             </div>
         </div>
