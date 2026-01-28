@@ -610,6 +610,19 @@ class M3uProxyService
         $originalChannelId = $channel->id;
         $originalPlaylistUuid = $playlist->uuid;
 
+        // Determine the source playlist for provider profiles
+        // When streaming through a CustomPlaylist, MergedPlaylist, or PlaylistAlias,
+        // we need to use the channel's source Playlist for provider profile selection
+        // since profiles are defined on the source Playlist, not the custom/merged playlist
+        $profileSourcePlaylist = null;
+        if ($playlist instanceof Playlist && $playlist->profiles_enabled) {
+            // Streaming directly through the Playlist - use it
+            $profileSourcePlaylist = $playlist;
+        } elseif ($channel->playlist instanceof Playlist && $channel->playlist->profiles_enabled) {
+            // Streaming through CustomPlaylist/MergedPlaylist/PlaylistAlias - use channel's source Playlist
+            $profileSourcePlaylist = $channel->playlist;
+        }
+
         // IMPORTANT: Check for existing pooled stream BEFORE capacity check AND provider profile selection
         // If a pooled stream exists, we can reuse it without consuming additional capacity
         // We search WITHOUT filtering by provider profile to maximize pooling opportunities:
@@ -637,19 +650,22 @@ class M3uProxyService
             }
 
             // Only select provider profile if we're creating a NEW stream (no pooled stream found)
-            if ($playlist instanceof Playlist && $playlist->profiles_enabled) {
-                $selectedProfile = ProfileService::selectProfile($playlist);
+            // Use profileSourcePlaylist which may be the channel's source playlist when streaming via CustomPlaylist
+            if ($profileSourcePlaylist) {
+                $selectedProfile = ProfileService::selectProfile($profileSourcePlaylist);
 
                 if (! $selectedProfile) {
                     Log::warning('No profiles with capacity available for new stream', [
-                        'playlist_id' => $playlist->id,
+                        'playlist_id' => $profileSourcePlaylist->id,
+                        'source_playlist' => $profileSourcePlaylist->name,
                         'channel_id' => $id,
                     ]);
                     abort(503, 'All provider profiles have reached their maximum stream limit. Please try again later.');
                 }
 
                 Log::debug('Selected provider profile for new stream creation', [
-                    'playlist_id' => $playlist->id,
+                    'playlist_id' => $profileSourcePlaylist->id,
+                    'source_playlist' => $profileSourcePlaylist->name,
                     'provider_profile_id' => $selectedProfile?->id,
                     'channel_id' => $id,
                 ]);
@@ -663,7 +679,8 @@ class M3uProxyService
         // and the total capacity is the sum of all profile limits, not the playlist's available_streams
         $primaryUrl = null;
         $actualChannel = $channel;  // Track the actual channel being used (may differ from original if failover)
-        $usingProviderProfiles = $playlist instanceof Playlist && $playlist->profiles_enabled;
+        // Use profileSourcePlaylist to check for provider profiles (may be channel's source playlist when streaming via CustomPlaylist)
+        $usingProviderProfiles = $profileSourcePlaylist !== null;
 
         if ($playlist->available_streams !== 0 && ! $usingProviderProfiles) {
             $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
@@ -744,12 +761,14 @@ class M3uProxyService
 
         // Provider Profile selection for Xtream playlists with profiles enabled
         // Note: If we already selected a profile during pooled stream check, skip this
-        if (! $selectedProfile && $playlist instanceof Playlist && $playlist->profiles_enabled) {
-            $selectedProfile = ProfileService::selectProfile($playlist);
+        // Use profileSourcePlaylist which may be the channel's source playlist when streaming via CustomPlaylist
+        if (! $selectedProfile && $profileSourcePlaylist) {
+            $selectedProfile = ProfileService::selectProfile($profileSourcePlaylist);
 
             if (! $selectedProfile) {
                 Log::warning('No profiles with capacity available', [
-                    'playlist_id' => $playlist->id,
+                    'playlist_id' => $profileSourcePlaylist->id,
+                    'source_playlist' => $profileSourcePlaylist->name,
                     'channel_id' => $id,
                 ]);
                 abort(503, 'All provider profiles have reached their maximum stream limit. Please try again later.');
@@ -758,7 +777,8 @@ class M3uProxyService
             Log::debug('Selected profile for streaming', [
                 'profile_id' => $selectedProfile->id,
                 'profile_name' => $selectedProfile->name,
-                'playlist_id' => $playlist->id,
+                'source_playlist' => $profileSourcePlaylist->name,
+                'playlist_id' => $profileSourcePlaylist->id,
                 'channel_id' => $id,
             ]);
         }

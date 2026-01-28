@@ -220,7 +220,20 @@ class VodRelationManager extends RelationManager
 
                                 return "{$displayTitle} [{$playlistName}]";
                             }),
-                    ]),
+                    ])
+                    ->after(function () use ($ownerRecord): void {
+                        // Auto-enable proxy if the custom playlist now contains channels from pooled playlists
+                        if ($ownerRecord->hasPooledSourcePlaylists() && ! $ownerRecord->enable_proxy) {
+                            $ownerRecord->update(['enable_proxy' => true]);
+
+                            Notification::make()
+                                ->title('Proxy Enabled')
+                                ->body('Proxy mode was automatically enabled because this playlist now contains channels from source playlists with Provider Profiles enabled.')
+                                ->info()
+                                ->persistent()
+                                ->send();
+                        }
+                    }),
             ])
             ->recordActions([
                 DetachAction::make()
