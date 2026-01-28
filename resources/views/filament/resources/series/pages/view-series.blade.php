@@ -265,77 +265,77 @@
                         {{-- Episodes list --}}
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto p-1">
                             @foreach($episodes as $episode)
-                                            @php
-                                                $episodeCover = \App\Facades\LogoFacade::getEpisodeLogoUrl($episode);
-                                                $info = $episode->info ?? [];
-                                            @endphp
+                                @php
+                                    $episodeCover = \App\Facades\LogoFacade::getEpisodeLogoUrl($episode);
+                                    $info = $episode->info ?? [];
+                                @endphp
                                 <div
-                                                class="bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden {{ !$episode->enabled ? 'opacity-50' : '' }}">
-                                                {{-- Episode Thumbnail --}}
-                                                <div class="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-700">
-                                                    @if($episodeCover)
-                                                        <img src="{{ $episodeCover }}" alt="{{ $episode->title }}"
-                                                            class="w-full h-full object-cover" />
-                                                    @else
-                                                        <div class="w-full h-full flex items-center justify-center">
-                                                            <x-heroicon-o-film class="w-8 h-8 text-gray-400" />
-                                                        </div>
-                                                    @endif
-
-                                                    {{-- Play Button Overlay --}}
-                                                    @if($episode->enabled)
-                                                        <button type="button"
-                                                            wire:click="$dispatch('openFloatingStream', {{ json_encode($episode->getFloatingPlayerAttributes()) }})"
-                                                            class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
-                                                            <div
-                                                                class="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                                                                <x-heroicon-s-play class="w-6 h-6 text-gray-900 ml-1" />
-                                                            </div>
-                                                        </button>
-                                                    @endif
-
-                                                    {{-- Episode Number Badge --}}
-                                                    <div class="absolute top-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
-                                                        E{{ str_pad($episode->episode_num, 2, '0', STR_PAD_LEFT) }}
-                                                    </div>
-
-                                                    {{-- Duration Badge --}}
-                                                    @if(!empty($info['duration']))
-                                                        <div class="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
-                                                            {{ $info['duration'] }}
-                                                        </div>
-                                                    @endif
-                                                </div>
-
-                                                {{-- Episode Info --}}
-                                                <div class="p-3 space-y-1">
-                                                    <div class="font-medium text-sm truncate" title="{{ $episode->title }}">
-                                                        {{ $episode->title }}
-                                                    </div>
-
-                                                    @if(!empty($info['plot']))
-                                                        <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2"
-                                                            title="{{ $info['plot'] }}">
-                                                            {{ $info['plot'] }}
-                                                        </p>
-                                                    @endif
-
-                                                    <div class="flex items-center gap-2 pt-1">
-                                                        @if(!empty($info['rating']))
-                                                            <span
-                                                                class="inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
-                                                                <x-heroicon-s-star class="w-3 h-3" />
-                                                                {{ $info['rating'] }}
-                                                            </span>
-                                                        @endif
-                                                        @if(!empty($info['release_date']))
-                                                            <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                                {{ $info['release_date'] }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                </div>
+                                    class="bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden {{ !$episode->enabled ? 'opacity-50' : '' }}">
+                                    {{-- Episode Thumbnail --}}
+                                    <div class="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-700">
+                                        @if($episodeCover)
+                                            <img src="{{ $episodeCover }}" alt="{{ $episode->title }}"
+                                                class="w-full h-full object-cover" />
+                                        @else
+                                            <div class="w-full h-full flex items-center justify-center">
+                                                <x-heroicon-o-film class="w-8 h-8 text-gray-400" />
                                             </div>
+                                        @endif
+
+                                        {{-- Play Button Overlay --}}
+                                        @if($episode->enabled)
+                                            <button type="button"
+                                                wire:click="$dispatch('openFloatingStream', {{ json_encode($episode->getFloatingPlayerAttributes()) }})"
+                                                class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+                                                <div
+                                                    class="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                                                    <x-heroicon-s-play class="w-6 h-6 text-gray-900 ml-1" />
+                                                </div>
+                                            </button>
+                                        @endif
+
+                                        {{-- Episode Number Badge --}}
+                                        <div class="absolute top-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                            E{{ str_pad($episode->episode_num, 2, '0', STR_PAD_LEFT) }}
+                                        </div>
+
+                                        {{-- Duration Badge --}}
+                                        @if(!empty($info['duration']))
+                                            <div class="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                                {{ $info['duration'] }}
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Episode Info --}}
+                                    <div class="p-3 space-y-1">
+                                        <div class="font-medium text-sm truncate" title="{{ $episode->title }}">
+                                            {{ $episode->title }}
+                                        </div>
+
+                                        @if(!empty($info['plot']))
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2"
+                                                title="{{ $info['plot'] }}">
+                                                {{ $info['plot'] }}
+                                            </p>
+                                        @endif
+
+                                        <div class="flex items-center gap-2 pt-1">
+                                            @if(!empty($info['rating']))
+                                                <span
+                                                    class="inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                                                    <x-heroicon-s-star class="w-3 h-3" />
+                                                    {{ $info['rating'] }}
+                                                </span>
+                                            @endif
+                                            @if(!empty($info['release_date']))
+                                                <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                    {{ $info['release_date'] }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             @endforeach
                         </div>
                     </x-filament::modal>
