@@ -265,19 +265,29 @@ class GroupResource extends Resource
                         ->label('Sort Alpha')
                         ->icon('heroicon-o-bars-arrow-down')
                         ->schema([
+                            Select::make('column')
+                                ->label('Sort By')
+                                ->options([
+                                    'title' => 'Title (or override if set)',
+                                    'name' => 'Name (or override if set)',
+                                    'stream_id' => 'ID (or override if set)',
+                                    'channel' => 'Channel No.',
+                                ])
+                                ->default('title')
+                                ->required(),
                             Select::make('sort')
                                 ->label('Sort Order')
                                 ->options([
-                                    'ASC' => 'A to Z',
-                                    'DESC' => 'Z to A',
+                                    'ASC' => 'A to Z or 0 to 9',
+                                    'DESC' => 'Z to A or 9 to 0',
                                 ])
                                 ->default('ASC')
                                 ->required(),
                         ])
                         ->action(function (Group $record, array $data): void {
-                            // Sort by title_custom (if present) then title, matching the UI column sort
                             $order = $data['sort'] ?? 'ASC';
-                            SortFacade::bulkSortGroupChannels($record, $order);
+                            $column = $data['column'] ?? 'title';
+                            SortFacade::bulkSortGroupChannels($record, $order, $column);
                         })
                         ->after(function () {
                             Notification::make()
