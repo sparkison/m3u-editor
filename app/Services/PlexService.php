@@ -319,6 +319,16 @@ class PlexService implements MediaServer
                                 'hasMDE' => 1,
                             ];
 
+                            // Include seek position if provided via StartTimeTicks
+                            if ($request->has('StartTimeTicks')) {
+                                $ticks = (int) $request->input('StartTimeTicks');
+                                $offsetSeconds = $this->ticksToSeconds($ticks);
+                                if ($offsetSeconds !== null && $offsetSeconds > 0) {
+                                    // Plex uses 'offset' in seconds for transcode seeking
+                                    $decisionParams['offset'] = $offsetSeconds;
+                                }
+                            }
+
                             Log::debug('Calling Plex decision endpoint', [
                                 'endpoint' => $decisionEndpoint,
                                 'params' => $decisionParams,
@@ -357,113 +367,40 @@ class PlexService implements MediaServer
                                 }
                             }
 
-                            // If decision returned XML but no redirect, try calling start endpoints directly
+                            // If decision returned XML/200 but no redirect, construct start URL directly
+                            // IMPORTANT: Do NOT make GET requests to start endpoints - that consumes the
+                            // Plex session and causes HTTP 400 when FFmpeg tries to access the URL later.
                             if ($decisionResp->successful() && ! empty($decisionResp->body())) {
-                                $startEndpoints = [
-                                    $this->baseUrl.'/video/:/transcode/universal/start.mpd',
-                                    $this->baseUrl.'/video/:/transcode/universal/start.m3u8',
-                                ];
+                                $sessionId = bin2hex(random_bytes(8));
 
-                                $startParamsBase = array_merge($decisionParams, [
+                                // Build start URL directly - prefer HLS (start.m3u8) as it's more compatible with FFmpeg
+                                $startEndpoint = $this->baseUrl.'/video/:/transcode/universal/start.m3u8';
+
+                                $endpointParams = array_merge($decisionParams, [
                                     'hasMDE' => 1,
                                     'location' => 'lan',
                                     'fastSeek' => 1,
-                                    // Ensure token is present in start URL query string so FFmpeg (no headers) can access it
+                                    'protocol' => 'hls',
+                                    'session' => $sessionId,
                                     'X-Plex-Token' => $this->apiKey,
                                     'X-Plex-Client-Identifier' => 'm3u-proxy',
+                                    'X-Plex-Client-Profile-Extra' => 'append-transcode-target-codec(type=videoProfile&context=streaming&videoCodec=h264&audioCodec=aac&protocol=hls)',
                                 ]);
 
-                                $sessionId = bin2hex(random_bytes(8));
+                                $query = http_build_query($endpointParams);
+                                $startUrl = $startEndpoint.'?'.$query;
 
-                                foreach ($startEndpoints as $startEndpoint) {
-                                    try {
-                                        // Copy base params and adjust per-endpoint needs
-                                        $endpointParams = $startParamsBase;
+                                Log::info('Plex transcode URL constructed (without pre-fetch)', [
+                                    'item_id' => $itemId,
+                                    'session_id' => $sessionId,
+                                    'start_url' => $startUrl,
+                                ]);
 
-                                        // Use appropriate protocol for the chosen start endpoint
-                                        if (str_ends_with($startEndpoint, '.mpd')) {
-                                            $endpointParams['protocol'] = 'dash';
-                                            // Prefer DASH codecs for mpd
-                                            $endpointParams['X-Plex-Client-Profile-Extra'] = 'append-transcode-target-codec(type=videoProfile&context=streaming&videoCodec=h264,hevc&audioCodec=aac&protocol=dash)';
-                                            $accept = 'application/dash+xml';
-                                        } else {
-                                            $endpointParams['protocol'] = 'hls';
-                                            $endpointParams['X-Plex-Client-Profile-Extra'] = 'append-transcode-target-codec(type=videoProfile&context=streaming&videoCodec=h264&audioCodec=aac&protocol=hls)';
-                                            $accept = 'application/vnd.apple.mpegurl';
-                                        }
-
-                                        // Provide a session param expected by Plex
-                                        $endpointParams['session'] = $sessionId;
-
-                                        Log::debug('Attempting Plex start endpoint', [
-                                            'endpoint' => $startEndpoint,
-                                            'params' => $endpointParams,
-                                        ]);
-
-                                        $startResp = Http::timeout(15)
-                                            ->withHeaders([
-                                                'X-Plex-Token' => $this->apiKey,
-                                                'X-Plex-Product' => 'Plex Web',
-                                                'X-Plex-Client-Identifier' => 'm3u-proxy',
-                                                'X-Plex-Platform' => 'Chrome',
-                                                'X-Plex-Device' => 'OSX',
-                                                'X-Plex-Playback-Session-Id' => $sessionId,
-                                                'Accept-Language' => 'en',
-                                                'Accept' => $accept,
-                                            ])
-                                            ->withoutRedirecting()
-                                            ->get($startEndpoint, $endpointParams);
-
-                                        if (in_array($startResp->status(), [301, 302, 303, 307, 308], true)) {
-                                            $loc = $startResp->header('Location');
-                                            if ($loc) {
-                                                $startUrl = str_starts_with($loc, '/') ? rtrim($this->baseUrl, '/').$loc : $loc;
-
-                                                // Ensure token present on returned URL for downstream FFmpeg access
-                                                $parsed = parse_url($startUrl);
-                                                parse_str($parsed['query'] ?? '', $qs);
-                                                if (empty($qs['X-Plex-Token'])) {
-                                                    $sep = strpos($startUrl, '?') === false ? '?' : '&';
-                                                    $startUrl = $startUrl.$sep.'X-Plex-Token='.urlencode($this->apiKey);
-                                                }
-
-                                                Log::info('Plex start endpoint redirected to', ['start_url' => $startUrl]);
-
-                                                return $startUrl;
-                                            }
-                                        }
-
-                                        if ($startResp->successful() && ! empty($startResp->body())) {
-                                            // Ensure token present in constructed URL
-                                            if (empty($endpointParams['X-Plex-Token'])) {
-                                                $endpointParams['X-Plex-Token'] = $this->apiKey;
-                                            }
-
-                                            Log::info('Plex start endpoint returned content; using start endpoint URL', ['endpoint' => $startEndpoint, 'params' => $endpointParams]);
-
-                                            // Build final start URL including all endpoint params (path, session, protocol, token, etc.)
-                                            $query = http_build_query($endpointParams);
-                                            $startUrl = $startEndpoint.(strpos($startEndpoint, '?') === false ? '?'.$query : '&'.$query);
-
-                                            return $startUrl;
-                                        }
-
-                                        Log::warning('Plex start endpoint did not return usable response', [
-                                            'endpoint' => $startEndpoint,
-                                            'status' => $startResp->status(),
-                                            'body_snippet' => substr($startResp->body(), 0, 500),
-                                        ]);
-                                    } catch (\Exception $e) {
-                                        Log::warning('Exception calling Plex start endpoint', [
-                                            'endpoint' => $startEndpoint,
-                                            'exception' => $e->getMessage(),
-                                        ]);
-                                    }
-                                }
+                                return $startUrl;
                             }
 
-                            // Nothing usable returned
-                            Log::warning('Plex decision endpoint did not return start URL', [
+                            // Decision endpoint failed or returned empty
+                            Log::warning('Plex decision endpoint did not return usable response', [
                                 'endpoint' => $decisionEndpoint,
                                 'status' => $decisionResp->status(),
                                 'body_snippet' => substr($decisionResp->body(), 0, 500),

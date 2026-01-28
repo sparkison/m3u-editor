@@ -230,6 +230,11 @@ class NetworkBroadcastService
             'video_bitrate' => $network->video_bitrate ? (string) $network->video_bitrate : null,
             'audio_bitrate' => $network->audio_bitrate ?? 192,
             'video_resolution' => $network->video_resolution,
+            // Additional transcode settings for local mode
+            'video_codec' => $network->video_codec,
+            'audio_codec' => $network->audio_codec,
+            'preset' => $network->transcode_preset,
+            'hwaccel' => $network->hwaccel,
             'callback_url' => $callbackUrl,
         ];
 
