@@ -212,7 +212,7 @@
                         $totalEpisodes = $record->episodes()->where('season', $season->season_number)->count();
                         $enabledEpisodes = $record->episodes()->where('season', $season->season_number)->where('enabled', true)->count();
                     @endphp
-                    <x-filament::modal>
+                    <x-filament::modal width="4xl">
                         <x-slot name="trigger">
                             <div
                                 class="w-60 h-full cursor-pointer group bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden hover:ring-primary-500 dark:hover:ring-primary-500 transition-all">
