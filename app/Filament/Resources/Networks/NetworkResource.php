@@ -174,6 +174,7 @@ class NetworkResource extends Resource
                                             'name',
                                             fn (Builder $query) => $query->where('is_network_playlist', true)
                                         )
+                                        ->required()
                                         ->helperText('Assign this network to a playlist for M3U/EPG output. Create one if none exist.')
                                         ->createOptionForm([
                                             TextInput::make('name')
