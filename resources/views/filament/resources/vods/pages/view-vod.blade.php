@@ -64,6 +64,14 @@
             $cover = null;
             $tmdbId = $imdbId = $youtubeTrailer = null;
         }
+
+        $playerArgs = json_encode([
+            'id' => $record->id,
+            'title' => $title,
+            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
+            'format' => $record->container_extension ?? 'ts',
+            'type' => 'channel',
+        ]);
     @endphp
 
     @if($hasError ?? false)
@@ -155,13 +163,8 @@
                     {{-- Actions Row --}}
                     <div class="flex gap-3 pt-4">
                         {{-- Play Button --}}
-                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ json_encode([
-            'id' => $record->id,
-            'title' => $title,
-            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
-            'format' => $record->container_extension ?? 'ts',
-            'type' => 'channel',
-        ]) }}])" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
+                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ $playerArgs }}])"
+                            class="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
                             <x-heroicon-s-play class="w-5 h-5" />
                             Play Movie
                         </button>
@@ -242,13 +245,8 @@
 
                     {{-- Play Button --}}
                     <div class="flex gap-3 pt-2">
-                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ json_encode([
-            'id' => $record->id,
-            'title' => $title,
-            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
-            'format' => $record->container_extension ?? 'ts',
-            'type' => 'channel',
-        ]) }}])" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
+                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ $playerArgs }}])"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
                             <x-heroicon-s-play class="w-4 h-4" />
                             Play Movie
                         </button>
