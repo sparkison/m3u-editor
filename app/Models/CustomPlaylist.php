@@ -189,4 +189,33 @@ class CustomPlaylist extends Model
             ->filter(fn ($config) => $config['url'] !== null)
             ->toArray();
     }
+
+    /**
+     * Check if any source playlists have provider profiles enabled.
+     * When this returns true, proxy mode should be required for proper connection pooling.
+     */
+    public function hasPooledSourcePlaylists(): bool
+    {
+        return $this->channels()
+            ->whereNotNull('playlist_id')
+            ->whereHas('playlist', function ($query) {
+                $query->where('profiles_enabled', true);
+            })
+            ->exists();
+    }
+
+    /**
+     * Get source playlists that have provider profiles enabled.
+     */
+    public function getPooledSourcePlaylists(): \Illuminate\Database\Eloquent\Collection
+    {
+        $playlistIds = $this->channels()
+            ->whereNotNull('playlist_id')
+            ->distinct()
+            ->pluck('playlist_id');
+
+        return Playlist::whereIn('id', $playlistIds)
+            ->where('profiles_enabled', true)
+            ->get();
+    }
 }
