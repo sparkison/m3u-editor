@@ -45,8 +45,7 @@ class ViewSeries extends ViewRecord
                 ->label('Back to Series')
                 ->url(SeriesResource::getUrl('index'))
                 ->icon('heroicon-s-arrow-left')
-                ->color('gray')
-                ->size('sm'),
+                ->color('gray'),
             Actions\EditAction::make()
                 ->label('Edit Series')
                 ->slideOver()

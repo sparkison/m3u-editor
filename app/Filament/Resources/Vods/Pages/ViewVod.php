@@ -52,8 +52,7 @@ class ViewVod extends ViewRecord
                 ->label('Back to VOD')
                 ->url(VodResource::getUrl('index'))
                 ->icon('heroicon-s-arrow-left')
-                ->color('gray')
-                ->size('sm'),
+                ->color('gray'),
             Actions\EditAction::make()
                 ->label('Edit VOD')
                 ->slideOver()
