@@ -1,9 +1,7 @@
-<x-filament-panels::page
-    @class([
-        'fi-resource-view-record-page',
-        'fi-resource-' . str_replace('/', '-', $this->getResource()::getSlug()),
-    ])
->
+<x-filament-panels::page @class([
+    'fi-resource-view-record-page',
+    'fi-resource-' . str_replace('/', '-', $this->getResource()::getSlug()),
+])>
     @php
         try {
             $record = $this->record;
@@ -25,7 +23,7 @@
             $director = $info['director'] ?? $movieInfo['director'] ?? null;
             $cast = $info['cast'] ?? $movieInfo['cast'] ?? $info['actors'] ?? $movieInfo['actors'] ?? null;
             $country = $info['country'] ?? $movieInfo['country'] ?? null;
-            
+
             // Handle backdrop_path - can be array (Emby), string (Xtream), or nested array
             $backdropRaw = $info['backdrop_path'] ?? $movieInfo['backdrop_path'] ?? $info['cover_big'] ?? $movieInfo['cover_big'] ?? null;
             if (is_array($backdropRaw)) {
@@ -35,7 +33,7 @@
             } else {
                 $backdrop = is_string($backdropRaw) ? $backdropRaw : null;
             }
-            
+
             $cover = \App\Facades\LogoFacade::getChannelLogoUrl($record);
             $tmdbId = $record->tmdb_id ?? $info['tmdb_id'] ?? $movieInfo['tmdb_id'] ?? null;
             $imdbId = $record->imdb_id ?? $info['imdb_id'] ?? $movieInfo['imdb_id'] ?? null;
@@ -47,14 +45,14 @@
                 if (is_string($duration) && str_contains($duration, ':')) {
                     $formattedDuration = $duration;
                 } elseif (is_numeric($duration)) {
-                    $hours = floor((int)$duration / 3600);
-                    $minutes = floor(((int)$duration % 3600) / 60);
+                    $hours = floor((int) $duration / 3600);
+                    $minutes = floor(((int) $duration % 3600) / 60);
                     $formattedDuration = $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
                 } elseif (is_string($duration)) {
                     $formattedDuration = $duration;
                 }
             }
-            
+
             $hasError = false;
         } catch (\Throwable $e) {
             $hasError = true;
@@ -77,7 +75,7 @@
 
     {{-- Hero Section with Backdrop --}}
     @if($backdrop)
-        <div class="relative -mx-4 -mt-4 mb-6 overflow-hidden rounded-xl" style="min-height: 400px;">
+        <div class="relative -mt-4 mb-6 overflow-hidden rounded-xl" style="min-height: 400px;">
             {{-- Backdrop Image --}}
             <div class="absolute inset-0">
                 <img src="{{ $backdrop }}" alt="{{ $title }}" class="w-full h-full object-cover" />
@@ -90,7 +88,8 @@
                 {{-- Poster --}}
                 <div class="flex-shrink-0">
                     @if($cover)
-                        <img src="{{ $cover }}" alt="{{ $title }}" class="w-48 h-72 object-cover rounded-lg shadow-2xl ring-1 ring-white/20" />
+                        <img src="{{ $cover }}" alt="{{ $title }}"
+                            class="w-48 h-72 object-cover rounded-lg shadow-2xl ring-1 ring-white/20" />
                     @else
                         <div class="w-48 h-72 bg-gray-800 rounded-lg shadow-2xl flex items-center justify-center">
                             <x-heroicon-o-film class="w-16 h-16 text-gray-600" />
@@ -124,7 +123,8 @@
                         @endif
 
                         {{-- Status Badge --}}
-                        <span class="px-3 py-1 rounded-full {{ $record->enabled ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300' }}">
+                        <span
+                            class="px-3 py-1 rounded-full {{ $record->enabled ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300' }}">
                             {{ $record->enabled ? 'Enabled' : 'Disabled' }}
                         </span>
                     </div>
@@ -138,12 +138,14 @@
                     @if($tmdbId || $imdbId)
                         <div class="flex gap-3 pt-2">
                             @if($tmdbId)
-                                <a href="https://www.themoviedb.org/movie/{{ $tmdbId }}" target="_blank" class="px-3 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded text-xs transition-colors">
+                                <a href="https://www.themoviedb.org/movie/{{ $tmdbId }}" target="_blank"
+                                    class="px-3 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded text-xs transition-colors">
                                     TMDB: {{ $tmdbId }}
                                 </a>
                             @endif
                             @if($imdbId)
-                                <a href="https://www.imdb.com/title/{{ $imdbId }}" target="_blank" class="px-3 py-1 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded text-xs transition-colors">
+                                <a href="https://www.imdb.com/title/{{ $imdbId }}" target="_blank"
+                                    class="px-3 py-1 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded text-xs transition-colors">
                                     {{ $imdbId }}
                                 </a>
                             @endif
@@ -153,23 +155,20 @@
                     {{-- Actions Row --}}
                     <div class="flex gap-3 pt-4">
                         {{-- Play Button --}}
-                        <button
-                            type="button"
-                            wire:click="$dispatch('openFloatingStream', [{{ json_encode([
-                                'id' => $record->id,
-                                'title' => $title,
-                                'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
-                                'format' => $record->container_extension ?? 'ts',
-                                'type' => 'channel',
-                            ]) }}])"
-                            class="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors"
-                        >
+                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ json_encode([
+            'id' => $record->id,
+            'title' => $title,
+            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
+            'format' => $record->container_extension ?? 'ts',
+            'type' => 'channel',
+        ]) }}])" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
                             <x-heroicon-s-play class="w-5 h-5" />
                             Play Movie
                         </button>
 
                         @if($youtubeTrailer)
-                            <a href="https://www.youtube.com/watch?v={{ $youtubeTrailer }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                            <a href="https://www.youtube.com/watch?v={{ $youtubeTrailer }}" target="_blank"
+                                class="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
                                 <x-heroicon-s-play class="w-5 h-5" />
                                 Watch Trailer
                             </a>
@@ -180,10 +179,12 @@
                     @if($director || $cast)
                         <div class="pt-4 border-t border-white/10 space-y-2">
                             @if($director)
-                                <p class="text-sm"><span class="text-gray-400">Director:</span> <span class="text-white">{{ $director }}</span></p>
+                                <p class="text-sm"><span class="text-gray-400">Director:</span> <span
+                                        class="text-white">{{ $director }}</span></p>
                             @endif
                             @if($cast)
-                                <p class="text-sm"><span class="text-gray-400">Cast:</span> <span class="text-white">{{ Str::limit($cast, 200) }}</span></p>
+                                <p class="text-sm"><span class="text-gray-400">Cast:</span> <span
+                                        class="text-white">{{ Str::limit($cast, 200) }}</span></p>
                             @endif
                         </div>
                     @endif
@@ -217,7 +218,8 @@
                             <span class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">{{ $genre }}</span>
                         @endif
                         @if($rating)
-                            <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded flex items-center gap-1">
+                            <span
+                                class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded flex items-center gap-1">
                                 <x-heroicon-s-star class="w-3 h-3" />
                                 {{ $rating }}
                             </span>
@@ -228,7 +230,8 @@
                                 {{ $formattedDuration }}
                             </span>
                         @endif
-                        <span class="px-2 py-1 rounded {{ $record->enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' }}">
+                        <span
+                            class="px-2 py-1 rounded {{ $record->enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' }}">
                             {{ $record->enabled ? 'Enabled' : 'Disabled' }}
                         </span>
                     </div>
@@ -239,17 +242,13 @@
 
                     {{-- Play Button --}}
                     <div class="flex gap-3 pt-2">
-                        <button
-                            type="button"
-                            wire:click="$dispatch('openFloatingStream', [{{ json_encode([
-                                'id' => $record->id,
-                                'title' => $title,
-                                'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
-                                'format' => $record->container_extension ?? 'ts',
-                                'type' => 'channel',
-                            ]) }}])"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors"
-                        >
+                        <button type="button" wire:click="$dispatch('openFloatingStream', [{{ json_encode([
+            'id' => $record->id,
+            'title' => $title,
+            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
+            'format' => $record->container_extension ?? 'ts',
+            'type' => 'channel',
+        ]) }}])" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-colors">
                             <x-heroicon-s-play class="w-4 h-4" />
                             Play Movie
                         </button>
@@ -272,12 +271,7 @@
 
     {{-- Technical Details --}}
     <div class="mb-6">
-        <x-filament::section
-            icon="heroicon-o-cog-6-tooth"
-            :heading="__('Technical Details')"
-            collapsible
-            collapsed
-        >
+        <x-filament::section icon="heroicon-o-cog-6-tooth" :heading="__('Technical Details')" collapsible collapsed>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <span class="text-sm text-gray-500">Format</span>
