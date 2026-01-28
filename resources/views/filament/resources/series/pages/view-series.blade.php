@@ -197,28 +197,41 @@
 
     {{-- Seasons Grid --}}
     @php
-        $seasons = $record->seasons()->orderBy('season_number')->get();
+        // Fetch all episodes with season relationship, ordered by season and episode number
+        $allEpisodes = $record->episodes()
+            ->with('season')
+            ->orderBy('season')
+            ->orderBy('episode_num')
+            ->get();
+
+        // Group episodes by season number
+        $episodesBySeason = $allEpisodes->groupBy('season');
+
+        // Create a lookup of Season models by season_number for cover images
+        $seasonsLookup = $record->seasons()->orderBy('season_number')->get()->keyBy('season_number');
     @endphp
-    @if($seasons->isNotEmpty())
+    @if($episodesBySeason->isNotEmpty())
         <div class="mb-6">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                 <x-heroicon-o-rectangle-stack class="w-5 h-5" />
                 Seasons
             </h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                @foreach($seasons as $season)
+                @foreach($episodesBySeason as $seasonNumber => $episodes)
                     @php
-                        $cover = $season->cover_big ?? $season->cover;
-                        $totalEpisodes = $record->episodes()->where('season', $season->season_number)->count();
-                        $enabledEpisodes = $record->episodes()->where('season', $season->season_number)->where('enabled', true)->count();
+                        $season = $seasonsLookup->get($seasonNumber);
+                        $cover = $season?->cover_big ?? $season?->cover;
+                        $seasonName = $season?->name ?? 'Season ' . str_pad($seasonNumber, 2, '0', STR_PAD_LEFT);
+                        $totalEpisodes = $episodes->count();
+                        $enabledEpisodes = $episodes->where('enabled', true)->count();
                     @endphp
-                    <x-filament::modal width="4xl">
+                    <x-filament::modal width="5xl">
                         <x-slot name="trigger">
                             <div
                                 class="w-60 h-full cursor-pointer group bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden hover:ring-primary-500 dark:hover:ring-primary-500 transition-all">
                                 @if($cover)
                                     <div class="aspect-[2/3] overflow-hidden">
-                                        <img src="{{ $cover }}" alt="{{ $season->name }}"
+                                        <img src="{{ $cover }}" alt="{{ $seasonName }}"
                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                     </div>
                                 @else
@@ -227,7 +240,7 @@
                                     </div>
                                 @endif
                                 <div class="p-3">
-                                    <div class="font-medium text-sm truncate">{{ $season->name }}</div>
+                                    <div class="font-medium text-sm truncate">{{ $seasonName }}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                         {{ $enabledEpisodes }}/{{ $totalEpisodes }} episodes
                                     </div>
@@ -241,8 +254,90 @@
                             </div>
                         </x-slot>
 
-                        {{-- Episodes list... --}}
-                        Episodes for {{ $season->name }} go here.
+                        <x-slot name="heading">
+                            {{ $seasonName }}
+                        </x-slot>
+
+                        <x-slot name="description">
+                            {{ $enabledEpisodes }}/{{ $totalEpisodes }} episodes enabled
+                        </x-slot>
+
+                        {{-- Episodes list --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto p-1">
+                            @foreach($episodes as $episode)
+                                            @php
+                                                $episodeCover = \App\Facades\LogoFacade::getEpisodeLogoUrl($episode);
+                                                $info = $episode->info ?? [];
+                                            @endphp
+                                <div
+                                                class="bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden {{ !$episode->enabled ? 'opacity-50' : '' }}">
+                                                {{-- Episode Thumbnail --}}
+                                                <div class="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-700">
+                                                    @if($episodeCover)
+                                                        <img src="{{ $episodeCover }}" alt="{{ $episode->title }}"
+                                                            class="w-full h-full object-cover" />
+                                                    @else
+                                                        <div class="w-full h-full flex items-center justify-center">
+                                                            <x-heroicon-o-film class="w-8 h-8 text-gray-400" />
+                                                        </div>
+                                                    @endif
+
+                                                    {{-- Play Button Overlay --}}
+                                                    @if($episode->enabled)
+                                                        <button type="button"
+                                                            wire:click="$dispatch('openFloatingStream', {{ json_encode($episode->getFloatingPlayerAttributes()) }})"
+                                                            class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+                                                            <div
+                                                                class="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                                                                <x-heroicon-s-play class="w-6 h-6 text-gray-900 ml-1" />
+                                                            </div>
+                                                        </button>
+                                                    @endif
+
+                                                    {{-- Episode Number Badge --}}
+                                                    <div class="absolute top-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                                        E{{ str_pad($episode->episode_num, 2, '0', STR_PAD_LEFT) }}
+                                                    </div>
+
+                                                    {{-- Duration Badge --}}
+                                                    @if(!empty($info['duration']))
+                                                        <div class="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                                            {{ $info['duration'] }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+
+                                                {{-- Episode Info --}}
+                                                <div class="p-3 space-y-1">
+                                                    <div class="font-medium text-sm truncate" title="{{ $episode->title }}">
+                                                        {{ $episode->title }}
+                                                    </div>
+
+                                                    @if(!empty($info['plot']))
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2"
+                                                            title="{{ $info['plot'] }}">
+                                                            {{ $info['plot'] }}
+                                                        </p>
+                                                    @endif
+
+                                                    <div class="flex items-center gap-2 pt-1">
+                                                        @if(!empty($info['rating']))
+                                                            <span
+                                                                class="inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                                                                <x-heroicon-s-star class="w-3 h-3" />
+                                                                {{ $info['rating'] }}
+                                                            </span>
+                                                        @endif
+                                                        @if(!empty($info['release_date']))
+                                                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                                {{ $info['release_date'] }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                            @endforeach
+                        </div>
                     </x-filament::modal>
 
                 @endforeach
