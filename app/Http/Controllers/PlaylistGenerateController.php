@@ -311,7 +311,7 @@ class PlaylistGenerateController extends Controller
         );
     }
 
-    public function hdhr(string $uuid)
+    public function hdhr(Request $request, string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -320,9 +320,15 @@ class PlaylistGenerateController extends Controller
         }
 
         // Setup the HDHR device info
-        $deviceInfo = $this->getDeviceInfo($playlist);
+        $deviceInfo = $this->getDeviceInfo($request, $playlist);
+        // Ensure XML special characters are escaped (e.g., '&' -> '&amp;') to avoid parser errors
         $deviceInfoXml = collect($deviceInfo)->map(function ($value, $key) {
-            return "<$key>$value</$key>";
+            if (is_array($value)) {
+                $value = implode(',', $value);
+            }
+            $value = htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+            return "<{$key}>{$value}</{$key}>";
         })->implode('');
         $xmlResponse = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root>$deviceInfoXml</root>";
 
@@ -376,7 +382,7 @@ class PlaylistGenerateController extends Controller
         ]);
     }
 
-    public function hdhrDiscover(string $uuid)
+    public function hdhrDiscover(Request $request, string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -385,10 +391,10 @@ class PlaylistGenerateController extends Controller
         }
 
         // Return the HDHR device info
-        return $this->getDeviceInfo($playlist);
+        return $this->getDeviceInfo($request, $playlist);
     }
 
-    public function hdhrLineup(string $uuid)
+    public function hdhrLineup(Request $request, string $uuid)
     {
         // Fetch the playlist
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -399,9 +405,48 @@ class PlaylistGenerateController extends Controller
         // Build the channel query
         $channels = self::getChannelQuery($playlist);
 
+        // Check auth
+        $usedAuth = null;
+        if ($playlist instanceof PlaylistAlias) {
+            $auth = $playlist->authObject;
+            if ($auth) {
+                $auths = collect([$auth]);
+            } else {
+                $auths = collect();
+            }
+        } else {
+            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        }
+
+        if ($auths->isNotEmpty()) {
+            $authenticated = false;
+            foreach ($auths as $auth) {
+                $authUsername = $auth->username;
+                $authPassword = $auth->password;
+
+                if (
+                    $request->get('username') === $authUsername &&
+                    $request->get('password') === $authPassword
+                ) {
+                    $authenticated = true;
+                    $usedAuth = $auth;
+                    break;
+                }
+            }
+
+            if (! $authenticated) {
+                return response()->json(['Error' => 'Unauthorized'], 401);
+            }
+        }
+
         // Set the auth details
-        $username = $playlist->user->name;
-        $password = $playlist->uuid;
+        if ($usedAuth) {
+            $username = $usedAuth->username;
+            $password = $usedAuth->password;
+        } else {
+            $username = $playlist->user->name;
+            $password = $playlist->uuid;
+        }
 
         // Check if proxy enabled
         $idChannelBy = $playlist->id_channel_by;
@@ -472,7 +517,7 @@ class PlaylistGenerateController extends Controller
         }, 200, $headers);
     }
 
-    public function hdhrLineupStatus(string $uuid)
+    public function hdhrLineupStatus(Request $request, string $uuid)
     {
         // No need to fetch, status is same for all...
         return response()->json([
@@ -483,8 +528,36 @@ class PlaylistGenerateController extends Controller
         ]);
     }
 
-    private function getDeviceInfo($playlist)
+    private function getDeviceInfo(Request $request, $playlist)
     {
+        // Check auth
+        $usedAuth = null;
+        if ($playlist instanceof PlaylistAlias) {
+            $auth = $playlist->authObject;
+            if ($auth) {
+                $auths = collect([$auth]);
+            } else {
+                $auths = collect();
+            }
+        } else {
+            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        }
+
+        if ($auths->isNotEmpty()) {
+            foreach ($auths as $auth) {
+                $authUsername = $auth->username;
+                $authPassword = $auth->password;
+
+                if (
+                    $request->get('username') === $authUsername &&
+                    $request->get('password') === $authPassword
+                ) {
+                    $usedAuth = $auth;
+                    break;
+                }
+            }
+        }
+
         // Return the HDHR device info
         $uuid = $playlist->uuid;
         $tunerCount = (int) $playlist->streams === 0
@@ -495,6 +568,11 @@ class PlaylistGenerateController extends Controller
         $baseUrl = ProxyFacade::getBaseUrl();
         $baseUrl = $baseUrl."/{$uuid}/hdhr";
 
+        $auth = '';
+        if ($usedAuth) {
+            $auth = "?username={$usedAuth->username}&password={$usedAuth->password}";
+        }
+
         return [
             'DeviceID' => $deviceId,
             'FriendlyName' => "{$playlist->name} HDHomeRun",
@@ -502,8 +580,8 @@ class PlaylistGenerateController extends Controller
             'FirmwareName' => 'hdhomerun5_firmware_20240425',
             'FirmwareVersion' => '20240425',
             'DeviceAuth' => 'test_auth_token',
-            'BaseURL' => $baseUrl,
-            'LineupURL' => "$baseUrl/lineup.json",
+            'BaseURL' => $baseUrl.$auth,
+            'LineupURL' => "$baseUrl/lineup.json$auth",
             'TunerCount' => $tunerCount,
         ];
     }
