@@ -112,7 +112,9 @@ class PlexService implements MediaServer
 
         foreach ($libraries as $library) {
             try {
-                $response = $this->client()->get("/library/sections/{$library['key']}/all");
+                $response = $this->client()->get("/library/sections/{$library['key']}/all", [
+                    'includeGuids' => 1,
+                ]);
 
                 if ($response->successful()) {
                     $data = $response->json();
@@ -166,11 +168,26 @@ class PlexService implements MediaServer
      */
     protected function normalizeItem(array $item): array
     {
+        // Extract people by type (actors, directors)
+        $people = $item['Role'] ?? [];
+        $directors = array_filter($item['Director'] ?? [], fn ($d) => isset($d['tag']));
+
+        // Extract external IDs from Guid array (e.g., "imdb://tt1234567", "tmdb://12345", "tvdb://12345")
+        $externalIds = $this->extractExternalIds($item['Guid'] ?? []);
+
+        // Extract bitrate from first media source
+        $bitrate = null;
+        if (! empty($item['Media'][0]['bitrate'])) {
+            $bitrate = (int) $item['Media'][0]['bitrate'];
+        }
+
         return [
             'Id' => $item['ratingKey'],
             'Name' => $item['title'],
+            'OriginalTitle' => $item['originalTitle'] ?? null,
             'Type' => ucfirst($item['type']),
             'ProductionYear' => $item['year'] ?? null,
+            'PremiereDate' => $item['originallyAvailableAt'] ?? null,
             'Path' => $item['Media'][0]['Part'][0]['file'] ?? null,
             'CommunityRating' => $item['rating'] ?? null,
             'OfficialRating' => $item['contentRating'] ?? null,
@@ -179,20 +196,90 @@ class PlexService implements MediaServer
             'IndexNumber' => $item['index'] ?? null,
             'ParentIndexNumber' => $item['parentIndex'] ?? null,
             'Genres' => array_map(fn ($g) => $g['tag'], $item['Genre'] ?? []),
+            'People' => array_map(fn ($p) => [
+                'Name' => $p['tag'] ?? $p['name'] ?? null,
+                'Type' => 'Actor',
+                'Role' => $p['role'] ?? null,
+            ], $people),
+            'Directors' => array_map(fn ($d) => $d['tag'], $directors),
             'ImageTags' => [
                 'Primary' => $item['thumb'] ?? null,
                 'Backdrop' => $item['art'] ?? null,
             ],
+            'BackdropImageTags' => ! empty($item['art']) ? [$item['art']] : [],
             'MediaSources' => array_map(fn ($media) => [
                 'Container' => $media['container'] ?? null,
+                'Bitrate' => $media['bitrate'] ?? null,
             ], $item['Media'] ?? []),
+            'Bitrate' => $bitrate,
+            'ProviderIds' => $externalIds,
         ];
+    }
+
+    /**
+     * Extract external IDs (TMDB, TVDB, IMDB) from Plex Guid array.
+     */
+    protected function extractExternalIds(array $guids): array
+    {
+        $ids = [
+            'Tmdb' => null,
+            'Tvdb' => null,
+            'Imdb' => null,
+        ];
+
+        foreach ($guids as $guid) {
+            $id = $guid['id'] ?? null;
+            if (! $id) {
+                continue;
+            }
+
+            if (str_starts_with($id, 'tmdb://')) {
+                $ids['Tmdb'] = str_replace('tmdb://', '', $id);
+            } elseif (str_starts_with($id, 'tvdb://')) {
+                $ids['Tvdb'] = str_replace('tvdb://', '', $id);
+            } elseif (str_starts_with($id, 'imdb://')) {
+                $ids['Imdb'] = str_replace('imdb://', '', $id);
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Fetch detailed metadata for a single series (includes cast, directors, etc.).
+     */
+    public function fetchSeriesDetails(string $seriesId): ?array
+    {
+        try {
+            $response = $this->client()->get("/library/metadata/{$seriesId}", [
+                'includeGuids' => 1,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $item = $data['MediaContainer']['Metadata'][0] ?? null;
+
+                return $item ? $this->normalizeItem($item) : null;
+            }
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('PlexService: Error fetching series details', [
+                'integration_id' => $this->integration->id,
+                'series_id' => $seriesId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function fetchSeasons(string $seriesId): Collection
     {
         try {
-            $response = $this->client()->get("/library/metadata/{$seriesId}/children");
+            $response = $this->client()->get("/library/metadata/{$seriesId}/children", [
+                'includeGuids' => 1,
+            ]);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -220,7 +307,9 @@ class PlexService implements MediaServer
                 ? "/library/metadata/{$seasonId}/children"
                 : "/library/metadata/{$seriesId}/allLeaves";
 
-            $response = $this->client()->get($endpoint);
+            $response = $this->client()->get($endpoint, [
+                'includeGuids' => 1,
+            ]);
 
             if ($response->successful()) {
                 $data = $response->json();

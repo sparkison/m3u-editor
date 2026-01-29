@@ -451,6 +451,13 @@ class SyncMediaServer implements ShouldQueue
         array $seriesData
     ): void {
         $seriesId = $seriesData['Id'];
+
+        // Fetch detailed series info for cast, directors, and external IDs
+        $detailedData = $service->fetchSeriesDetails($seriesId);
+        if ($detailedData) {
+            $seriesData = array_merge($seriesData, $detailedData);
+        }
+
         $genres = $service->extractGenres($seriesData);
         if (empty($genres)) {
             $genres = ['Uncategorized'];
@@ -458,6 +465,40 @@ class SyncMediaServer implements ShouldQueue
 
         // Ensure category exists for the first genre
         $category = $this->ensureCategory($playlist, $genres[0]);
+
+        // Extract cast and directors
+        $people = $seriesData['People'] ?? [];
+        $actors = array_slice(array_column(
+            array_filter($people, fn ($p) => ($p['Type'] ?? '') === 'Actor'),
+            'Name'
+        ), 0, 10);
+        $directors = $seriesData['Directors'] ?? array_column(
+            array_filter($people, fn ($p) => ($p['Type'] ?? '') === 'Director'),
+            'Name'
+        );
+
+        // Extract external IDs (Plex uses ProviderIds, Emby uses ProviderIds directly)
+        $providerIds = $seriesData['ProviderIds'] ?? [];
+        $tmdbId = $providerIds['Tmdb'] ?? $providerIds['Tmdb'] ?? null;
+        $tvdbId = $providerIds['Tvdb'] ?? $providerIds['Tvdb'] ?? null;
+        $imdbId = $providerIds['Imdb'] ?? $providerIds['Imdb'] ?? null;
+
+        // Extract backdrop paths
+        $backdropPaths = $seriesData['BackdropImageTags'] ?? [];
+        if (! empty($backdropPaths)) {
+            // Convert to full URLs if they're just paths
+            $backdropPaths = array_map(function ($path) use ($service, $seriesId) {
+                if (str_starts_with($path, '/') || str_starts_with($path, 'http')) {
+                    return $service->getImageUrl($seriesId, 'Backdrop');
+                }
+
+                return $service->getImageUrl($seriesId, 'Backdrop');
+            }, is_array($backdropPaths) ? $backdropPaths : [$backdropPaths]);
+        }
+
+        // Calculate rating on 5-based scale
+        $communityRating = $seriesData['CommunityRating'] ?? null;
+        $rating5Based = $communityRating ? round($communityRating / 2, 1) : null;
 
         // Create or update the series
         $series = Series::updateOrCreate(
@@ -475,12 +516,21 @@ class SyncMediaServer implements ShouldQueue
                 'cover' => $service->getImageUrl($seriesId, 'Primary'),
                 'plot' => $seriesData['Overview'] ?? null,
                 'genre' => implode(', ', $genres),
-                'release_date' => $seriesData['ProductionYear'] ?? null,
-                'rating' => $seriesData['CommunityRating'] ?? null,
-                'last_metadata_fetch' => now(), // Mark metadata as fetched so Xtream API doesn't try to fetch again
+                'release_date' => $seriesData['PremiereDate'] ?? $seriesData['ProductionYear'] ?? null,
+                'cast' => ! empty($actors) ? implode(', ', $actors) : null,
+                'director' => ! empty($directors) ? implode(', ', $directors) : null,
+                'rating' => $communityRating,
+                'rating_5based' => $rating5Based,
+                'backdrop_path' => ! empty($backdropPaths) ? $backdropPaths : null,
+                'tmdb_id' => $tmdbId,
+                'tvdb_id' => $tvdbId,
+                'imdb_id' => $imdbId,
+                'last_metadata_fetch' => now(),
                 'metadata' => [
                     'media_server_id' => $seriesId,
                     'media_server_type' => $integration->type,
+                    'official_rating' => $seriesData['OfficialRating'] ?? null,
+                    'original_title' => $seriesData['OriginalTitle'] ?? null,
                 ],
             ]
         );
@@ -550,6 +600,21 @@ class SyncMediaServer implements ShouldQueue
         $imageUrl = $service->getImageUrl($episodeId, 'Primary');
         $runtimeSeconds = $service->ticksToSeconds($episodeData['RunTimeTicks'] ?? 0);
 
+        // Extract bitrate from media sources
+        $bitrate = $episodeData['Bitrate'] ?? null;
+        if (! $bitrate && ! empty($episodeData['MediaSources'][0]['Bitrate'])) {
+            $bitrate = (int) $episodeData['MediaSources'][0]['Bitrate'];
+        }
+
+        // Extract external IDs
+        $providerIds = $episodeData['ProviderIds'] ?? [];
+        $tmdbId = $providerIds['Tmdb'] ?? null;
+        $tvdbId = $providerIds['Tvdb'] ?? null;
+        $imdbId = $providerIds['Imdb'] ?? null;
+
+        // Extract rating
+        $rating = $episodeData['CommunityRating'] ?? null;
+
         Episode::updateOrCreate(
             [
                 'playlist_id' => $playlist->id,
@@ -572,9 +637,17 @@ class SyncMediaServer implements ShouldQueue
                     'media_server_id' => $episodeId,
                     'media_server_type' => $integration->type,
                     'duration_secs' => $runtimeSeconds,
-                    'duration' => gmdate('H:i:s', $runtimeSeconds),
-                    'movie_image' => $imageUrl, // Store image in info for UI compatibility
-                    'cover_big' => $imageUrl, // Also store as cover_big for fallback
+                    'duration' => gmdate('H:i:s', $runtimeSeconds ?? 0),
+                    'movie_image' => $imageUrl,
+                    'cover_big' => $imageUrl,
+                    'release_date' => $episodeData['PremiereDate'] ?? null,
+                    'rating' => $rating,
+                    'bitrate' => $bitrate,
+                    'season' => $season->season_number,
+                    'tmdb_id' => $tmdbId,
+                    'tvdb_id' => $tvdbId,
+                    'imdb_id' => $imdbId,
+                    'official_rating' => $episodeData['OfficialRating'] ?? null,
                 ],
             ]
         );
