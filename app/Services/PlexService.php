@@ -176,6 +176,8 @@ class PlexService implements MediaServer
             'OfficialRating' => $item['contentRating'] ?? null,
             'Overview' => $item['summary'] ?? null,
             'RunTimeTicks' => isset($item['duration']) ? ($item['duration'] * 10000) : null,
+            'IndexNumber' => $item['index'] ?? null,
+            'ParentIndexNumber' => $item['parentIndex'] ?? null,
             'Genres' => array_map(fn ($g) => $g['tag'], $item['Genre'] ?? []),
             'ImageTags' => [
                 'Primary' => $item['thumb'] ?? null,
