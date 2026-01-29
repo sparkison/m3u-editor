@@ -67,6 +67,10 @@ RUN NODE_ENV=production npm run build && \
 ########################################
 FROM alpine:3.21.3 AS proxy_builder
 
+# Cache bust arg - when this changes, Docker invalidates the layer cache
+# Pass the latest m3u-proxy commit SHA to ensure fresh clones
+ARG M3U_PROXY_COMMIT=""
+
 # Re-declare ARGs for this stage
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
 ARG M3U_PROXY_BRANCH=master
@@ -77,7 +81,8 @@ WORKDIR /opt/m3u-proxy
 RUN apk add --no-cache git
 
 # Clone m3u-proxy source code
-RUN echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH})" && \
+# The M3U_PROXY_COMMIT arg ensures cache invalidation when proxy is updated
+RUN echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH}, commit: ${M3U_PROXY_COMMIT})" && \
     git clone -b ${M3U_PROXY_BRANCH} ${M3U_PROXY_REPO} . && \
     # Remove .git to reduce image size
     rm -rf .git
