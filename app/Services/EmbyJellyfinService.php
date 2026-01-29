@@ -173,6 +173,65 @@ class EmbyJellyfinService implements MediaServer
     }
 
     /**
+     * Fetch detailed metadata for a single series (includes cast, directors, etc.).
+     *
+     * @param  string  $seriesId  The media server's series ID
+     */
+    public function fetchSeriesDetails(string $seriesId): ?array
+    {
+        try {
+            $response = $this->client()->get("/Users/{$this->getUserId()}/Items/{$seriesId}", [
+                'Fields' => 'Genres,Overview,CommunityRating,OfficialRating,ProductionYear,People,ProviderIds,ExternalUrls',
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('MediaServerService: Error fetching series details', [
+                'integration_id' => $this->integration->id,
+                'series_id' => $seriesId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Get the user ID for API calls that require it.
+     */
+    protected function getUserId(): string
+    {
+        // Try to get from integration config, or use a default admin user lookup
+        if (! empty($this->integration->user_id_emby)) {
+            return $this->integration->user_id_emby;
+        }
+
+        // Fallback: fetch users and use the first admin
+        try {
+            $response = $this->client()->get('/Users');
+            if ($response->successful()) {
+                $users = $response->json();
+                foreach ($users as $user) {
+                    if ($user['Policy']['IsAdministrator'] ?? false) {
+                        return $user['Id'];
+                    }
+                }
+
+                // Return first user if no admin found
+                return $users[0]['Id'] ?? '';
+            }
+        } catch (Exception $e) {
+            Log::warning('MediaServerService: Could not fetch users', ['error' => $e->getMessage()]);
+        }
+
+        return '';
+    }
+
+    /**
      * Fetch all seasons for a series.
      *
      * @param  string  $seriesId  The media server's series ID

@@ -16,6 +16,8 @@ interface MediaServer
 
     public function fetchSeries(): Collection;
 
+    public function fetchSeriesDetails(string $seriesId): ?array;
+
     public function fetchSeasons(string $seriesId): Collection;
 
     public function fetchEpisodes(string $seriesId, ?string $seasonId = null): Collection;
