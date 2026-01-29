@@ -6,7 +6,6 @@ use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\Pages\EditGroup;
 use App\Filament\Resources\Groups\Pages\ListGroups;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
-use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Jobs\MergeChannels;
 use App\Jobs\UnmergeChannels;
 use App\Models\CustomPlaylist;
