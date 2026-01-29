@@ -21,6 +21,7 @@ class UnmergeChannels implements ShouldQueue
     public function __construct(
         public $user,
         public $playlistId = null,
+        public $groupId = null,
     ) {}
 
     /**
@@ -48,6 +49,25 @@ class UnmergeChannels implements ShouldQueue
             if (count($idsToDelete) > 0) {
                 ChannelFailover::whereIn('channel_id', $idsToDelete)->delete();
             }
+        } elseif ($this->groupId) {
+            // Get the group channels IDs
+            $channelIds = Channel::where('group_id', $this->groupId);
+
+            // Should be much less channels than playlist unmerge but still use cursor() for safety
+            $idsToDelete = [];
+            foreach ($channelIds->cursor() as $channel) {
+                // Bulk delete in chunks of 100
+                $idsToDelete[] = $channel->id;
+                if (count($idsToDelete) >= 100) {
+                    ChannelFailover::whereIn('channel_id', $idsToDelete)->delete();
+                    $idsToDelete = [];
+                }
+            }
+
+            // Clean up any remaining IDs
+            if (count($idsToDelete) > 0) {
+                ChannelFailover::whereIn('channel_id', $idsToDelete)->delete();
+            }
         } else {
             // Delete all user failovers if no playlist is specified
             ChannelFailover::where('user_id', $this->user->id)->delete();
@@ -58,9 +78,16 @@ class UnmergeChannels implements ShouldQueue
 
     protected function sendCompletionNotification()
     {
+        if ($this->playlistId) {
+            $message = 'Channels in the specified playlist have been unmerged successfully.';
+        } elseif ($this->groupId) {
+            $message = 'Channels in the specified group have been unmerged successfully.';
+        } else {
+            $message = 'All channels have been unmerged successfully.';
+        }
         Notification::make()
             ->title('Unmerge complete')
-            ->body('All channels have been unmerged successfully.')
+            ->body($message)
             ->success()
             ->broadcast($this->user)
             ->sendToDatabase($this->user);
