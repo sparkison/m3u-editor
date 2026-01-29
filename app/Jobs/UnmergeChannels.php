@@ -78,9 +78,16 @@ class UnmergeChannels implements ShouldQueue
 
     protected function sendCompletionNotification()
     {
+        if ($this->playlistId) {
+            $message = 'Channels in the specified playlist have been unmerged successfully.';
+        } elseif ($this->groupId) {
+            $message = 'Channels in the specified group have been unmerged successfully.';
+        } else {
+            $message = 'All channels have been unmerged successfully.';
+        }
         Notification::make()
             ->title('Unmerge complete')
-            ->body('All channels have been unmerged successfully.')
+            ->body($message)
             ->success()
             ->broadcast($this->user)
             ->sendToDatabase($this->user);
