@@ -5,8 +5,9 @@ namespace App\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @method static null bulkSortGroupChannels(\App\Models\Group $record, string $order = 'ASC')
+ * @method static null bulkSortGroupChannels(\App\Models\Group $record, string $order = 'ASC', ?string $column = null)
  * @method static null bulkRecountGroupChannels(\App\Models\Group $record, int $start = 1)
+ * @method static null bulkRecountChannels(\Illuminate\Database\Eloquent\Collection $channels, int $start = 1)
  */
 class SortFacade extends Facade
 {

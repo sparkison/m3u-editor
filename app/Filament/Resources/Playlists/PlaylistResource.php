@@ -1626,7 +1626,7 @@ class PlaylistResource extends Resource
             Section::make('Playlist Processing')
                 ->description('Processing settings for the playlist')
                 ->columnSpanFull()
-                ->columns(2)
+                ->columns(3)
                 ->schema([
                     Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -1640,7 +1640,12 @@ class PlaylistResource extends Resource
                         ->columnSpan(1)
                         ->inline(true)
                         ->default(false)
-                        ->helperText('When enabled, newly added channels will be enabled by default.'),
+                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
+                    Toggle::make('enable_series')
+                        ->label('Enable new series')
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
                     Toggle::make('import_prefs.use_regex')
                         ->label('Use regex for filtering')
                         ->columnSpan(2)

@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\CustomPlaylist;
 use App\Traits\HasUserFiltering;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
@@ -126,7 +127,7 @@ class CategoryResource extends Resource
                 //     ->searchable(),
             ])
             ->recordActions([
-                BulkActionGroup::make([
+                ActionGroup::make([
                     ViewAction::make(),
                     Action::make('add')
                         ->label('Add to Custom Playlist')

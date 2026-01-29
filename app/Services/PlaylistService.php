@@ -535,30 +535,30 @@ class PlaylistService
      */
     public function resolveXtreamExpDate($authRecord, string $authMethod, ?string $username, ?string $password): int
     {
-        // PlaylistAuth login
-        if ($authMethod === 'playlist_auth' && $authRecord instanceof \App\Models\PlaylistAuth) {
-            return $authRecord->expires_at ? $authRecord->expires_at->timestamp : 0;
-        }
-
-        // Alias login
-        if ($authMethod === 'alias_auth' && $authRecord instanceof \App\Models\PlaylistAlias) {
-            return $authRecord->expires_at ? $authRecord->expires_at->timestamp : 0;
-        }
-
-        // Legacy (owner_auth)
-        if ($authMethod === 'owner_auth' && $username && $password) {
-            // Optional legacy-expiration override: a PlaylistAuth matching legacy creds
-            $legacyOverride = \App\Models\PlaylistAuth::where('username', $username)
+        // PlaylistAuth login: authRecord is the assigned playlist model, so resolve by creds
+        if ($authMethod === 'playlist_auth' && $username && $password) {
+            $playlistAuth = PlaylistAuth::where('username', $username)
                 ->where('password', $password)
                 ->where('enabled', true)
                 ->first();
 
-            if ($legacyOverride) {
-                return $legacyOverride->expires_at ? $legacyOverride->expires_at->timestamp : 0;
-            }
+            // If found, return the custom expiration timestamp
+            return $playlistAuth?->expires_at?->timestamp ?? 0;
+        }
 
-            // No override => treat as "never expires" (0)
-            return 0;
+        // Alias login
+        if ($authMethod === 'alias_auth' && $authRecord instanceof PlaylistAlias) {
+            return $authRecord?->expires_at?->timestamp ?? 0;
+        }
+
+        // Legacy (owner_auth) optional override
+        if ($authMethod === 'owner_auth' && $username && $password) {
+            $legacyOverride = PlaylistAuth::where('username', $username)
+                ->where('password', $password)
+                ->where('enabled', true)
+                ->first();
+
+            return $legacyOverride?->expires_at?->timestamp ?? 0;
         }
 
         // Default fallback
