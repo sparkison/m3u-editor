@@ -7,6 +7,7 @@ use App\Facades\ProxyFacade;
 use App\Facades\SortFacade;
 use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\Vods\Pages\ListVod;
+use App\Filament\Resources\Vods\Pages\ViewVod;
 use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\FetchTmdbIds;
@@ -670,10 +671,12 @@ class VodResource extends Resource
                 ->hiddenLabel()
                 ->size('sm'),
             ViewAction::make()
+                ->url(fn ($record) => static::getUrl('view', ['record' => $record]))
                 ->button()
-                ->icon('heroicon-s-information-circle')
+                ->icon('heroicon-s-eye')
                 ->hiddenLabel()
-                ->slideOver(),
+                ->tooltip('View enhanced details')
+                ->size('sm'),
         ];
     }
 
@@ -1229,8 +1232,8 @@ class VodResource extends Resource
     {
         return [
             'index' => ListVod::route('/'),
+            'view' => ViewVod::route('/{record}'),
             // 'create' => Pages\CreateVod::route('/create'),
-            // 'view' => Pages\ViewVod::route('/{record}'),
             // 'edit' => Pages\EditVod::route('/{record}/edit'),
         ];
     }

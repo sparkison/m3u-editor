@@ -7,6 +7,7 @@ use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Filament\Resources\Series\Pages\CreateSeries;
 use App\Filament\Resources\Series\Pages\EditSeries;
 use App\Filament\Resources\Series\Pages\ListSeries;
+use App\Filament\Resources\Series\Pages\ViewSeries;
 use App\Filament\Resources\Series\RelationManagers\EpisodesRelationManager;
 use App\Jobs\FetchTmdbIds;
 use App\Jobs\ProcessM3uImportSeriesEpisodes;
@@ -29,6 +30,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -466,6 +468,11 @@ class SeriesResource extends Resource
                 ->button()->hiddenLabel()->size('sm')
                     // Refresh table after edit to remove records that no longer match active filters
                 ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
+            ViewAction::make()
+                ->url(fn ($record) => static::getUrl('view', ['record' => $record]))
+                ->button()->hiddenLabel()->size('sm')
+                ->icon('heroicon-s-eye')
+                ->tooltip('View enhanced details'),
         ];
     }
 
@@ -791,6 +798,7 @@ class SeriesResource extends Resource
         return [
             'index' => ListSeries::route('/'),
             'create' => CreateSeries::route('/create'),
+            'view' => ViewSeries::route('/{record}'),
             'edit' => EditSeries::route('/{record}/edit'),
         ];
     }
