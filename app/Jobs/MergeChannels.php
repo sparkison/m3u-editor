@@ -27,6 +27,7 @@ class MergeChannels implements ShouldQueue
         public bool $deactivateFailoverChannels = false,
         public bool $forceCompleteRemerge = false,
         public bool $preferCatchupAsPrimary = false,
+        public ?int $groupId = null,
     ) {}
 
     /**
@@ -68,6 +69,10 @@ class MergeChannels implements ShouldQueue
             ->where(function ($query) {
                 $query->where('stream_id_custom', '!=', '')
                     ->orWhere('stream_id', '!=', '');
+            })
+            ->when($this->groupId, function ($query) {
+                // Filter by group_id if specified
+                $query->where('group_id', $this->groupId);
             })
             ->when($shouldExcludeExistingFailovers, function ($query) use ($existingFailoverChannelIds) {
                 // Only exclude existing failovers if we're not forcing a complete re-merge
