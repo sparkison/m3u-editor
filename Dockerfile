@@ -1,7 +1,6 @@
 ########################################
 # Build Arguments - Configurable at build time
 ########################################
-# Cache bust: 2026-01-09-v2
 # Allow customization of m3u-proxy repository and branch
 # NOTE: GitHub Actions workflow automatically overrides these with dynamic values
 # based on the repository owner (e.g., hektyc/m3u-proxy for hektyc/m3u-editor)

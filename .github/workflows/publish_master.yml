@@ -81,6 +81,8 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=master
           cache-from: type=gha,scope=release-amd64
           cache-to: type=gha,mode=max,scope=release-amd64
           provenance: false
@@ -127,6 +129,8 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=master
           cache-from: type=gha,scope=release-arm64
           cache-to: type=gha,mode=max,scope=release-arm64
           provenance: false
