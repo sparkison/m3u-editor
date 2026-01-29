@@ -220,6 +220,7 @@ class EmbyJellyfinService implements MediaServer
                         return $user['Id'];
                     }
                 }
+
                 // Return first user if no admin found
                 return $users[0]['Id'] ?? '';
             }

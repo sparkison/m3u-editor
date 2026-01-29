@@ -181,6 +181,12 @@ class PlexService implements MediaServer
             $bitrate = (int) $item['Media'][0]['bitrate'];
         }
 
+        // Plex uses different rating fields:
+        // - 'rating' is typically the critic score (often empty for TV shows)
+        // - 'audienceRating' is the audience/user score (more commonly available)
+        // Prefer audienceRating, fall back to rating
+        $communityRating = $item['audienceRating'] ?? $item['rating'] ?? null;
+
         return [
             'Id' => $item['ratingKey'],
             'Name' => $item['title'],
@@ -189,7 +195,7 @@ class PlexService implements MediaServer
             'ProductionYear' => $item['year'] ?? null,
             'PremiereDate' => $item['originallyAvailableAt'] ?? null,
             'Path' => $item['Media'][0]['Part'][0]['file'] ?? null,
-            'CommunityRating' => $item['rating'] ?? null,
+            'CommunityRating' => $communityRating,
             'OfficialRating' => $item['contentRating'] ?? null,
             'Overview' => $item['summary'] ?? null,
             'RunTimeTicks' => isset($item['duration']) ? ($item['duration'] * 10000) : null,
