@@ -4,6 +4,8 @@ namespace App\Filament\Resources\VodGroups\Pages;
 
 use App\Facades\SortFacade;
 use App\Filament\Resources\VodGroups\VodGroupResource;
+use App\Jobs\ProcessVodChannels;
+use App\Jobs\SyncVodStrmFiles;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use Filament\Actions\Action;
@@ -11,6 +13,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
@@ -176,6 +179,60 @@ class EditVodGroup extends EditRecord
                     ->requiresConfirmation()
                     ->modalIcon('heroicon-o-bars-arrow-down')
                     ->modalDescription('Sort all channels in this group alphabetically? This will update the sort order.'),
+
+                Action::make('process_vod')
+                    ->label('Fetch Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                    ])
+                    ->action(function ($record, array $data) {
+                        foreach ($record->enabled_channels as $channel) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new ProcessVodChannels(
+                                    channel: $channel,
+                                    force: $data['overwrite_existing'] ?? false,
+                                ));
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Fetching VOD metadata for channel')
+                            ->body('The VOD metadata fetching and processing has been started for the group channels. Only enabled channels will be processed. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the group channels.')
+                    ->modalSubmitActionLabel('Yes, process now'),
+
+                Action::make('sync_vod')
+                    ->label('Sync VOD .strm file')
+                    ->action(function ($record) {
+                        foreach ($record->enabled_channels as $channel) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new SyncVodStrmFiles(
+                                    channel: $channel,
+                                ));
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('.strm files are being synced for the group channels. Only enabled channels will be synced.')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync group VOD channels .strm files now? This will generate .strm files for the group channels.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
 
                 Action::make('enable')
                     ->label('Enable group channels')
