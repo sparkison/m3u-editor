@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Series\RelationManagers;
 
-use App\Facades\LogoFacade;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -13,8 +12,6 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\Layout\Grid;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
@@ -56,93 +53,92 @@ class EpisodesRelationManager extends RelationManager
             ->paginated([12, 24, 48, 100])
             ->defaultPaginationPageOption(12)
             ->columns([
+                ImageColumn::make('info.movie_image')
+                    ->label('Cover')
+                    ->height(60)
+                    ->width(40)
+                    ->getStateUsing(function ($record) {
+                        $info = $record->info ?? [];
+
+                        return $info['movie_image'] ?? $info['cover_big'] ?? null;
+                    })
+                    ->defaultImageUrl('/images/placeholder-episode.png'),
+
+                TextColumn::make('title')
+                    ->limit(50)
+                    ->tooltip(fn ($record) => $record->title),
+
                 ToggleColumn::make('enabled')
                     ->label('Enabled'),
-                Stack::make([
-                    ImageColumn::make('info.movie_image')
-                        ->label('')
-                        ->height(200)
-                        ->width('full')
-                        ->extraImgAttributes(['class' => 'episode-placeholder rounded-t-lg object-cover w-full h-48'])
-                        ->checkFileExistence(false)
-                        ->getStateUsing(fn ($record) => LogoFacade::getEpisodeLogoUrl($record)),
 
-                    Stack::make([
-                        TextColumn::make('title')
-                            ->weight('semibold')
-                            ->size('sm')
-                            ->limit(50)
-                            ->tooltip(fn ($record) => $record->title),
+                TextColumn::make('info.plot')
+                    ->label('Plot')
+                    ->limit(100)
+                    ->wrap()
+                    ->tooltip(fn ($record) => $record->plot ?? $record->info['plot'] ?? null)
+                    ->getStateUsing(function ($record) {
+                        // Check the dedicated plot column first, then fall back to info.plot
+                        if (! empty($record->plot)) {
+                            return $record->plot;
+                        }
+                        $info = $record->info ?? [];
 
-                        TextColumn::make('episode_info')
-                            ->label('')
-                            ->size('xs')
-                            ->color('gray')
-                            ->getStateUsing(function ($record) {
-                                $seasonName = $record->season ? "Season {$record->season}" : 'Unknown Season';
-                                $episodeNum = $record->episode_num ? "Episode {$record->episode_num}" : '';
+                        return $info['plot'] ?? null;
+                    })
+                    ->placeholder('No description available'),
 
-                                return trim("{$seasonName} {$episodeNum}");
-                            }),
+                TextColumn::make('series.category.name')
+                    ->label('Category')
+                    ->searchable()
+                    ->toggleable()
+                    ->sortable(),
 
-                        TextColumn::make('info.plot')
-                            ->label('')
-                            ->limit(100)
-                            ->size('xs')
-                            ->color('gray')
-                            ->tooltip(fn ($record) => $record->plot ?? $record->info['plot'] ?? null)
-                            ->getStateUsing(function ($record) {
-                                // Check the dedicated plot column first, then fall back to info.plot
-                                if (! empty($record->plot)) {
-                                    return $record->plot;
-                                }
-                                $info = $record->info ?? [];
+                TextColumn::make('season')
+                    ->label('Season #')
+                    ->searchable()
+                    ->sortable(),
 
-                                return $info['plot'] ?? null;
-                            })
-                            ->placeholder('No description available'),
+                TextColumn::make('episode_num')
+                    ->label('Ep #')
+                    ->searchable()
+                    ->sortable(),
 
-                        Grid::make(2)
-                            ->schema([
-                                TextColumn::make('info.duration')
-                                    ->label('Duration')
-                                    ->badge()
-                                    ->size('xs')
-                                    ->color('primary')
-                                    ->icon('heroicon-m-clock')
-                                    ->getStateUsing(function ($record) {
-                                        $info = $record->info ?? [];
+                TextColumn::make('info.duration')
+                    ->label('Duration')
+                    ->badge()
+                    ->size('sm')
+                    ->color('primary')
+                    ->icon('heroicon-m-clock')
+                    ->getStateUsing(function ($record) {
+                        $info = $record->info ?? [];
 
-                                        return $info['duration'] ?? null;
-                                    }),
+                        return $info['duration'] ?? null;
+                    }),
 
-                                TextColumn::make('info.rating')
-                                    ->label('Rating')
-                                    ->badge()
-                                    ->size('xs')
-                                    ->color('success')
-                                    ->icon('heroicon-m-star')
-                                    ->getStateUsing(function ($record) {
-                                        $info = $record->info ?? [];
+                TextColumn::make('info.rating')
+                    ->label('Rating')
+                    ->badge()
+                    ->size('sm')
+                    ->color('success')
+                    ->icon('heroicon-m-star')
+                    ->getStateUsing(function ($record) {
+                        $info = $record->info ?? [];
 
-                                        return $info['rating'] ?? null;
-                                    }),
-                            ]),
+                        return $info['rating'] ?? null;
+                    }),
 
-                        TextColumn::make('info.release_date')
-                            ->label('')
-                            ->date()
-                            ->size('xs')
-                            ->color('gray')
-                            ->prefix('Released: ')
-                            ->getStateUsing(function ($record) {
-                                $info = $record->info ?? [];
+                TextColumn::make('info.release_date')
+                    ->label('Release Date')
+                    ->date()
+                    ->size('sm')
+                    ->color('gray')
+                    ->prefix('Released: ')
+                    ->getStateUsing(function ($record) {
+                        $info = $record->info ?? [];
 
-                                return $info['release_date'] ?? null;
-                            })
-                            ->placeholder(''),
-                    ])->space(2)->extraAttributes(['class' => 'p-4']),
-                ])->space(0)->extraAttributes(['class' => 'bg-white dark:bg-gray-800 rounded-lg shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 overflow-hidden']),
+                        return $info['release_date'] ?? null;
+                    })
+                    ->placeholder(''),
             ])
             ->filters([
                 //
