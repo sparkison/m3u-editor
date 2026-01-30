@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VodGroups;
 
+use App\Facades\SortFacade;
 use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Filament\Resources\VodGroups\Pages\ListVodGroups;
 use App\Filament\Resources\VodGroups\Pages\ViewVodGroup;
@@ -236,6 +237,69 @@ class VodGroupResource extends Resource
                         ->modalIcon('heroicon-o-arrows-right-left')
                         ->modalDescription('Move the group channels to the another group.')
                         ->modalSubmitActionLabel('Move now'),
+
+                    Action::make('recount')
+                        ->label('Recount Channels')
+                        ->icon('heroicon-o-hashtag')
+                        ->schema([
+                            TextInput::make('start')
+                                ->label('Start Number')
+                                ->numeric()
+                                ->default(1)
+                                ->required(),
+                        ])
+                        ->action(function (Group $record, array $data): void {
+                            $start = (int) $data['start'];
+                            SortFacade::bulkRecountGroupChannels($record, $start);
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels Recounted')
+                                ->body('The channels in this group have been recounted.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-hashtag')
+                        ->modalDescription('Recount all channels in this group sequentially?'),
+                    Action::make('sort_alpha')
+                        ->label('Sort Alpha')
+                        ->icon('heroicon-o-bars-arrow-down')
+                        ->schema([
+                            Select::make('column')
+                                ->label('Sort By')
+                                ->options([
+                                    'title' => 'Title (or override if set)',
+                                    'name' => 'Name (or override if set)',
+                                    'stream_id' => 'ID (or override if set)',
+                                    'channel' => 'Channel No.',
+                                ])
+                                ->default('title')
+                                ->required(),
+                            Select::make('sort')
+                                ->label('Sort Order')
+                                ->options([
+                                    'ASC' => 'A to Z or 0 to 9',
+                                    'DESC' => 'Z to A or 9 to 0',
+                                ])
+                                ->default('ASC')
+                                ->required(),
+                        ])
+                        ->action(function (Group $record, array $data): void {
+                            $order = $data['sort'] ?? 'ASC';
+                            $column = $data['column'] ?? 'title';
+                            SortFacade::bulkSortGroupChannels($record, $order, $column);
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels Sorted')
+                                ->body('The channels in this group have been sorted alphabetically.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-bars-arrow-down')
+                        ->modalDescription('Sort all channels in this group alphabetically? This will update the sort order.'),
 
                     Action::make('enable')
                         ->label('Enable group channels')

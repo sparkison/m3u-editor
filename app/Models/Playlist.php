@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\PlaylistChannelId;
 use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
-use App\Services\XtreamService;
+use App\Jobs\UpdateXtreamStats;
 use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class Playlist extends Model
 {
@@ -58,6 +57,8 @@ class Playlist extends Model
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
         'source_type' => PlaylistSourceType::class,
+        'enable_channels' => 'boolean',
+        'enable_series' => 'boolean',
     ];
 
     public function getFolderPathAttribute(): string
@@ -279,31 +280,21 @@ class Playlist extends Model
     {
         return Attribute::make(
             get: function ($value, $attributes) {
-                $results = $value;
-                $key = "playlist:{$attributes['id']}:xtream_status";
-                if ($this->xtream) {
-                    // This value is live, cache for 5s at a time, then fetch again
-                    try {
-                        $xtream = XtreamService::make(xtream_config: $this->xtream_config);
-                        if ($xtream) {
-                            $results = Cache::remember(
-                                $key,
-                                5, // cache for 5 seconds
-                                function () use ($xtream) {
-                                    $userInfo = $xtream->userInfo(timeout: 3);
-
-                                    return $userInfo ?: [];
-                                }
-                            );
-                        }
-                    } catch (\Exception $e) {
-                        Log::error('Failed to fetch metadata for Xtream playlist '.$this->id, ['exception' => $e]);
-                    }
+                $key = "p:{$attributes['id']}:xtream_status";
+                $cached = Cache::get($key);
+                if ($cached !== null) {
+                    return $cached;
                 }
 
-                return is_string($results)
-                    ? json_decode($results, true)
-                    : $results;
+                // Dispatch job to update in background if not cached/cache expired
+                UpdateXtreamStats::dispatch($this);
+
+                // Return stored value from database
+                $results = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+
+                return $results;
             }
         );
     }

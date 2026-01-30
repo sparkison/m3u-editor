@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
-use App\Services\XtreamService;
+use App\Jobs\UpdateXtreamStats;
 use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class PlaylistAlias extends Model
 {
@@ -345,34 +344,21 @@ class PlaylistAlias extends Model
     {
         return Attribute::make(
             get: function ($value, $attributes) {
-                $key = "playlist_alias:{$attributes['id']}:xtream_status";
-
-                $primaryConfig = $this->getPrimaryXtreamConfig();
-                if (! $primaryConfig) {
-                    return [];
+                $key = "a:{$attributes['id']}:xtream_status";
+                $cached = Cache::get($key);
+                if ($cached !== null) {
+                    return $cached;
                 }
 
-                try {
-                    $xtream = XtreamService::make(xtream_config: $primaryConfig);
-                    if ($xtream) {
-                        return Cache::remember(
-                            $key,
-                            5, // cache for 5 seconds
-                            function () use ($xtream) {
-                                $userInfo = $xtream->userInfo(timeout: 3);
+                // Dispatch job to update in background if not cached/cache expired
+                UpdateXtreamStats::dispatch($this);
 
-                                return $userInfo ?: [];
-                            }
-                        );
-                    }
-                } catch (\Exception $e) {
-                    Log::error(
-                        'Failed to fetch metadata for Xtream playlist alias '.$this->id,
-                        ['exception' => $e]
-                    );
-                }
+                // Return stored value from database
+                $results = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
 
-                return [];
+                return $results;
             }
         );
     }

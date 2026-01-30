@@ -80,6 +80,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
@@ -125,9 +126,15 @@ class PlaylistResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('enabled_live_channels')
-                    ->withCount('enabled_vod_channels')
-                    ->withCount('enabled_series');
+                $query->withCount([
+                    'enabled_live_channels',
+                    'enabled_vod_channels',
+                    'enabled_series',
+                    'groups',
+                    'live_channels',
+                    'vod_channels',
+                    'series',
+                ]);
             })
             ->deferLoading()
             ->columns([
@@ -200,7 +207,16 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn (Playlist $record): string => 'Active: '.M3uProxyService::getPlaylistActiveStreamsCount($record))
+                    ->description(function (Playlist $record): string {
+                        // Cache active streams count for 5 seconds to reduce load
+                        $count = Cache::remember(
+                            "active_streams_{$record->id}",
+                            5,
+                            fn () => M3uProxyService::getPlaylistActiveStreamsCount($record)
+                        );
+
+                        return "Active: {$count}";
+                    })
                     ->sortable(),
                 TextColumn::make('groups_count')
                     ->label('Groups')
@@ -1610,7 +1626,7 @@ class PlaylistResource extends Resource
             Section::make('Playlist Processing')
                 ->description('Processing settings for the playlist')
                 ->columnSpanFull()
-                ->columns(2)
+                ->columns(3)
                 ->schema([
                     Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -1624,7 +1640,12 @@ class PlaylistResource extends Resource
                         ->columnSpan(1)
                         ->inline(true)
                         ->default(false)
-                        ->helperText('When enabled, newly added channels will be enabled by default.'),
+                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
+                    Toggle::make('enable_series')
+                        ->label('Enable new series')
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
                     Toggle::make('import_prefs.use_regex')
                         ->label('Use regex for filtering')
                         ->columnSpan(2)
@@ -1669,6 +1690,9 @@ class PlaylistResource extends Resource
                                 ->getOptionLabelFromRecordUsing(fn ($record) => $record->name)
                                 ->getOptionLabelsUsing(function (array $values, $record): array {
                                     // Values are IDs, return id => name pairs
+                                    // Need to filter out strings (names) that may exist from previous storage format
+                                    $values = array_filter($values, fn ($value) => is_numeric($value));
+
                                     return SourceGroup::where('playlist_id', $record?->id)
                                         ->where('type', 'live')
                                         ->whereIn('id', $values)
@@ -1755,6 +1779,9 @@ class PlaylistResource extends Resource
                                 ->getOptionLabelFromRecordUsing(fn ($record) => $record->name)
                                 ->getOptionLabelsUsing(function (array $values, $record): array {
                                     // Values are IDs, return id => name pairs
+                                    // Need to filter out strings (names) that may exist from previous storage format
+                                    $values = array_filter($values, fn ($value) => is_numeric($value));
+
                                     return SourceGroup::where('playlist_id', $record?->id)
                                         ->where('type', 'vod')
                                         ->whereIn('id', $values)
@@ -1840,6 +1867,9 @@ class PlaylistResource extends Resource
                                 ->getOptionLabelFromRecordUsing(fn ($record) => $record->name)
                                 ->getOptionLabelsUsing(function (array $values, $record): array {
                                     // Values are IDs, return id => name pairs
+                                    // Need to filter out strings (names) that may exist from previous storage format
+                                    $values = array_filter($values, fn ($value) => is_numeric($value));
+
                                     return SourceCategory::where('playlist_id', $record?->id)
                                         ->whereIn('id', $values)
                                         ->pluck('name', 'id')  // id => name

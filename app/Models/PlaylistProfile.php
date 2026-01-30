@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use App\Services\XtreamService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class PlaylistProfile extends Model
 {
@@ -83,59 +81,27 @@ class PlaylistProfile extends Model
 
     /**
      * Get provider info with caching.
-     * Fetches user info from the Xtream API and caches it.
+     * PERFORMANCE FIX: Only returns stored/cached data, never makes HTTP calls during page render.
+     * Use ProfileService::refreshProfile() or background jobs to update provider info.
      */
     public function providerInfo(): Attribute
     {
         return Attribute::make(
             get: function ($value, $attributes) {
                 $cacheKey = "playlist_profile:{$attributes['id']}:provider_info";
-                $result = null;
 
                 // Try to get from cache first
                 $cached = Cache::get($cacheKey);
                 if ($cached !== null) {
-                    $result = $cached;
-                } elseif ($value && isset($attributes['provider_info_updated_at'])) {
-                    // If we have a recent value in the database, use that
-                    $updatedAt = \Carbon\Carbon::parse($attributes['provider_info_updated_at']);
-                    if ($updatedAt->diffInMinutes(now()) < 5) {
-                        $decoded = is_string($value) ? json_decode($value, true) : $value;
-                        Cache::put($cacheKey, $decoded, 60);
-                        $result = $decoded;
-                    }
+                    return $cached;
                 }
 
-                if ($result === null) {
-                    // Fetch fresh data from the provider
-                    try {
-                        $xtreamConfig = $this->xtream_config;
-                        if ($xtreamConfig) {
-                            $xtream = XtreamService::make(xtream_config: $xtreamConfig);
-                            if ($xtream) {
-                                $userInfo = $xtream->userInfo(timeout: 3);
-                                if ($userInfo) {
-                                    // Update the database
-                                    $this->updateQuietly([
-                                        'provider_info' => $userInfo,
-                                        'provider_info_updated_at' => now(),
-                                    ]);
+                // Return stored value from database (never fetch live during page render)
+                $result = is_string($value) ? json_decode($value, true) : ($value ?? []);
 
-                                    Cache::put($cacheKey, $userInfo, 60);
-                                    $result = $userInfo;
-                                }
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        Log::warning("Failed to fetch provider info for profile {$attributes['id']}", [
-                            'exception' => $e->getMessage(),
-                        ]);
-                    }
-                }
-
-                // Return stored value or empty array if no result
-                if ($result === null) {
-                    $result = is_string($value) ? json_decode($value, true) : ($value ?? []);
+                // Cache the database value for 60 seconds
+                if ($result) {
+                    Cache::put($cacheKey, $result, 60);
                 }
 
                 return $result;

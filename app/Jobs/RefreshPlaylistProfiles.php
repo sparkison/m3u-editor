@@ -101,8 +101,10 @@ class RefreshPlaylistProfiles implements ShouldQueue
         foreach ($profiles as $profile) {
             $this->refreshProfile($profile);
 
-            // Add a small delay between API calls to avoid rate limiting
-            usleep(500000); // 500ms
+            // Add a delay between API calls to avoid overwhelming the provider
+            // Random delay between 3-5 seconds to prevent burst patterns
+            $delayMicroseconds = rand(3000000, 5000000); // 3-5 seconds
+            usleep($delayMicroseconds);
         }
     }
 

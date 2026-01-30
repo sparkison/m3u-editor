@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Playlist;
+use App\Models\PlaylistProfile;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
+use App\Services\ProfileService;
 use App\Settings\GeneralSettings;
 use Exception;
 use Illuminate\Http\Request;
@@ -276,18 +278,25 @@ class M3uProxyApiController extends Controller
 
     /**
      * Handle webhooks from m3u-proxy for real-time cache invalidation
+     * and provider profile connection tracking
      */
     public function handleWebhook(Request $request)
     {
         $eventType = $request->input('event_type');
         $streamId = $request->input('stream_id');
         $data = $request->input('data', []);
+        $metadata = $data['metadata'] ?? [];
 
         Log::info('Received m3u-proxy webhook', [
             'event_type' => $eventType,
             'stream_id' => $streamId,
             'data' => $data,
         ]);
+
+        // Handle profile connection tracking if provider_profile_id is present
+        if (isset($metadata['provider_profile_id'])) {
+            $this->handleProfileConnectionTracking($eventType, $streamId, $metadata);
+        }
 
         // Invalidate caches based on event type
         switch ($eventType) {
@@ -316,5 +325,51 @@ class M3uProxyApiController extends Controller
         }
 
         Log::info('Cache invalidated for m3u-proxy event', $data);
+    }
+
+    /**
+     * Handle provider profile connection tracking based on webhook events
+     */
+    protected function handleProfileConnectionTracking(string $eventType, string $streamId, array $metadata): void
+    {
+        $profileId = $metadata['provider_profile_id'] ?? null;
+
+        if (! $profileId) {
+            return;
+        }
+
+        try {
+            $profile = PlaylistProfile::find($profileId);
+
+            if (! $profile) {
+                Log::warning('Profile not found for connection tracking', [
+                    'profile_id' => $profileId,
+                    'stream_id' => $streamId,
+                    'event_type' => $eventType,
+                ]);
+
+                return;
+            }
+
+            // Only decrement on stream_stopped events
+            // This ensures we decrement exactly once per stream, avoiding race conditions
+            if ($eventType === 'stream_stopped') {
+                ProfileService::decrementConnections($profile, $streamId);
+
+                Log::debug('Decremented profile connections via webhook', [
+                    'profile_id' => $profileId,
+                    'stream_id' => $streamId,
+                    'event_type' => $eventType,
+                    'new_count' => ProfileService::getConnectionCount($profile),
+                ]);
+            }
+        } catch (Exception $e) {
+            Log::error('Error handling profile connection tracking', [
+                'profile_id' => $profileId,
+                'stream_id' => $streamId,
+                'event_type' => $eventType,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 }

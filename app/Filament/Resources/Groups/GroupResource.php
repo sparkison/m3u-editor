@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources\Groups;
 
+use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\Pages\ListGroups;
 use App\Filament\Resources\Groups\Pages\ViewGroup;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
 use App\Filament\Resources\Playlists\PlaylistResource;
+use App\Jobs\MergeChannels;
+use App\Jobs\UnmergeChannels;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
@@ -16,8 +19,10 @@ use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -249,10 +254,7 @@ class GroupResource extends Resource
                         ])
                         ->action(function (Group $record, array $data): void {
                             $start = (int) $data['start'];
-                            $channels = $record->channels()->orderBy('sort')->cursor();
-                            foreach ($channels as $channel) {
-                                $channel->update(['channel' => $start++]);
-                            }
+                            SortFacade::bulkRecountGroupChannels($record, $start);
                         })
                         ->after(function () {
                             Notification::make()
@@ -263,19 +265,34 @@ class GroupResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->modalIcon('heroicon-o-hashtag')
-                        ->modalDescription('Recount all channels in this group sequentially?'),
+                        ->modalDescription('Recount all channels in this group sequentially? Channel numbers will be assigned based on the current sort order.'),
                     Action::make('sort_alpha')
                         ->label('Sort Alpha')
                         ->icon('heroicon-o-bars-arrow-down')
-                        ->action(function (Group $record): void {
-                            // Sort by title_custom (if present) then title, matching the UI column sort
-                            $channels = $record->channels()
-                                ->orderByRaw('COALESCE(title_custom, title) ASC')
-                                ->cursor();
-                            $sort = 1;
-                            foreach ($channels as $channel) {
-                                $channel->update(['sort' => $sort++]);
-                            }
+                        ->schema([
+                            Select::make('column')
+                                ->label('Sort By')
+                                ->options([
+                                    'title' => 'Title (or override if set)',
+                                    'name' => 'Name (or override if set)',
+                                    'stream_id' => 'ID (or override if set)',
+                                    'channel' => 'Channel No.',
+                                ])
+                                ->default('title')
+                                ->required(),
+                            Select::make('sort')
+                                ->label('Sort Order')
+                                ->options([
+                                    'ASC' => 'A to Z or 0 to 9',
+                                    'DESC' => 'Z to A or 9 to 0',
+                                ])
+                                ->default('ASC')
+                                ->required(),
+                        ])
+                        ->action(function (Group $record, array $data): void {
+                            $order = $data['sort'] ?? 'ASC';
+                            $column = $data['column'] ?? 'title';
+                            SortFacade::bulkSortGroupChannels($record, $order, $column);
                         })
                         ->after(function () {
                             Notification::make()
@@ -287,6 +304,95 @@ class GroupResource extends Resource
                         ->requiresConfirmation()
                         ->modalIcon('heroicon-o-bars-arrow-down')
                         ->modalDescription('Sort all channels in this group alphabetically? This will update the sort order.'),
+
+                    Action::make('merge')
+                        ->label('Merge Same ID')
+                        ->schema([
+                            Select::make('playlist_id')
+                                ->required()
+                                ->label('Preferred Playlist')
+                                ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                                ->live()
+                                ->searchable()
+                                ->helperText('Select a playlist to prioritize as the master during the merge process.'),
+                            Repeater::make('failover_playlists')
+                                ->label('')
+                                ->helperText('Select one or more playlists use as failover source(s).')
+                                ->reorderable()
+                                ->reorderableWithButtons()
+                                ->orderColumn('sort')
+                                ->simple(
+                                    Select::make('playlist_failover_id')
+                                        ->label('Failover Playlists')
+                                        ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                                        ->searchable()
+                                        ->required()
+                                )
+                                ->distinct()
+                                ->columns(1)
+                                ->addActionLabel('Add failover playlist')
+                                ->columnSpanFull()
+                                ->minItems(1)
+                                ->defaultItems(1),
+                            Toggle::make('by_resolution')
+                                ->label('Order by Resolution')
+                                ->live()
+                                ->helperText('⚠️ IPTV WARNING: This will analyze each stream to determine resolution, which may cause rate limiting or blocking with IPTV providers. Only enable if your provider allows stream analysis.')
+                                ->default(false),
+                            Toggle::make('deactivate_failover_channels')
+                                ->label('Deactivate Failover Channels')
+                                ->helperText('When enabled, channels that become failovers will be automatically disabled.')
+                                ->default(false),
+                            Toggle::make('prefer_catchup_as_primary')
+                                ->label('Prefer catch-up channels as primary')
+                                ->helperText('When enabled, catch-up channels will be selected as the master when available.')
+                                ->default(false),
+                        ])
+                        ->action(function (Group $record, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new MergeChannels(
+                                    user: auth()->user(),
+                                    playlists: collect($data['failover_playlists']),
+                                    playlistId: $data['playlist_id'],
+                                    checkResolution: $data['by_resolution'] ?? false,
+                                    deactivateFailoverChannels: $data['deactivate_failover_channels'] ?? false,
+                                    preferCatchupAsPrimary: $data['prefer_catchup_as_primary'] ?? false,
+                                    groupId: $record->id,
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channel merge started')
+                                ->body('Merging channels in the background for this group only. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-pointing-in')
+                        ->modalIcon('heroicon-o-arrows-pointing-in')
+                        ->modalDescription('Merge all channels with the same ID in this group into a single channel with failover.')
+                        ->modalSubmitActionLabel('Merge now'),
+
+                    Action::make('unmerge')
+                        ->label('Unmerge Same ID')
+                        ->action(function (Group $record, $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new UnmergeChannels(
+                                    user: auth()->user(),
+                                    groupId: $record->id,
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channel unmerge started')
+                                ->body('Unmerging channels for this group in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-pointing-out')
+                        ->color('warning')
+                        ->modalIcon('heroicon-o-arrows-pointing-out')
+                        ->modalDescription('Unmerge all channels with the same ID in this group, removing all failover relationships.')
+                        ->modalSubmitActionLabel('Unmerge now'),
 
                     Action::make('enable')
                         ->label('Enable group channels')

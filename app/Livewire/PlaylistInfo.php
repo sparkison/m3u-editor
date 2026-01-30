@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Facades\PlaylistFacade;
+use App\Jobs\RefreshPlaylistProfiles;
 use App\Models\Playlist;
 use App\Services\M3uProxyService;
 use App\Services\ProfileService;
@@ -15,6 +16,18 @@ class PlaylistInfo extends Component
     public Model $record;
 
     public bool $isVisible = true;
+
+    /**
+     * Mount the component and dispatch background refresh for provider info.
+     * PERFORMANCE FIX: Refresh provider info asynchronously to avoid blocking page load.
+     */
+    public function mount(): void
+    {
+        // Dispatch background job to refresh provider info if profiles are enabled
+        if ($this->record instanceof Playlist && $this->record->profiles_enabled) {
+            RefreshPlaylistProfiles::dispatch($this->record->id);
+        }
+    }
 
     public function render()
     {
@@ -47,8 +60,17 @@ class PlaylistInfo extends Component
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
-            $availableStreams = $playlist->available_streams ?? 0;
+            // If profiles are enabled, use combined capacity from all profiles
+            if ($playlist->profiles_enabled) {
+                $poolStatus = ProfileService::getPoolStatus($playlist);
+                $activeStreams = $poolStatus['total_active'];
+                $availableStreams = $poolStatus['total_capacity'];
+            } else {
+                // Use m3u-proxy active streams count and playlist-level limit
+                $activeStreams = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
+                $availableStreams = $playlist->available_streams ?? 0;
+            }
+
             if ($availableStreams === 0) {
                 $availableStreams = '∞';
             }

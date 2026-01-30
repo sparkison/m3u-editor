@@ -1424,6 +1424,7 @@ class XtreamApiController extends Controller
             $streamId = $request->input('stream_id');
             $limit = $request->input('limit');
             $limit = (int) ($limit ?? 4);
+            $proxyEnabled = $playlist->enable_proxy;
 
             if (! $streamId) {
                 return response()->json(['error' => 'stream_id parameter is required for get_short_epg action'], 400);
@@ -1468,8 +1469,7 @@ class XtreamApiController extends Controller
             }
 
             // Check if channel is currently playing
-            $isNowPlaying = M3uProxyService::isChannelActive($channel);
-            $isNowPlaying = false;
+            $isNowPlaying = $proxyEnabled ? M3uProxyService::isChannelActive($channel) : false;
 
             // Filter programmes to current time and future, then limit
             $now = Carbon::now();
@@ -1489,7 +1489,7 @@ class XtreamApiController extends Controller
                     $isCurrentProgramme = $startTime->lte($now) && $endTime->gt($now);
 
                     $epgListings[] = [
-                        'id' => $programme['id'] ?? $count,
+                        'id' => (string) ($programme['id'] ?? $count),
                         'epg_id' => (string) $epg->id,
                         'title' => $programme['title'] ?? '',
                         'lang' => $programme['lang'] ?? 'en',
@@ -1500,7 +1500,7 @@ class XtreamApiController extends Controller
                         'start_timestamp' => (string) $startTime->timestamp,
                         'stop_timestamp' => (string) $endTime->timestamp,
                         'now_playing' => ($isCurrentProgramme && $isNowPlaying) ? 1 : 0,
-                        'has_archive' => $channel->catchup ? 1 : 0,
+                        'has_archive' => ($channel->catchup && $endTime->lt($now)) ? 1 : 0,
                     ];
                     $count++;
                 }
@@ -1509,6 +1509,7 @@ class XtreamApiController extends Controller
             return response()->json(['epg_listings' => $epgListings]);
         } elseif ($action === 'get_simple_data_table') {
             $streamId = $request->input('stream_id');
+            $proxyEnabled = $playlist->enable_proxy;
 
             if (! $streamId) {
                 return response()->json(['error' => 'stream_id parameter is required for get_simple_data_table action'], 400);
@@ -1537,24 +1538,33 @@ class XtreamApiController extends Controller
                 return response()->json(['epg_listings' => []]);
             }
 
-            // Get programmes for today
-            $today = Carbon::now()->format('Y-m-d');
-            $programmes = $cacheService->getCachedProgrammes($epg, $today, [$channel->epgChannel->channel_id]);
+            // Get programmes for several days to ensure we have enough data
+            // Start from 4 days ago to cover past programmes as well
+            // We fetch 8 days total (4 past, today, 3 future)
+            $daysToFetch = 8;
+            $allProgrammes = [];
+            $threeDaysAgo = Carbon::now()->subDays(value: 4);
+            foreach (range(0, $daysToFetch - 1) as $dayOffset) {
+                $date = $threeDaysAgo->clone()->addDays($dayOffset)->format('Y-m-d');
+                $programmes = $cacheService->getCachedProgrammes($epg, $date, [$channel->epgChannel->channel_id]);
+                if (isset($programmes[$channel->epgChannel->channel_id])) {
+                    $allProgrammes = array_merge($allProgrammes, $programmes[$channel->epgChannel->channel_id]);
+                }
+            }
 
             $epgListings = [];
-            if (isset($programmes[$channel->epgChannel->channel_id])) {
+            if (! empty($allProgrammes)) {
                 // Check if channel is currently playing
-                $isNowPlaying = M3uProxyService::isChannelActive($channel);
-                $isNowPlaying = false;
+                $isNowPlaying = $proxyEnabled ? M3uProxyService::isChannelActive($channel) : false;
 
                 $now = Carbon::now();
-                foreach ($programmes[$channel->epgChannel->channel_id] as $index => $programme) {
+                foreach ($allProgrammes as $index => $programme) {
                     $startTime = Carbon::parse($programme['start']);
                     $endTime = Carbon::parse($programme['stop']);
                     $isCurrentProgramme = $startTime->lte($now) && $endTime->gt($now);
 
                     $epgListings[] = [
-                        'id' => $programme['id'] ?? $index,
+                        'id' => (string) ($programme['id'] ?? $index),
                         'epg_id' => (string) $epg->id,
                         'title' => base64_encode($programme['title'] ?? ''),
                         'description' => base64_encode($programme['desc'] ?? ''),
@@ -1565,7 +1575,7 @@ class XtreamApiController extends Controller
                         'start_timestamp' => (string) $startTime->timestamp,
                         'stop_timestamp' => (string) $endTime->timestamp,
                         'now_playing' => ($isCurrentProgramme && $isNowPlaying) ? 1 : 0,
-                        'has_archive' => $channel->catchup ? 1 : 0,
+                        'has_archive' => ($channel->catchup && $endTime->lt($now)) ? 1 : 0,
                     ];
                 }
             }

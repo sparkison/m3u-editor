@@ -28,6 +28,7 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class PlaylistAliasResource extends Resource
@@ -113,7 +114,16 @@ class PlaylistAliasResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn (PlaylistAlias $record): string => 'Active: '.M3uProxyService::getPlaylistActiveStreamsCount($record)),
+                    ->description(function (PlaylistAlias $record): string {
+                        // Cache active streams count for 5 seconds to reduce load
+                        $count = Cache::remember(
+                            "alias_active_streams_{$record->id}",
+                            5,
+                            fn () => M3uProxyService::getPlaylistActiveStreamsCount($record)
+                        );
+
+                        return "Active: {$count}";
+                    }),
                 Tables\Columns\TextColumn::make('live_count')
                     ->label('Live')
                     ->description(fn (PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels()->count()}")

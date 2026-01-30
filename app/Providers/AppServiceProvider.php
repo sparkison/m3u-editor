@@ -26,6 +26,7 @@ use App\Services\EpgCacheService;
 use App\Services\GitInfoService;
 use App\Services\PlaylistService;
 use App\Services\ProxyService;
+use App\Services\SortService;
 use App\Settings\GeneralSettings;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -149,7 +150,7 @@ class AppServiceProvider extends ServiceProvider
      * Configure a sensible base URL for console/CLI contexts where there is
      * no incoming HTTP request. This ensures that route() and url() include
      * the correct host and port when generating absolute URLs (e.g. for
-     * Schedules Direct artwork proxies written into EPG files).
+     * SchedulesDirect artwork proxies written into EPG files).
      */
     private function configureConsoleBaseUrl(): void
     {
@@ -636,6 +637,11 @@ class AppServiceProvider extends ServiceProvider
         // Register the playlist url service
         $this->app->singleton('playlist', function () {
             return new PlaylistService;
+        });
+
+        // Register the sort service
+        $this->app->singleton('sort', function () {
+            return new SortService;
         });
     }
 
