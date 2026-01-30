@@ -38,4 +38,66 @@ class MergeChannelsTest extends TestCase
         // channel1 and channel2 have same stream_id, so there should be 1 failover entry
         $this->assertDatabaseCount('channel_failovers', 1);
     }
+
+    /** @test */
+    public function promoted_master_is_enabled_and_old_master_is_deactivated_when_failovers_are_deactivated()
+    {
+        $user = User::factory()->create();
+        $playlist1 = Playlist::factory()->for($user)->create();
+        $playlist2 = Playlist::factory()->for($user)->create();
+
+        // Create channels with same stream id
+        $oldMaster = Channel::factory()->create([
+            'stream_id' => 'streamX',
+            'user_id' => $user->id,
+            'playlist_id' => $playlist1->id,
+            'enabled' => true,
+        ]);
+
+        $newMaster = Channel::factory()->create([
+            'stream_id' => 'streamX',
+            'user_id' => $user->id,
+            'playlist_id' => $playlist2->id,
+            'enabled' => false,
+        ]);
+
+        $failover = Channel::factory()->create([
+            'stream_id' => 'streamX',
+            'user_id' => $user->id,
+            'playlist_id' => $playlist1->id,
+            'enabled' => true,
+        ]);
+
+        // Existing failover relationship (old master had a failover)
+        \App\Models\ChannelFailover::create([
+            'user_id' => $user->id,
+            'channel_id' => $oldMaster->id,
+            'channel_failover_id' => $failover->id,
+        ]);
+
+        $playlists = collect([
+            ['playlist_failover_id' => $playlist1->id],
+            ['playlist_failover_id' => $playlist2->id],
+        ]);
+
+        // Run job preferring playlist2 as primary and deactivating failovers
+        MergeChannels::dispatchSync($user, $playlists, $playlist2->id, false, true);
+
+        // Reload models from DB
+        $oldMaster->refresh();
+        $newMaster->refresh();
+        $failover->refresh();
+
+        $this->assertTrue($newMaster->enabled, 'Promoted master should be enabled');
+        $this->assertFalse($oldMaster->enabled, 'Old master should be deactivated as a failover');
+        // Ensure failover relationships exist for the new master
+        $this->assertDatabaseHas('channel_failovers', [
+            'channel_id' => $newMaster->id,
+            'channel_failover_id' => $oldMaster->id,
+        ]);
+        $this->assertDatabaseHas('channel_failovers', [
+            'channel_id' => $newMaster->id,
+            'channel_failover_id' => $failover->id,
+        ]);
+    }
 }

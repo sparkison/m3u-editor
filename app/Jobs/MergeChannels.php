@@ -100,6 +100,11 @@ class MergeChannels implements ShouldQueue
                 continue; // Skip if no valid master found
             }
 
+            // Ensure master is enabled in case it was previously disabled
+            if (! $master->enabled) {
+                $master->update(['enabled' => true]);
+            }
+
             // Create failover relationships for remaining channels
             $failoverChannels = $group->where('id', '!=', $master->id);
             if ($this->checkResolution) {
