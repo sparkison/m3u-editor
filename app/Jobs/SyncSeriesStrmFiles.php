@@ -483,6 +483,13 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     }
                 }
 
+                // Add category suffix to filename if enabled
+                if (in_array('category', $filenameMetadata)) {
+                    $catSuffix = $category?->name ?? $category?->name_internal ?? 'Uncategorized';
+                    $catSuffix = $applyNameFilter($catSuffix);
+                    $fileName .= " - {$catSuffix}";
+                }
+
                 // Clean the filename
                 $fileName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($fileName, $replaceChar)

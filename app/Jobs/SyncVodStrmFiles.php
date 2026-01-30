@@ -242,6 +242,13 @@ class SyncVodStrmFiles implements ShouldQueue
                     }
                 }
 
+                // Add group suffix to filename if enabled
+                if (in_array('group', $filenameMetadata)) {
+                    $groupSuffix = $channel->group ?? $groupModel?->name ?? $groupModel?->name_internal ?? 'Uncategorized';
+                    $groupSuffix = $applyNameFilter($groupSuffix);
+                    $fileName .= " - {$groupSuffix}";
+                }
+
                 // Clean the filename
                 $fileName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($fileName, $replaceChar)

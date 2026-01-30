@@ -149,6 +149,12 @@ class StreamFileSettingResource extends Resource
                                 }
                             }
 
+                            if (in_array('group', $filenameMetadata)) {
+                                $groupName = $vod->group->name ?? $vod->group ?? 'Uncategorized';
+                                $groupName = PlaylistService::makeFilesystemSafe($groupName, $replaceChar);
+                                $filename .= " - {$groupName}";
+                            }
+
                             $preview .= '/'.$filename.'.strm';
 
                             return $preview;
@@ -188,6 +194,12 @@ class StreamFileSettingResource extends Resource
                             $filename .= " {$bracket[0]}tmdb-{$series->info->tmdb_id}{$bracket[1]}";
                         }
 
+                        if (in_array('category', $filenameMetadata)) {
+                            $catName = $series->category ?? 'Uncategorized';
+                            $catName = PlaylistService::makeFilesystemSafe($catName, $replaceChar);
+                            $filename .= " - {$catName}";
+                        }
+
                         $preview .= '/'.$filename.'.strm';
 
                         return $preview;
@@ -219,10 +231,18 @@ class StreamFileSettingResource extends Resource
                             ->inline()
                             ->multiple()
                             ->columnSpanFull()
-                            ->options([
-                                'year' => 'Year',
-                                'tmdb_id' => 'TMDB ID',
-                            ]),
+                            ->options(fn ($get) => $get('type') === 'series'
+                                ? [
+                                    'year' => 'Year',
+                                    'tmdb_id' => 'TMDB ID',
+                                    'category' => 'Category',
+                                ]
+                                : [
+                                    'year' => 'Year',
+                                    'tmdb_id' => 'TMDB ID',
+                                    'group' => 'Group',
+                                ]
+                            ),
                         ToggleButtons::make('tmdb_id_format')
                             ->label('TMDB ID format')
                             ->inline()
