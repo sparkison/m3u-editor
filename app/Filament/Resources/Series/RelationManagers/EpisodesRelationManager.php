@@ -14,6 +14,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -41,17 +42,11 @@ class EpisodesRelationManager extends RelationManager
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['season', 'series', 'playlist']);
             })
-            ->recordAction(null)
             ->defaultGroup('season')
             ->defaultSort('episode_num', 'asc')
-            ->contentGrid([
-                'md' => 2,
-                'lg' => 3,
-                'xl' => 4,
-            ])
             ->recordUrl(null) // Disable default record URL behavior
-            ->paginated([12, 24, 48, 100])
-            ->defaultPaginationPageOption(12)
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 ImageColumn::make('info.movie_image')
                     ->label('Cover')
@@ -73,8 +68,7 @@ class EpisodesRelationManager extends RelationManager
 
                 TextColumn::make('info.plot')
                     ->label('Plot')
-                    ->limit(100)
-                    ->wrap()
+                    ->limit(50)
                     ->tooltip(fn ($record) => $record->plot ?? $record->info['plot'] ?? null)
                     ->getStateUsing(function ($record) {
                         // Check the dedicated plot column first, then fall back to info.plot
@@ -106,7 +100,6 @@ class EpisodesRelationManager extends RelationManager
                 TextColumn::make('info.duration')
                     ->label('Duration')
                     ->badge()
-                    ->size('sm')
                     ->color('primary')
                     ->icon('heroicon-m-clock')
                     ->getStateUsing(function ($record) {
@@ -118,7 +111,6 @@ class EpisodesRelationManager extends RelationManager
                 TextColumn::make('info.rating')
                     ->label('Rating')
                     ->badge()
-                    ->size('sm')
                     ->color('success')
                     ->icon('heroicon-m-star')
                     ->getStateUsing(function ($record) {
@@ -130,7 +122,6 @@ class EpisodesRelationManager extends RelationManager
                 TextColumn::make('info.release_date')
                     ->label('Release Date')
                     ->date()
-                    ->size('sm')
                     ->color('gray')
                     ->prefix('Released: ')
                     ->getStateUsing(function ($record) {
@@ -154,16 +145,14 @@ class EpisodesRelationManager extends RelationManager
                     })
                     ->icon('heroicon-s-play-circle')
                     ->button()
-                    ->hiddenLabel()
-                    ->size('sm'),
+                    ->hiddenLabel(),
                 ViewAction::make()
                     ->slideOver()
                     ->hiddenLabel()
                     ->icon('heroicon-m-information-circle')
                     ->button()
-                    ->size('xs')
                     ->tooltip('Episode Details'),
-            ])
+            ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 // @TODO - add download? Would need to generate streamlink files and compress then download...
 
