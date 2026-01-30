@@ -81,6 +81,13 @@ class PlaylistService
         }
 
         // Get the base URLs
+        // Build a path-based auth suffix for HDHR when auth is present. We keep query auth for
+        // other endpoints (M3U/EPG) to retain backwards compatibility.
+        $hdhrAuthPath = '';
+        if ($playlistAuth) {
+            $hdhrAuthPath = '/'.rawurlencode($playlistAuth->username).'/'.rawurlencode($playlistAuth->password);
+        }
+
         if ($playlist->short_urls_enabled) {
             $shortUrls = collect($playlist->short_urls)->keyBy('type');
 
@@ -90,7 +97,9 @@ class PlaylistService
             $epgZipData = $shortUrls->get('epg_zip');
 
             $m3uUrl = $m3uData ? url('/s/'.$m3uData['key']) : null;
-            $hdhrUrl = $hdhrData ? url('/s/'.$hdhrData['key']) : null;
+            // For HDHR short URLs we append the auth path (if present). The short URL forwarding
+            // will preserve the extra path so the final redirect becomes /{uuid}/hdhr/{user}/{pass}
+            $hdhrUrl = $hdhrData ? url('/s/'.$hdhrData['key'].$hdhrAuthPath) : null;
             $epgUrl = $epgData ? url('/s/'.$epgData['key']) : null;
 
             // Since zipped url was added later, it might not be present in the short urls
@@ -100,19 +109,25 @@ class PlaylistService
                 : route('epg.generate.compressed', ['uuid' => $playlist->uuid]);
         } else {
             $m3uUrl = route('playlist.generate', ['uuid' => $playlist->uuid]);
-            $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
             $epgUrl = route('epg.generate', ['uuid' => $playlist->uuid]);
             $epgZipUrl = route('epg.generate.compressed', ['uuid' => $playlist->uuid]);
+            if ($hdhrAuthPath) {
+                $hdhrUrl = route('playlist.hdhr.overview.auth', [
+                    'uuid' => $playlist->uuid,
+                    'username' => $playlistAuth->username,
+                    'password' => $playlistAuth->password,
+                ]);
+            } else {
+                $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
+            }
         }
 
-        // If auth set, append auth parameters to the URLs
+        // If auth set, append auth query parameters to URLs that expect query auth (M3U, EPG)
         if ($auth) {
             if ($m3uUrl) {
                 $m3uUrl .= $auth;
             }
-            if ($hdhrUrl) {
-                $hdhrUrl .= $auth;
-            }
+            // Do NOT append query auth to HDHR because many HDHR clients ignore query strings.
         }
 
         // Return the results

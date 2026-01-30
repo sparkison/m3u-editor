@@ -320,7 +320,7 @@ class PlaylistGenerateController extends Controller
         );
     }
 
-    public function hdhr(Request $request, string $uuid)
+    public function hdhr(Request $request, string $uuid, ?string $username = null, ?string $password = null)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -328,8 +328,8 @@ class PlaylistGenerateController extends Controller
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
-        // Setup the HDHR device info
-        $deviceInfo = $this->getDeviceInfo($request, $playlist);
+        // Setup the HDHR device info (pass through optional path auth)
+        $deviceInfo = $this->getDeviceInfo($request, $playlist, $username, $password);
         // Ensure XML special characters are escaped (e.g., '&' -> '&amp;') to avoid parser errors
         $deviceInfoXml = collect($deviceInfo)->map(function ($value, $key) {
             if (is_array($value)) {
@@ -345,7 +345,7 @@ class PlaylistGenerateController extends Controller
         return response($xmlResponse)->header('Content-Type', 'application/xml');
     }
 
-    public function hdhrOverview(Request $request, string $uuid)
+    public function hdhrOverview(Request $request, string $uuid, ?string $username = null, ?string $password = null)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -353,7 +353,10 @@ class PlaylistGenerateController extends Controller
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
-        // Check auth
+        // Check auth (prefer path-based auth if present)
+        $providedUsername = $username ?? $request->get('username');
+        $providedPassword = $password ?? $request->get('password');
+
         if ($playlist instanceof PlaylistAlias) {
             $auth = $playlist->authObject;
             if ($auth) {
@@ -372,8 +375,8 @@ class PlaylistGenerateController extends Controller
                 $authPassword = $auth->password;
 
                 if (
-                    $request->get('username') === $authUsername &&
-                    $request->get('password') === $authPassword
+                    $providedUsername === $authUsername &&
+                    $providedPassword === $authPassword
                 ) {
                     $authenticated = true;
                     $usedAuth = $auth;
@@ -391,7 +394,7 @@ class PlaylistGenerateController extends Controller
         ]);
     }
 
-    public function hdhrDiscover(Request $request, string $uuid)
+    public function hdhrDiscover(Request $request, string $uuid, ?string $username = null, ?string $password = null)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -399,11 +402,11 @@ class PlaylistGenerateController extends Controller
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
-        // Return the HDHR device info
-        return $this->getDeviceInfo($request, $playlist);
+        // Return the HDHR device info (pass through optional path auth)
+        return $this->getDeviceInfo($request, $playlist, $username, $password);
     }
 
-    public function hdhrLineup(Request $request, string $uuid)
+    public function hdhrLineup(Request $request, string $uuid, ?string $username = null, ?string $password = null)
     {
         // Fetch the playlist
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
@@ -414,7 +417,10 @@ class PlaylistGenerateController extends Controller
         // Build the channel query
         $channels = self::getChannelQuery($playlist);
 
-        // Check auth
+        // Check auth (prefer path-based auth if present)
+        $providedUsername = $username ?? $request->get('username');
+        $providedPassword = $password ?? $request->get('password');
+
         $usedAuth = null;
         if ($playlist instanceof PlaylistAlias) {
             $auth = $playlist->authObject;
@@ -434,8 +440,8 @@ class PlaylistGenerateController extends Controller
                 $authPassword = $auth->password;
 
                 if (
-                    $request->get('username') === $authUsername &&
-                    $request->get('password') === $authPassword
+                    $providedUsername === $authUsername &&
+                    $providedPassword === $authPassword
                 ) {
                     $authenticated = true;
                     $usedAuth = $auth;
@@ -537,10 +543,13 @@ class PlaylistGenerateController extends Controller
         ]);
     }
 
-    private function getDeviceInfo(Request $request, $playlist)
+    private function getDeviceInfo(Request $request, $playlist, ?string $username = null, ?string $password = null)
     {
-        // Check auth
+        // Check auth (prefer path-based auth if present)
         $usedAuth = null;
+        $providedUsername = $username ?? $request->get('username');
+        $providedPassword = $password ?? $request->get('password');
+
         if ($playlist instanceof PlaylistAlias) {
             $auth = $playlist->authObject;
             if ($auth) {
@@ -558,8 +567,8 @@ class PlaylistGenerateController extends Controller
                 $authPassword = $auth->password;
 
                 if (
-                    $request->get('username') === $authUsername &&
-                    $request->get('password') === $authPassword
+                    $providedUsername === $authUsername &&
+                    $providedPassword === $authPassword
                 ) {
                     $usedAuth = $auth;
                     break;
@@ -577,9 +586,10 @@ class PlaylistGenerateController extends Controller
         $baseUrl = ProxyFacade::getBaseUrl();
         $baseUrl = $baseUrl."/{$uuid}/hdhr";
 
-        $auth = '';
+        // Prefer path-based auth for HDHR (clients typically ignore query strings)
+        $authPath = '';
         if ($usedAuth) {
-            $auth = "?username={$usedAuth->username}&password={$usedAuth->password}";
+            $authPath = '/'.rawurlencode($usedAuth->username).'/'.rawurlencode($usedAuth->password);
         }
 
         return [
@@ -589,8 +599,8 @@ class PlaylistGenerateController extends Controller
             'FirmwareName' => 'hdhomerun5_firmware_20240425',
             'FirmwareVersion' => '20240425',
             'DeviceAuth' => 'test_auth_token',
-            'BaseURL' => $baseUrl.$auth,
-            'LineupURL' => "$baseUrl/lineup.json$auth",
+            'BaseURL' => $baseUrl.$authPath,
+            'LineupURL' => $baseUrl.$authPath.'/lineup.json',
             'TunerCount' => $tunerCount,
         ];
     }
