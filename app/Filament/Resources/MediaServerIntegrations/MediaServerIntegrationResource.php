@@ -499,14 +499,9 @@ class MediaServerIntegrationResource extends Resource
                     ->label('Libraries')
                     ->formatStateUsing(function ($record, $state): string {
                         $available = $record->available_libraries ?? [];
-                        $selected = $record->selected_library_ids ?? [];
 
                         if (empty($available)) {
                             return 'Not configured';
-                        }
-
-                        if (empty($selected)) {
-                            return 'None selected';
                         }
 
                         return collect($available)
