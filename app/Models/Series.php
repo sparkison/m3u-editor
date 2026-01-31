@@ -231,7 +231,7 @@ class Series extends Model
                     // Upsert the episodes in bulk
                     Episode::upsert(
                         $bulk,
-                        uniqueBy: ['source_episode_id', 'playlist_id'],
+                        uniqueBy: ['source_episode_id', 'playlist_id', 'series_id'],
                         update: [
                             'title',
                             'import_batch_no',
