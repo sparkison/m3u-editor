@@ -168,7 +168,7 @@ class MediaServerIntegration extends Model
      */
     public function hasSelectedLibrariesOfType(string $type): bool
     {
-        return ! empty($this->getSelectedLibraryIdsForType($type));
+        return !empty($this->getSelectedLibraryIdsForType($type));
     }
 
     /**
