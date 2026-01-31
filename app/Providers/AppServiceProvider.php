@@ -22,6 +22,7 @@ use App\Models\MergedPlaylist;
 use App\Models\Network;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
+use App\Models\StreamFileSetting;
 use App\Models\StreamProfile;
 use App\Models\User;
 use App\Services\EpgCacheService;
@@ -602,6 +603,15 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 Channel::where('network_id', $network->id)->delete();
+            });
+
+            // StreamFileSetting
+            StreamFileSetting::creating(function (StreamFileSetting $setting) {
+                if (! $setting->user_id) {
+                    $setting->user_id = auth()->id();
+                }
+
+                return $setting;
             });
 
             // ...
