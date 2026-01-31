@@ -9,7 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('episodes', function (Blueprint $table) {
-            // Nombre por defecto que Laravel pone a ese unique:
             $table->dropUnique('episodes_source_episode_id_playlist_id_unique');
 
             $table->unique(['source_episode_id', 'playlist_id', 'series_id']);
