@@ -130,6 +130,10 @@ class MediaServerProxyController extends Controller
     public function proxyStream(Request $request, int $integrationId, string $itemId, string $container = 'ts')
     {
         try {
+            // Ensure long-running streaming inside closure is not subject to the default timeout
+            set_time_limit(0);
+            ignore_user_abort(true);
+
             $integration = MediaServerIntegration::find($integrationId);
 
             if (! $integration) {
@@ -164,6 +168,7 @@ class MediaServerProxyController extends Controller
                 'Content-Type' => $contentType,
                 'Accept-Ranges' => 'bytes',
                 'X-Proxied-From' => 'MediaServer',
+                'Connection' => 'keep-alive',
             ];
 
             // Forward content-length if available

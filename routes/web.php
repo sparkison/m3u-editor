@@ -67,6 +67,19 @@ Route::get('/logo-proxy/{encodedUrl}', [LogoProxyController::class, 'serveLogo']
 Route::get('/{uuid}/playlist.m3u', PlaylistGenerateController::class)
     ->name('playlist.generate');
 
+// Auth-aware HDHR routes (path-based auth to support clients that ignore query string auth)
+Route::get('/{uuid}/hdhr/{username}/{password}/device.xml', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhr'])
+    ->name('playlist.hdhr.auth_device');
+Route::get('/{uuid}/hdhr/{username}/{password}', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrOverview'])
+    ->name('playlist.hdhr.overview.auth');
+Route::get('/{uuid}/hdhr/{username}/{password}/discover.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrDiscover'])
+    ->name('playlist.hdhr.discover.auth');
+Route::get('/{uuid}/hdhr/{username}/{password}/lineup.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrLineup'])
+    ->name('playlist.hdhr.lineup.auth');
+Route::get('/{uuid}/hdhr/{username}/{password}/lineup_status.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrLineupStatus'])
+    ->name('playlist.hdhr.lineup_status.auth');
+
+// Legacy/non-auth HDHR routes (keep for backwards compatibility and query-var auth)
 Route::get('/{uuid}/hdhr/device.xml', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhr'])
     ->name('playlist.hdhr');
 Route::get('/{uuid}/hdhr', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrOverview'])

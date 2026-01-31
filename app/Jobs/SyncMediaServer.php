@@ -621,6 +621,7 @@ class SyncMediaServer implements ShouldQueue
         Episode::updateOrCreate(
             [
                 'playlist_id' => $playlist->id,
+                'series_id' => $series->id,
                 'source_episode_id' => crc32("media-server-{$integration->id}-{$episodeId}"),
             ],
             [

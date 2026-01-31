@@ -488,34 +488,6 @@ class VodResource extends Resource
     {
         return [
             ActionGroup::make([
-                Action::make('process_vod')
-                    ->label('Fetch Metadata')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->schema([
-                        Toggle::make('overwrite_existing')
-                            ->label('Overwrite Existing Metadata')
-                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
-                            ->default(false),
-                    ])
-                    ->action(function ($record) {
-                        app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new ProcessVodChannels(
-                                channel: $record,
-                                force: $record->overwrite_existing ?? false
-                            ));
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Fetching VOD metadata for channel')
-                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
-                            ->duration(10000)
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->modalIcon('heroicon-o-arrow-down-tray')
-                    ->modalDescription('Fetch and process VOD metadata for the selected channel.')
-                    ->modalSubmitActionLabel('Yes, process now'),
                 Action::make('fetch_tmdb_ids')
                     ->label('Fetch TMDB/TVDB IDs')
                     ->icon('heroicon-o-film')
@@ -626,6 +598,34 @@ class VodResource extends Resource
                                     ->default([]),
                             ]),
                     ]),
+                Action::make('process_vod')
+                    ->label('Fetch Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                    ])
+                    ->action(function ($record, array $data) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new ProcessVodChannels(
+                                channel: $record,
+                                force: $data['overwrite_existing'] ?? false
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Fetching VOD metadata for channel')
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channel.')
+                    ->modalSubmitActionLabel('Yes, process now'),
                 Action::make('sync')
                     ->label('Sync VOD .strm file')
                     ->action(function ($record) {
