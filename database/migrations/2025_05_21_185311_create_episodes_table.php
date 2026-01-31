@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('added')->nullable();
             $table->unsignedInteger('season')->nullable();
             $table->timestamps();
-            $table->unique(['source_episode_id', 'playlist_id', 'series_id']);
+            $table->unique(['source_episode_id', 'playlist_id']);
         });
 
         Schema::enableForeignKeyConstraints();
