@@ -168,7 +168,7 @@ class MediaServerIntegration extends Model
      */
     public function hasSelectedLibrariesOfType(string $type): bool
     {
-        return !empty($this->getSelectedLibraryIdsForType($type));
+        return ! empty($this->getSelectedLibraryIdsForType($type));
     }
 
     /**
@@ -196,7 +196,7 @@ class MediaServerIntegration extends Model
      * Returns missing library IDs.
      *
      * @param  array  $currentLibraries  Libraries fetched from the server
-     * @return array<string>  IDs of libraries that were selected but no longer exist
+     * @return array<string> IDs of libraries that were selected but no longer exist
      */
     public function validateSelectedLibraries(array $currentLibraries): array
     {

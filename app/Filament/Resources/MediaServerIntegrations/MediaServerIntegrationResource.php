@@ -497,7 +497,7 @@ class MediaServerIntegrationResource extends Resource
 
                 TextColumn::make('selected_library_ids')
                     ->label('Libraries')
-                    ->formatStateUsing(function ($record): string {
+                    ->formatStateUsing(function ($record, $state): string {
                         $available = $record->available_libraries ?? [];
                         $selected = $record->selected_library_ids ?? [];
 
@@ -509,44 +509,12 @@ class MediaServerIntegrationResource extends Resource
                             return 'None selected';
                         }
 
-                        $selectedCount = count($selected);
-                        $totalCount = count($available);
-
-                        return "{$selectedCount}/{$totalCount} selected";
-                    })
-                    ->description(function ($record): ?string {
-                        $selected = $record->selected_library_ids ?? [];
-                        $available = $record->available_libraries ?? [];
-
-                        if (empty($selected) || empty($available)) {
-                            return null;
-                        }
-
-                        $names = collect($available)
-                            ->filter(fn ($lib) => in_array($lib['id'], $selected))
-                            ->pluck('name')
-                            ->take(3)
-                            ->toArray();
-
-                        $suffix = count($selected) > 3 ? '...' : '';
-
-                        return implode(', ', $names).$suffix;
+                        return collect($available)
+                            ->where('id', '=', (string) $state)->first()['name'] ?? 'N/A';
                     })
                     ->toggleable()
                     ->badge()
-                    ->color(function ($record): string {
-                        $available = $record->available_libraries ?? [];
-                        $selected = $record->selected_library_ids ?? [];
-
-                        if (empty($available)) {
-                            return 'gray';
-                        }
-                        if (empty($selected)) {
-                            return 'danger';
-                        }
-
-                        return 'success';
-                    }),
+                    ->color('success'),
 
                 TextColumn::make('status')
                     ->label('Status')
