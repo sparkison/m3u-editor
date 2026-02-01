@@ -1569,41 +1569,6 @@ class PlaylistResource extends Resource
                                 ->helperText('When enabled, a backup will be created before syncing.')
                                 ->inline(false)
                                 ->default(false),
-                            Toggle::make('auto_merge_channels_enabled')
-                                ->label('Auto-merge channels after sync')
-                                ->helperText('When enabled, channels with the same stream ID will be automatically merged with failover relationships after each sync.')
-                                ->live()
-                                ->inline(false)
-                                ->default(false),
-                            Toggle::make('auto_merge_deactivate_failover')
-                                ->label('Deactivate failover channels')
-                                ->helperText('When enabled, all failover channels will be automatically deactivated during the merge process, keeping only the master channel active.')
-                                ->inline(false)
-                                ->default(false)
-                                ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled')),
-                        ]),
-
-                    Fieldset::make('Auto-Merge advanced settings')
-                        ->columnSpanFull()
-                        ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled'))
-                        ->schema([
-                            static::makeToggle('auto_merge_config.check_resolution')
-                                ->label('Prioritize by resolution')
-                                ->hintIcon(
-                                    'heroicon-m-exclamation-triangle',
-                                    tooltip: 'This process takes longer as stream resolution needs to be analyzed. Only recommended for smaller playlists.'
-                                )
-                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge.'),
-                            static::makeToggle('auto_merge_config.force_complete_remerge')
-                                ->label('Force complete re-merge')
-                                ->hintIcon(
-                                    'heroicon-m-exclamation-triangle',
-                                    tooltip: 'Disable this for better performance if you only want to merge new channels.'
-                                )
-                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships.'),
-                            static::makeToggle('auto_merge_config.prefer_catchup_as_primary')
-                                ->label('Prefer catch-up channels as primary')
-                                ->helperText('When enabled, channels with catch-up enabled will be selected as the master channel when available.'),
                         ]),
 
                     TextInput::make('sync_interval')
@@ -1944,6 +1909,51 @@ class PlaylistResource extends Resource
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
                 ]),
+
+            Section::make('Merge Settings')
+                ->description('Settings for auto-merging channels with the same stream ID')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('auto_merge_channels_enabled')
+                        ->label('Auto-merge channels after sync')
+                        ->helperText('When enabled, channels with the same stream ID will be automatically merged with failover relationships after each sync.')
+                        ->live()
+                        ->inline(false)
+                        ->default(false),
+                    Toggle::make('auto_merge_deactivate_failover')
+                        ->label('Deactivate failover channels')
+                        ->helperText('When enabled, all failover channels will be automatically deactivated during the merge process, keeping only the master channel active.')
+                        ->inline(false)
+                        ->default(false)
+                        ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled')),
+
+                    Fieldset::make('Auto-Merge advanced settings')
+                        ->columnSpanFull()
+                        ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled'))
+                        ->schema([
+                            static::makeToggle('auto_merge_config.check_resolution')
+                                ->label('Prioritize by resolution')
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'This process takes longer as stream resolution needs to be analyzed. Only recommended for smaller playlists.'
+                                )
+                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge.'),
+                            static::makeToggle('auto_merge_config.force_complete_remerge')
+                                ->label('Force complete re-merge')
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'Disable this for better performance if you only want to merge new channels.'
+                                )
+                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships.'),
+                            static::makeToggle('auto_merge_config.prefer_catchup_as_primary')
+                                ->label('Prefer catch-up channels as primary')
+                                ->helperText('When enabled, channels with catch-up enabled will be selected as the master channel when available.'),
+                        ]),
+                ]),
+
             Section::make('Series Processing')
                 ->description('Processing options for playlist series')
                 ->columnSpanFull()
