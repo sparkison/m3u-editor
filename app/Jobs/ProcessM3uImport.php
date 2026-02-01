@@ -88,6 +88,12 @@ class ProcessM3uImport implements ShouldQueue
     // Groups we should auto-enable channels for
     public Collection $enabledGroups;
 
+    // EPG mapping enabled by default
+    public bool $epgMapEnabled = true;
+
+    // Merging enabled by default
+    public bool $canMergeEnabled = true;
+
     // Categories we should auto-enable series for
     public Collection $enabledCategories;
 
@@ -118,6 +124,14 @@ class ProcessM3uImport implements ShouldQueue
         // Selected categories for import
         $this->selectedCategories = $playlist->import_prefs['selected_categories'] ?? [];
         $this->includedCategoryPrefixes = $playlist->import_prefs['included_category_prefixes'] ?? [];
+
+        // See if channel options set
+        if ($this->playlist->enable_channels ?? false) {
+            $epgMapEnabled = $playlist->import_prefs['channel_default_mapping_enabled'] ?? null;
+            $canMergeEnabled = $playlist->import_prefs['channel_default_merge_enabled'] ?? null;
+            $this->epgMapEnabled = $epgMapEnabled !== null ? $epgMapEnabled : true;
+            $this->canMergeEnabled = $canMergeEnabled !== null ? $canMergeEnabled : true;
+        }
 
         // Get the enabled groups and categories for this playlist
         $this->enabledGroups = $playlist->groups()->where('enabled', true)->get('name')->pluck('name');
@@ -436,6 +450,8 @@ class ProcessM3uImport implements ShouldQueue
                 'rating' => null, // new field for rating
                 'rating_5based' => null, // new field for 5-based rating
                 'source_id' => null, // source ID for the channel
+                'can_merge' => $this->canMergeEnabled,
+                'epg_map_enabled' => $this->epgMapEnabled,
             ];
 
             // Keep track of channel number
@@ -696,6 +712,8 @@ class ProcessM3uImport implements ShouldQueue
                     'shift' => 0,
                     'tvg_shift' => null,
                     'source_id' => null, // source ID for the channel
+                    'can_merge' => $this->canMergeEnabled,
+                    'epg_map_enabled' => $this->epgMapEnabled,
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;

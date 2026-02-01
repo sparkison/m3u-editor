@@ -1607,26 +1607,16 @@ class PlaylistResource extends Resource
             Section::make('Playlist Processing')
                 ->description('Processing settings for the playlist')
                 ->columnSpanFull()
-                ->columns(3)
+                ->columns(columns: 2)
                 ->schema([
                     Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
-                        ->columnSpan(1)
+                        ->columnSpanFull()
                         ->live()
                         ->inline(true)
                         ->default(false)
                         ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
-                    Toggle::make('enable_channels')
-                        ->label('Enable new channels')
-                        ->columnSpan(1)
-                        ->inline(true)
-                        ->default(false)
-                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
-                    Toggle::make('enable_series')
-                        ->label('Enable new series')
-                        ->inline(true)
-                        ->default(false)
-                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
+
                     Toggle::make('import_prefs.use_regex')
                         ->label('Use regex for filtering')
                         ->columnSpan(2)
@@ -1902,12 +1892,52 @@ class PlaylistResource extends Resource
                     TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
                         ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
-                        ->columnSpan(2)
+                        ->columnSpanFull()
                         ->suggestions([
                             '.avi',
                             '.mkv',
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
+                ]),
+
+            Section::make('Auto-Enable Settings')
+                ->description('Settings for automatically enabling new content')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('enable_channels')
+                        ->label('Enable new channels')
+                        ->columnSpanFull()
+                        ->live()
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
+
+                    Fieldset::make('Default options for new channels')
+                        ->columnSpanFull()
+                        ->schema([
+                            Toggle::make('import_prefs.channel_default_mapping_enabled')
+                                ->label('Enable EPG mapping by default')
+                                ->inline(true)
+                                ->default(true)
+                                ->helperText('When enabled, newly added channels will have EPG mapping enabled by default on sync.'),
+                            Toggle::make('import_prefs.channel_default_merge_enabled')
+                                ->label('Enable merging by default')
+                                ->inline(true)
+                                ->default(true)
+                                ->helperText('When enabled, newly added channels will have merging enabled by default on sync.'),
+                        ])
+                        ->hidden(fn (Get $get): bool => ! $get('enable_channels')),
+
+                    Toggle::make('enable_series')
+                        ->label('Enable new series')
+                        ->columnSpanFull()
+                        ->live()
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
                 ]),
 
             Section::make('Merge Settings')
