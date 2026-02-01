@@ -2056,6 +2056,7 @@ class PlaylistResource extends Resource
                                 ->label('Preferred Playlist (optional)')
                                 ->options(fn () => Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
                                 ->searchable()
+                                ->columnSpanFull()
                                 ->placeholder('Use this playlist only')
                                 ->helperText('If set, channels from this playlist will be prioritized as master during merge. Leave empty to only merge within this playlist.'),
                             Repeater::make('auto_merge_config.failover_playlists')
@@ -2148,9 +2149,15 @@ class PlaylistResource extends Resource
                                 ->schema([
                                     Select::make('group_id')
                                         ->label('Group')
-                                        ->options(fn () => Group::where('user_id', auth()->id())
-                                            ->orderBy('name')
-                                            ->pluck('name', 'id'))
+                                        ->options(fn () => Group::query()
+                                            ->with(['playlist'])
+                                            ->where(['user_id' => auth()->id(), 'type' => 'live'])
+                                            ->get(['name', 'id', 'playlist_id'])
+                                            ->transform(fn ($group) => [
+                                                'id' => $group->id,
+                                                'name' => $group->name.' ('.$group->playlist->name.')',
+                                            ])->pluck('name', 'id')
+                                        )
                                         ->searchable()
                                         ->required(),
                                     TextInput::make('weight')
