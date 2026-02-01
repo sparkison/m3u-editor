@@ -1592,26 +1592,16 @@ class PlaylistResource extends Resource
             Section::make('Playlist Processing')
                 ->description('Processing settings for the playlist')
                 ->columnSpanFull()
-                ->columns(3)
+                ->columns(columns: 2)
                 ->schema([
                     Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
-                        ->columnSpan(1)
+                        ->columnSpanFull()
                         ->live()
                         ->inline(true)
                         ->default(false)
                         ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
-                    Toggle::make('enable_channels')
-                        ->label('Enable new channels')
-                        ->columnSpan(1)
-                        ->inline(true)
-                        ->default(false)
-                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
-                    Toggle::make('enable_series')
-                        ->label('Enable new series')
-                        ->inline(true)
-                        ->default(false)
-                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
+
                     Toggle::make('import_prefs.use_regex')
                         ->label('Use regex for filtering')
                         ->columnSpan(2)
@@ -1887,13 +1877,98 @@ class PlaylistResource extends Resource
                     TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
                         ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
-                        ->columnSpan(2)
+                        ->columnSpanFull()
                         ->suggestions([
                             '.avi',
                             '.mkv',
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
                 ]),
+
+            Section::make('Auto-Enable Settings')
+                ->description('Settings for automatically enabling new content')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('enable_channels')
+                        ->label('Enable new channels')
+                        ->columnSpanFull()
+                        ->live()
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added Live and VOD channels will be enabled by default.'),
+
+                    Fieldset::make('Default options for new channels')
+                        ->columnSpanFull()
+                        ->schema([
+                            Toggle::make('import_prefs.channel_default_mapping_enabled')
+                                ->label('Enable EPG mapping by default')
+                                ->inline(true)
+                                ->default(true)
+                                ->helperText('When enabled, newly added channels will have EPG mapping enabled by default on sync.'),
+                            Toggle::make('import_prefs.channel_default_merge_enabled')
+                                ->label('Enable merging by default')
+                                ->inline(true)
+                                ->default(true)
+                                ->helperText('When enabled, newly added channels will have merging enabled by default on sync.'),
+                        ])
+                        ->hidden(fn (Get $get): bool => ! $get('enable_channels')),
+
+                    Toggle::make('enable_series')
+                        ->label('Enable new series')
+                        ->columnSpanFull()
+                        ->live()
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added series will be enabled by default on sync.'),
+                ]),
+
+            Section::make('Merge Settings')
+                ->description('Settings for auto-merging channels with the same stream ID')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('auto_merge_channels_enabled')
+                        ->label('Auto-merge channels after sync')
+                        ->helperText('When enabled, channels with the same stream ID will be automatically merged with failover relationships after each sync.')
+                        ->live()
+                        ->inline(false)
+                        ->default(false),
+                    Toggle::make('auto_merge_deactivate_failover')
+                        ->label('Deactivate failover channels')
+                        ->helperText('When enabled, all failover channels will be automatically deactivated during the merge process, keeping only the master channel active.')
+                        ->inline(false)
+                        ->default(false)
+                        ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled')),
+
+                    Fieldset::make('Auto-Merge advanced settings')
+                        ->columnSpanFull()
+                        ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled'))
+                        ->schema([
+                            static::makeToggle('auto_merge_config.check_resolution')
+                                ->label('Prioritize by resolution')
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'This process takes longer as stream resolution needs to be analyzed. Only recommended for smaller playlists.'
+                                )
+                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge.'),
+                            static::makeToggle('auto_merge_config.force_complete_remerge')
+                                ->label('Force complete re-merge')
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'Disable this for better performance if you only want to merge new channels.'
+                                )
+                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships.'),
+                            static::makeToggle('auto_merge_config.prefer_catchup_as_primary')
+                                ->label('Prefer catch-up channels as primary')
+                                ->helperText('When enabled, channels with catch-up enabled will be selected as the master channel when available.'),
+                        ]),
+                ]),
+
             Section::make('Series Processing')
                 ->description('Processing options for playlist series')
                 ->columnSpanFull()
