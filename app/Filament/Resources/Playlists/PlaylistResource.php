@@ -2083,21 +2083,6 @@ class PlaylistResource extends Resource
                         ->columns(2)
                         ->hidden(fn (Get $get): bool => ! $get('auto_merge_channels_enabled'))
                         ->schema([
-                            Toggle::make('auto_merge_config.new_channels_only')
-                                ->label('Merge only new channels')
-                                ->inline(false)
-                                ->default(true)
-                                ->helperText('When enabled, only newly synced channels will be merged. Disable to re-process all channels on each sync.'),
-                            Toggle::make('auto_merge_deactivate_failover')
-                                ->label('Deactivate failover channels')
-                                ->inline(false)
-                                ->default(false)
-                                ->helperText('When enabled, channels that become failovers will be automatically disabled.'),
-                            Toggle::make('auto_merge_config.prefer_catchup_as_primary')
-                                ->label('Prefer catch-up as primary')
-                                ->inline(false)
-                                ->default(false)
-                                ->helperText('When enabled, channels with catch-up enabled will be selected as the master when available.'),
                             Toggle::make('auto_merge_config.check_resolution')
                                 ->label('Prioritize by resolution')
                                 ->inline(false)
@@ -2116,11 +2101,38 @@ class PlaylistResource extends Resource
                                     tooltip: 'This will re-evaluate ALL existing failover relationships on each sync.'
                                 )
                                 ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships.'),
+                            Toggle::make('auto_merge_config.new_channels_only')
+                                ->label('Merge only new channels')
+                                ->inline(false)
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'When enabled, only newly synced channels will be merged. Disable to re-process all channels on each sync.'
+                                )
+                                ->default(true),
+                            Toggle::make('auto_merge_deactivate_failover')
+                                ->label('Deactivate failover channels')
+                                ->inline(false)
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'When enabled, channels that become failovers will be automatically disabled.'
+                                )
+                                ->default(false),
+                            Toggle::make('auto_merge_config.prefer_catchup_as_primary')
+                                ->label('Prefer catch-up as primary')
+                                ->inline(false)
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'When enabled, channels with catch-up enabled will be selected as the master when available.'
+                                )
+                                ->default(false),
                             Toggle::make('auto_merge_config.exclude_disabled_groups')
                                 ->label('Exclude disabled groups from master selection')
                                 ->inline(false)
-                                ->default(false)
-                                ->helperText('Channels from disabled groups will never be selected as master, only as failovers.'),
+                                ->hintIcon(
+                                    'heroicon-m-exclamation-triangle',
+                                    tooltip: 'Channels from disabled groups will never be selected as master, only as failovers.'
+                                )
+                                ->default(false),
                         ]),
 
                     Fieldset::make('Advanced Priority Scoring (optional)')
