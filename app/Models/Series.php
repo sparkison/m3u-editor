@@ -256,7 +256,8 @@ class Series extends Model
 
                 if ($sync && $this->enabled) {
                     // Dispatch the job to sync .strm files
-                    dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));
+                    dispatch(new SyncSeriesStrmFiles(series: $this, notify: false))
+                        ->afterCommit();
                 }
 
                 return $episodeCount;

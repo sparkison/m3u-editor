@@ -1013,8 +1013,14 @@ class ChannelResource extends Resource
         return [
             // Customizable channel fields
             Toggle::make('enabled')
+                ->columnSpanFull()
+                ->default(true),
+            Toggle::make('can_merge')
                 ->default(true)
-                ->columnSpan('full'),
+                ->helperText('Allow this channel to be merged during "Merge Same ID" jobs.'),
+            Toggle::make('epg_map_enabled')
+                ->default(true)
+                ->helperText('Allow mapping EPG to this channel when running EPG mapping jobs.'),
             Fieldset::make('Playlist Type (choose one)')
                 ->schema([
                     Toggle::make('is_custom')
