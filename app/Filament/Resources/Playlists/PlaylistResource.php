@@ -2177,17 +2177,12 @@ class PlaylistResource extends Resource
                                     // Store as an array of objects [{group_id: id|null, weight: weight}, ...]
                                     if (is_array($state) && ! empty($state)) {
                                         $formatted = [];
-
                                         foreach ($state as $item) {
                                             if (is_array($item) && isset($item['weight'])) {
                                                 $groupId = $item['group_id'] ?? null;
-
-                                                if (is_numeric($groupId)) {
-                                                    $groupId = (int) $groupId;
-                                                } else {
-                                                    $groupId = is_string($groupId) && is_numeric($groupId) ? (int) $groupId : ($groupId ?? null);
+                                                if (! $groupId) {
+                                                    continue;
                                                 }
-
                                                 $formatted[] = [
                                                     'group_id' => $groupId,
                                                     'weight' => (int) $item['weight'],
