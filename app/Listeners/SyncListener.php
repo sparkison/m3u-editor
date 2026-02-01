@@ -93,7 +93,7 @@ class SyncListener
             // Build weighted config if any weighted priority options are set
             $weightedConfig = $this->buildWeightedConfig($config);
 
-            // Dispatch the merge job for this chunk
+            // Dispatch the merge job
             dispatch(new MergeChannels(
                 user: $playlist->user,
                 playlists: $playlists,
