@@ -41,9 +41,6 @@ class MergeChannels implements ShouldQueue
 
     /**
      * Create a new job instance.
-     *
-     * @param  array<int>|null  $newChannelIds  Optional array of new channel IDs to limit merging to only new channels
-     * @param  array|null  $weightedConfig  Optional weighted priority configuration
      */
     public function __construct(
         public $user,
@@ -54,8 +51,8 @@ class MergeChannels implements ShouldQueue
         public bool $forceCompleteRemerge = false,
         public bool $preferCatchupAsPrimary = false,
         public ?int $groupId = null,
-        public ?array $newChannelIds = null,
         public ?array $weightedConfig = null,
+        public ?bool $newChannelsOnly = null,
     ) {}
 
     /**
@@ -111,9 +108,9 @@ class MergeChannels implements ShouldQueue
                 // Only exclude existing failovers if we're not forcing a complete re-merge
                 $query->whereNotIn('id', $existingFailoverChannelIds);
             })
-            ->when($this->newChannelIds !== null, function ($query) {
-                // Filter to only include new channels when newChannelIds is provided
-                $query->whereIn('id', $this->newChannelIds);
+            ->when($this->newChannelsOnly, function ($query) {
+                // Filter to only include new channels when newChannelsOnly is provided
+                $query->where('new', true);
             })->cursor();
 
         // Group channels by stream ID using LazyCollection

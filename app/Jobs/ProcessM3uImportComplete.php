@@ -227,13 +227,6 @@ class ProcessM3uImportComplete implements ShouldQueue
         $removedGroups->delete();
         $removedChannels->delete();
 
-        // Capture new channel IDs before clearing the new flag (for auto-merge feature)
-        $newChannelIds = $newChannels->clone()->pluck('id')->toArray();
-
-        // Flag new groups and channels as not new
-        $newGroups->update(['new' => false]);
-        $newChannels->update(['new' => false]);
-
         // Finally, clean up orphaned channels (non-custom channels with null or non-existent group_id)
         Channel::where('playlist_id', $playlist->id)
             ->where('is_custom', false)
@@ -383,7 +376,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         }
 
         // Fire the playlist synced event with new channel IDs for auto-merge
-        event(new SyncCompleted($playlist, 'playlist', $newChannelIds ?? []));
+        event(new SyncCompleted($playlist, 'playlist'));
     }
 
     /**

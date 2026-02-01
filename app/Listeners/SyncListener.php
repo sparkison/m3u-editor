@@ -24,7 +24,7 @@ class SyncListener
 
             // Handle auto-merge channels if enabled
             if ($playlist->auto_merge_channels_enabled && $playlist->status === Status::Completed) {
-                $this->handleAutoMergeChannels($playlist, $event->newChannelIds);
+                $this->handleAutoMergeChannels($playlist);
             }
 
             // Handle post-processes
@@ -59,10 +59,8 @@ class SyncListener
 
     /**
      * Handle auto-merge channels after playlist sync.
-     *
-     * @param  array<int>|null  $newChannelIds  Optional array of new channel IDs from sync
      */
-    private function handleAutoMergeChannels(\App\Models\Playlist $playlist, ?array $newChannelIds = null): void
+    private function handleAutoMergeChannels(\App\Models\Playlist $playlist): void
     {
         try {
             // Get auto-merge configuration
@@ -92,18 +90,10 @@ class SyncListener
             // Determine the preferred playlist ID (use configured one or fallback to current playlist)
             $effectivePlaylistId = $preferredPlaylistId ? (int) $preferredPlaylistId : $playlist->id;
 
-            // Determine which channel IDs to pass (only if new_channels_only is enabled)
-            $channelIdsToMerge = ($newChannelsOnly && ! empty($newChannelIds)) ? $newChannelIds : null;
-
-            // If new_channels_only is enabled but no new channels, skip merge
-            if ($newChannelsOnly && empty($newChannelIds)) {
-                return;
-            }
-
             // Build weighted config if any weighted priority options are set
             $weightedConfig = $this->buildWeightedConfig($config);
 
-            // Dispatch the merge job
+            // Dispatch the merge job for this chunk
             dispatch(new MergeChannels(
                 user: $playlist->user,
                 playlists: $playlists,
@@ -112,8 +102,8 @@ class SyncListener
                 deactivateFailoverChannels: $deactivateFailover,
                 forceCompleteRemerge: $forceCompleteRemerge,
                 preferCatchupAsPrimary: $preferCatchupAsPrimary,
-                newChannelIds: $channelIdsToMerge,
                 weightedConfig: $weightedConfig,
+                newChannelsOnly: $newChannelsOnly,
             ));
         } catch (Throwable $e) {
             // Log error and send notification
