@@ -1272,8 +1272,11 @@ class VodResource extends Resource
         return [
             // Customizable channel fields
             Toggle::make('enabled')
+                ->columnSpanFull()
+                ->default(true),
+            Toggle::make('can_merge')
                 ->default(true)
-                ->columnSpan('full'),
+                ->helperText('Allow this channel to be merged during "Merge Same ID" jobs.'),
             Fieldset::make('Playlist Type (choose one)')
                 ->schema([
                     Toggle::make('is_custom')
