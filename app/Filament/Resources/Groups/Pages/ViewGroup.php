@@ -21,6 +21,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Enums\Width;
 
 class ViewGroup extends ViewRecord
 {
@@ -282,6 +283,7 @@ class ViewGroup extends ViewRecord
                     ->icon('heroicon-o-arrows-pointing-in')
                     ->modalIcon('heroicon-o-arrows-pointing-in')
                     ->modalDescription('Merge all channels with the same ID in this group into a single channel with failover.')
+                    ->modalWidth(Width::FourExtraLarge)
                     ->modalSubmitActionLabel('Merge now'),
 
                 Action::make('unmerge')

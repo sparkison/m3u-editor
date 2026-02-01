@@ -31,6 +31,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
@@ -404,6 +405,7 @@ class GroupResource extends Resource
                         ->icon('heroicon-o-arrows-pointing-in')
                         ->modalIcon('heroicon-o-arrows-pointing-in')
                         ->modalDescription('Merge all channels with the same ID in this group into a single channel with failover.')
+                        ->modalWidth(Width::FourExtraLarge)
                         ->modalSubmitActionLabel('Merge now'),
 
                     Action::make('unmerge')

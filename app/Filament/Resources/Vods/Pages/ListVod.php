@@ -31,6 +31,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
@@ -157,6 +158,7 @@ class ListVod extends ListRecords
                     ->icon('heroicon-o-arrows-pointing-in')
                     ->modalIcon('heroicon-o-arrows-pointing-in')
                     ->modalDescription('Merge all channels with the same ID into a single channel with failover.')
+                    ->modalWidth(Width::FourExtraLarge)
                     ->modalSubmitActionLabel('Merge now'),
                 Action::make('unmerge')
                     ->schema([

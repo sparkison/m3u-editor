@@ -157,6 +157,7 @@ class ListChannels extends ListRecords
                     ->icon('heroicon-o-arrows-pointing-in')
                     ->modalIcon('heroicon-o-arrows-pointing-in')
                     ->modalDescription('Merge all channels with the same ID into a single channel with failover.')
+                    ->modalWidth(Width::FourExtraLarge)
                     ->modalSubmitActionLabel('Merge now'),
                 Action::make('unmerge')
                     ->schema([
