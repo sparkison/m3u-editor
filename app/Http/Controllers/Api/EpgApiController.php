@@ -195,8 +195,7 @@ class EpgApiController extends Controller
             $playlistChannels = PlaylistGenerateController::getChannelQuery($playlist)
                 ->limit($perPage)
                 ->offset($skip)
-                ->select('channels.*')
-                ->get();
+                ->cursor();
 
             // Get the stream profile to use for the floating player
             // Prefer playlist profiles over globals
@@ -247,8 +246,8 @@ class EpgApiController extends Controller
 
                     // Map EPG channel ID to playlist channel info
                     // Store array of playlist channels for each EPG channel (one-to-many mapping)
-                    if (! isset($epgChannelMap[$epgId][$channel->epg_channel_id])) {
-                        $epgChannelMap[$epgId][$channel->epg_channel_id] = [];
+                    if (! isset($epgChannelMap[$epgId][$channel->epg_channel_key])) {
+                        $epgChannelMap[$epgId][$channel->epg_channel_key] = [];
                     }
 
                     $logo = url('/placeholder.png');
@@ -266,7 +265,7 @@ class EpgApiController extends Controller
                     }
 
                     // Add the playlist channel info to the EPG channel map
-                    $epgChannelMap[$epgId][$channel->epg_channel_id][] = [
+                    $epgChannelMap[$epgId][$channel->epg_channel_key][] = [
                         'playlist_channel_id' => $channelKey,
                         'display_name' => $channel->title_custom ?? $channel->title,
                         'title' => $channel->name_custom ?? $channel->name,
