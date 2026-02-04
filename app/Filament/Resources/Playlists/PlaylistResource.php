@@ -352,7 +352,7 @@ class PlaylistResource extends Resource
                             ->icon('heroicon-o-arrow-path')
                             ->action(function ($record) {
                                 // For media server playlists, dispatch the media server sync job
-                                if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                                if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin, PlaylistSourceType::Plex])) {
                                     $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
                                     if ($integration) {
                                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -625,7 +625,7 @@ class PlaylistResource extends Resource
                                 return "/playlists/{$record->id}/playlist-sync-statuses";
                             })
                             ->openUrlInNewTab(false)
-                            ->hidden(fn (Playlist $record): bool => $record->is_network_playlist),
+                            ->hidden(fn (Playlist $record): bool => $record->is_network_playlist || $record->source_type !== null),
                         Action::make('reset')
                             ->label('Reset status')
                             ->icon('heroicon-o-arrow-uturn-left')
