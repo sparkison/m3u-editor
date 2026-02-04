@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
 use App\Interfaces\MediaServer;
 use App\Models\Category;
@@ -202,18 +201,13 @@ class SyncMediaServer implements ShouldQueue
             return $integration->playlist;
         }
 
-        // Determine source type based on integration type
-        $sourceType = $integration->type === 'emby'
-            ? PlaylistSourceType::Emby
-            : PlaylistSourceType::Jellyfin;
-
         // Create a new playlist for this integration
         $playlist = Playlist::createQuietly([
             'uuid' => Str::orderedUuid()->toString(),
             'name' => $integration->name,
             'url' => $integration->base_url, // Store the server URL for reference
             'user_id' => $integration->user_id,
-            'source_type' => $sourceType,
+            'source_type' => $integration->type,
             'status' => Status::Processing,
             'auto_sync' => false, // Sync is managed by the integration, not the playlist
             'user_agent' => 'M3U-Editor-MediaServer-Sync/1.0', // required value for playlist, set to something meaningful
