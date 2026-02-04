@@ -420,7 +420,7 @@ class PlaylistResource extends Resource
                                     ->body('The playlist is no longer processing. You can now run new syncs.')
                                     ->send();
                             })
-                            ->visible(fn (Playlist $record) => $record->isProcessing() && ! $record->is_network_playlist),
+                            ->visible(fn (Playlist $record) => $record->isProcessing() && ! ($record->is_network_playlist || $record->isMediaServerPlaylist())),
                         Action::make('process_series')
                             ->label('Fetch Series Metadata')
                             ->icon('heroicon-o-arrow-down-tray')
@@ -513,7 +513,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-document-duplicate')
                             ->modalDescription('Duplicate playlist now?')
                             ->modalSubmitActionLabel('Yes, duplicate now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->isMediaServerPlaylist()),
 
                         Action::make('Copy Changes')
                             ->label('Copy Changes')
@@ -615,7 +615,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-clipboard-document')
                             ->modalDescription('Select the target playlist and channel attributes to copy')
                             ->modalSubmitActionLabel('Copy now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->isMediaServerPlaylist()),
 
                         Action::make('view_sync_logs')
                             ->label('View Sync Logs')
@@ -658,7 +658,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-arrow-uturn-left')
                             ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                             ->modalSubmitActionLabel('Yes, reset now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->isMediaServerPlaylist()),
                         Action::make('purge_series')
                             ->label('Purge Series')
                             ->icon('heroicon-s-trash')
