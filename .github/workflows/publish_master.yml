@@ -200,6 +200,117 @@ jobs:
           echo "- \`${{ env.REGISTRY_IMAGE }}:${{ needs.validate.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
 
+  update-release-notes:
+    name: Update Release Notes
+    runs-on: ubuntu-latest
+    needs: [validate, push-manifest]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get previous stable tag
+        id: prev_tag
+        run: |
+          # Find the previous stable release tag (skip current one)
+          CURRENT_TAG="v${{ needs.validate.outputs.version }}"
+          PREV_TAG=$(git tag -l "v*" --sort=-version:refname | grep -v "^$CURRENT_TAG$" | head -n 1)
+          if [ -z "$PREV_TAG" ]; then
+            # Fallback to first commit
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          echo "📌 Previous stable tag: $PREV_TAG"
+
+      - name: Generate comprehensive changelog
+        run: |
+          echo "## 🚀 What's New in v${{ needs.validate.outputs.version }}" > changelog.md
+          echo "" >> changelog.md
+          
+          # Get all commits since last stable release (includes all dev changes)
+          git log ${{ steps.prev_tag.outputs.prev_tag }}..HEAD --pretty=format:"%s|%h|%an" | while IFS='|' read -r msg hash author; do
+            # Skip merge commits
+            if [[ "$msg" =~ ^Merge ]]; then
+              continue
+            fi
+            # Categorize by conventional commit prefix
+            if [[ "$msg" =~ ^feat ]]; then
+              echo "- 🚀 $msg (\`$hash\`) - @$author" >> features.tmp
+            elif [[ "$msg" =~ ^fix ]]; then
+              echo "- 🐛 $msg (\`$hash\`) - @$author" >> fixes.tmp
+            elif [[ "$msg" =~ ^docs ]]; then
+              echo "- 📚 $msg (\`$hash\`) - @$author" >> docs.tmp
+            elif [[ "$msg" =~ ^chore ]]; then
+              echo "- 🔧 $msg (\`$hash\`) - @$author" >> chores.tmp
+            elif [[ "$msg" =~ ^refactor ]]; then
+              echo "- ♻️ $msg (\`$hash\`) - @$author" >> refactor.tmp
+            elif [[ "$msg" =~ ^perf ]]; then
+              echo "- ⚡ $msg (\`$hash\`) - @$author" >> perf.tmp
+            fi
+          done
+          
+          # Combine into changelog with sections
+          if [ -f features.tmp ]; then
+            echo "### ✨ New Features" >> changelog.md
+            cat features.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          if [ -f fixes.tmp ]; then
+            echo "### 🐛 Bug Fixes" >> changelog.md
+            cat fixes.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          if [ -f perf.tmp ]; then
+            echo "### ⚡ Performance Improvements" >> changelog.md
+            cat perf.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          if [ -f refactor.tmp ]; then
+            echo "### ♻️ Refactoring" >> changelog.md
+            cat refactor.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          if [ -f docs.tmp ]; then
+            echo "### 📚 Documentation" >> changelog.md
+            cat docs.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          if [ -f chores.tmp ]; then
+            echo "### 🔧 Maintenance" >> changelog.md
+            cat chores.tmp >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Add Docker image info
+          echo "---" >> changelog.md
+          echo "### 🐳 Docker Image" >> changelog.md
+          echo "" >> changelog.md
+          echo "Pull the latest stable version:" >> changelog.md
+          echo "\`\`\`bash" >> changelog.md
+          echo "docker pull ${{ env.REGISTRY_IMAGE }}:${{ needs.validate.outputs.version }}" >> changelog.md
+          echo "# or" >> changelog.md
+          echo "docker pull ${{ env.REGISTRY_IMAGE }}:latest" >> changelog.md
+          echo "\`\`\`" >> changelog.md
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev_tag }}...v${{ needs.validate.outputs.version }}" >> changelog.md
+          
+          # Cleanup
+          rm -f *.tmp
+          
+          cat changelog.md
+
+      - name: Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: "v${{ needs.validate.outputs.version }}"
+          body_path: changelog.md
+          prerelease: false
+          make_latest: true
+
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
