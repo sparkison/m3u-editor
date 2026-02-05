@@ -27,14 +27,14 @@ docker run -d \
   -v ./data:/var/www/config \
   -v /dev/shm:/hls-segments \  # ← Map host /dev/shm to container path
   -e HLS_TEMP_DIR=/hls-segments \  # ← Point to the mapped path
-  grimothy/m3u-editor:dev
+  sparkison/m3u-editor:dev
 ```
 
 **Docker Compose**:
 ```yaml
 services:
   m3u-editor:
-    image: grimothy/m3u-editor:dev
+    image: sparkison/m3u-editor:dev
     container_name: m3u-editor
     ports:
       - "36400:36400"
@@ -66,8 +66,8 @@ docker run -d \
 ```yaml
 services:
   m3u-editor:
-    image: grimothy/m3u-editor:dev
-    container_name: grimothy/m3u-editor
+    image: sparkison/m3u-editor:dev
+    container_name: m3u-editor
     ports:
       - "36400:36400"
     volumes:
