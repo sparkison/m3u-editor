@@ -91,14 +91,14 @@ docker run -d \
   -v ./data:/var/www/config \
   --tmpfs /hls-segments:rw,size=10g \  # ← Create 10GB tmpfs
   -e HLS_TEMP_DIR=/hls-segments \
-  hektyc/m3u-editor:dev
+  sparkison/m3u-editor:dev
 ```
 
 **Docker Compose**:
 ```yaml
 services:
   m3u-editor:
-    image: hektyc/m3u-editor:dev
+    image: sparkison/m3u-editor:dev
     container_name: m3u-editor
     ports:
       - "36400:36400"
@@ -121,7 +121,7 @@ services:
 ```yaml
 services:
   m3u-editor:
-    image: hektyc/m3u-editor:dev
+    image: sparkison/m3u-editor:dev
     container_name: m3u-editor
     ports:
       - "36400:36400"
