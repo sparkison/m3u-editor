@@ -59,7 +59,7 @@ docker run -d \
   -v ./data:/var/www/config \
   -v /path/to/your/hls-storage:/hls-segments \  # ← Map host directory
   -e HLS_TEMP_DIR=/hls-segments \
-  hektyc/m3u-editor:dev
+  sparkison/m3u-editor:dev
 ```
 
 **Docker Compose**:
