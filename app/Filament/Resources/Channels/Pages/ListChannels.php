@@ -167,13 +167,18 @@ class ListChannels extends ListRecords
                             ->live()
                             ->searchable()
                             ->helperText('Playlist to unmerge channels from (or leave empty to unmerge all).'),
+                        Toggle::make('reactivate_channels')
+                            ->label('Reactivate disabled channels')
+                            ->helperText('Enable channels that were previously disabled during merge.')
+                            ->default(false),
                     ])
                     ->label('Unmerge Same ID')
-                    ->action(function ($data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new UnmergeChannels(
                                 user: auth()->user(),
-                                playlistId: $data['playlist_id'] ?? null
+                                playlistId: $data['playlist_id'] ?? null,
+                                reactivateChannels: $data['reactivate_channels'] ?? false,
                             ));
                     })->after(function () {
                         Notification::make()
