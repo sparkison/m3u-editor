@@ -216,15 +216,15 @@ jobs:
           git log ${{ steps.prev_tag.outputs.prev_tag }}..HEAD --pretty=format:"%s|%h|%an" | while IFS='|' read -r msg hash author; do
             # Categorize by conventional commit prefix
             if [[ "$msg" =~ ^feat ]]; then
-              echo "- 🚀 $msg (\`$hash\`) - @$author" >> features.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> features.tmp
             elif [[ "$msg" =~ ^fix ]]; then
-              echo "- 🐛 $msg (\`$hash\`) - @$author" >> fixes.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> fixes.tmp
             elif [[ "$msg" =~ ^docs ]]; then
-              echo "- 📚 $msg (\`$hash\`) - @$author" >> docs.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> docs.tmp
             elif [[ "$msg" =~ ^chore ]]; then
-              echo "- 🔧 $msg (\`$hash\`) - @$author" >> chores.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> chores.tmp
             elif [[ "$msg" =~ ^refactor ]]; then
-              echo "- ♻️ $msg (\`$hash\`) - @$author" >> refactor.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> refactor.tmp
             else
               echo "- $msg (\`$hash\`) - @$author" >> other.tmp
             fi
@@ -232,39 +232,39 @@ jobs:
           
           # Combine into changelog
           if [ -f features.tmp ]; then
-            echo "### ✨ Features" >> changelog.md
+            echo "### Features" >> changelog.md
             cat features.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f fixes.tmp ]; then
-            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "### Bug Fixes" >> changelog.md
             cat fixes.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f refactor.tmp ]; then
-            echo "### ♻️ Refactoring" >> changelog.md
+            echo "### Refactoring" >> changelog.md
             cat refactor.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f docs.tmp ]; then
-            echo "### 📚 Documentation" >> changelog.md
+            echo "### Documentation" >> changelog.md
             cat docs.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f chores.tmp ]; then
-            echo "### 🔧 Maintenance" >> changelog.md
+            echo "### Maintenance" >> changelog.md
             cat chores.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f other.tmp ]; then
-            echo "### 📦 Other Changes" >> changelog.md
+            echo "### Other Changes" >> changelog.md
             cat other.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           
           # Add Docker image info
           echo "---" >> changelog.md
-          echo "### 🐳 Docker Image" >> changelog.md
+          echo "### Docker Image" >> changelog.md
           echo "\`\`\`" >> changelog.md
           echo "docker pull ${{ env.REGISTRY_IMAGE }}:dev-${{ needs.get-version.outputs.version }}" >> changelog.md
           echo "\`\`\`" >> changelog.md
@@ -278,7 +278,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dev-${{ needs.get-version.outputs.version }}
-          name: "🔧 Dev ${{ needs.get-version.outputs.version }}"
+          name: "Dev ${{ needs.get-version.outputs.version }}"
           body_path: changelog.md
           prerelease: true
           generate_release_notes: false

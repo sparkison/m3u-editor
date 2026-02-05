@@ -227,7 +227,7 @@ jobs:
 
       - name: Generate comprehensive changelog
         run: |
-          echo "## 🚀 What's New in v${{ needs.validate.outputs.version }}" > changelog.md
+          echo "## What's New in v${{ needs.validate.outputs.version }}" > changelog.md
           echo "" >> changelog.md
           
           # Get all commits since last stable release (includes all dev changes)
@@ -238,55 +238,55 @@ jobs:
             fi
             # Categorize by conventional commit prefix
             if [[ "$msg" =~ ^feat ]]; then
-              echo "- 🚀 $msg (\`$hash\`) - @$author" >> features.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> features.tmp
             elif [[ "$msg" =~ ^fix ]]; then
-              echo "- 🐛 $msg (\`$hash\`) - @$author" >> fixes.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> fixes.tmp
             elif [[ "$msg" =~ ^docs ]]; then
-              echo "- 📚 $msg (\`$hash\`) - @$author" >> docs.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> docs.tmp
             elif [[ "$msg" =~ ^chore ]]; then
-              echo "- 🔧 $msg (\`$hash\`) - @$author" >> chores.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> chores.tmp
             elif [[ "$msg" =~ ^refactor ]]; then
-              echo "- ♻️ $msg (\`$hash\`) - @$author" >> refactor.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> refactor.tmp
             elif [[ "$msg" =~ ^perf ]]; then
-              echo "- ⚡ $msg (\`$hash\`) - @$author" >> perf.tmp
+              echo "- $msg (\`$hash\`) - @$author" >> perf.tmp
             fi
           done
           
           # Combine into changelog with sections
           if [ -f features.tmp ]; then
-            echo "### ✨ New Features" >> changelog.md
+            echo "### New Features" >> changelog.md
             cat features.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f fixes.tmp ]; then
-            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "### Bug Fixes" >> changelog.md
             cat fixes.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f perf.tmp ]; then
-            echo "### ⚡ Performance Improvements" >> changelog.md
+            echo "### Performance Improvements" >> changelog.md
             cat perf.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f refactor.tmp ]; then
-            echo "### ♻️ Refactoring" >> changelog.md
+            echo "### Refactoring" >> changelog.md
             cat refactor.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f docs.tmp ]; then
-            echo "### 📚 Documentation" >> changelog.md
+            echo "### Documentation" >> changelog.md
             cat docs.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           if [ -f chores.tmp ]; then
-            echo "### 🔧 Maintenance" >> changelog.md
+            echo "### Maintenance" >> changelog.md
             cat chores.tmp >> changelog.md
             echo "" >> changelog.md
           fi
           
           # Add Docker image info
           echo "---" >> changelog.md
-          echo "### 🐳 Docker Image" >> changelog.md
+          echo "### Docker Image" >> changelog.md
           echo "" >> changelog.md
           echo "Pull the latest stable version:" >> changelog.md
           echo "\`\`\`bash" >> changelog.md
