@@ -11,6 +11,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
@@ -36,12 +37,27 @@ class ViewVodGroup extends ViewRecord
                             ->afterStateUpdated(function (Set $set, $state) {
                                 if ($state) {
                                     $set('category', null);
+                                    $set('new_group', null);
+                                    $set('create_new_group', false);
                                 }
                             })
                             ->searchable(),
+                        Toggle::make('create_new_group')
+                            ->label('Create new group')
+                            ->helperText('Enable to create a new group instead of selecting an existing one.')
+                            ->live()
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if ($state) {
+                                    $set('category', null);
+                                } else {
+                                    $set('new_group', null);
+                                }
+                            }),
                         Select::make('category')
                             ->label('Custom Group')
                             ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->hidden(fn (Get $get) => $get('create_new_group'))
                             ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the channels to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
@@ -51,13 +67,40 @@ class ViewVodGroup extends ViewRecord
                                     ->toArray() : [];
                             })
                             ->searchable(),
+                        TextInput::make('new_group')
+                            ->label('New Group Name')
+                            ->helperText('Enter a name for the new group to create.')
+                            ->hidden(fn (Get $get) => ! $get('create_new_group'))
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->required(fn (Get $get) => $get('create_new_group'))
+                            ->maxLength(255),
                     ])
                     ->action(function ($record, array $data): void {
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
-                        if ($data['category']) {
-                            $tags = $playlist->groupTags()->get();
+
+                        // Determine which tag to use (existing or new)
+                        $tag = null;
+                        if ($data['create_new_group'] && $data['new_group']) {
+                            // Create new group tag
+                            $existingTag = \Spatie\Tags\Tag::where('type', $playlist->uuid)
+                                ->where('name->en', $data['new_group'])
+                                ->first();
+                            if ($existingTag) {
+                                $tag = $existingTag;
+                            } else {
+                                $tag = \Spatie\Tags\Tag::create([
+                                    'name' => ['en' => $data['new_group']],
+                                    'type' => $playlist->uuid,
+                                ]);
+                                $playlist->attachTag($tag);
+                            }
+                        } elseif ($data['category']) {
                             $tag = $playlist->groupTags()->where('name->en', $data['category'])->first();
+                        }
+
+                        if ($tag) {
+                            $tags = $playlist->groupTags()->get();
                             foreach ($record->channels()->cursor() as $channel) {
                                 // Need to detach any existing tags from this playlist first
                                 $channel->detachTags($tags);
