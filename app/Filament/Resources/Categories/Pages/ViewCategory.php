@@ -10,6 +10,8 @@ use App\Models\CustomPlaylist;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
@@ -35,12 +37,27 @@ class ViewCategory extends ViewRecord
                             ->afterStateUpdated(function (Set $set, $state) {
                                 if ($state) {
                                     $set('category', null);
+                                    $set('new_category', null);
+                                    $set('create_new_category', false);
                                 }
                             })
                             ->searchable(),
+                        Toggle::make('create_new_category')
+                            ->label('Create new category')
+                            ->helperText('Enable to create a new category instead of selecting an existing one.')
+                            ->live()
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if ($state) {
+                                    $set('category', null);
+                                } else {
+                                    $set('new_category', null);
+                                }
+                            }),
                         Select::make('category')
                             ->label('Custom Category')
                             ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->hidden(fn (Get $get) => $get('create_new_category'))
                             ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the series to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
@@ -50,13 +67,41 @@ class ViewCategory extends ViewRecord
                                     ->toArray() : [];
                             })
                             ->searchable(),
+                        TextInput::make('new_category')
+                            ->label('New Category Name')
+                            ->helperText('Enter a name for the new category to create.')
+                            ->hidden(fn (Get $get) => ! $get('create_new_category'))
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->required(fn (Get $get) => $get('create_new_category'))
+                            ->maxLength(255),
                     ])
                     ->action(function ($record, array $data): void {
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                        if ($data['category']) {
-                            $tags = $playlist->categoryTags()->get();
+
+                        // Determine which tag to use (existing or new)
+                        $tag = null;
+                        if ($data['create_new_category'] && $data['new_category']) {
+                            // Create new category tag
+                            $tagType = $playlist->uuid.'-category';
+                            $existingTag = \Spatie\Tags\Tag::where('type', $tagType)
+                                ->where('name->en', $data['new_category'])
+                                ->first();
+                            if ($existingTag) {
+                                $tag = $existingTag;
+                            } else {
+                                $tag = \Spatie\Tags\Tag::create([
+                                    'name' => ['en' => $data['new_category']],
+                                    'type' => $tagType,
+                                ]);
+                                $playlist->attachTag($tag);
+                            }
+                        } elseif ($data['category']) {
                             $tag = $playlist->categoryTags()->where('name->en', $data['category'])->first();
+                        }
+
+                        if ($tag) {
+                            $tags = $playlist->categoryTags()->get();
                             foreach ($record->series()->cursor() as $series) {
                                 // Need to detach any existing tags from this playlist first
                                 $series->detachTags($tags);
