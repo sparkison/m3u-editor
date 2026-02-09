@@ -2203,7 +2203,7 @@ class PlaylistResource extends Resource
                                 ->addActionLabel('Add priority attribute')
                                 ->defaultItems(0)
                                 ->afterStateHydrated(function ($component, $state) {
-                                    // Convert stored format to repeater format
+                                    // Convert stored format to repeater format (Array of config attributes)
                                     if (is_array($state) && ! empty($state)) {
                                         $formatted = [];
                                         foreach ($state as $item) {
@@ -2217,7 +2217,7 @@ class PlaylistResource extends Resource
                                     }
                                 })
                                 ->dehydrateStateUsing(function ($state) {
-                                    // Convert repeater format to simple array
+                                    // Convert repeater format back to simple array of attribute keys
                                     if (is_array($state) && ! empty($state)) {
                                         return collect($state)
                                             ->pluck('attribute')
