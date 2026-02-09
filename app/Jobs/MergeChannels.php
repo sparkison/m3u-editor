@@ -227,6 +227,14 @@ class MergeChannels implements ShouldQueue
      */
     protected function selectMasterByWeightedScore($group, array $playlistPriority)
     {
+        // Enforce prefer catch-up as primary if enabled
+        if ($this->preferCatchupAsPrimary) {
+            $catchupChannels = $group->filter(fn ($channel) => ! empty($channel->catchup));
+            if ($catchupChannels->isNotEmpty()) {
+                $group = $catchupChannels;
+            }
+        }
+
         $scoredChannels = $group->map(function ($channel) use ($playlistPriority) {
             return [
                 'channel' => $channel,
