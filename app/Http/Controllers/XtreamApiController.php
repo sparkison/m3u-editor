@@ -1691,6 +1691,91 @@ class XtreamApiController extends Controller
                 foreach ($group['channelMap'] as $streamId => $epgChannelId) {
                     $channelProgrammes = $programmes[$epgChannelId] ?? [];
                     $channel = $channels[$streamId];
+
+                    // Fill gaps in EPG
+                    if (empty($channelProgrammes)) {
+                        $start = Carbon::parse($date)->startOfDay();
+                        $end = Carbon::parse($nextDate)->endOfDay();
+
+                        $current = $start->copy();
+                        while ($current->lt($end)) {
+                            $chunkEnd = $current->copy()->addHour();
+                            if ($chunkEnd->gt($end)) {
+                                $chunkEnd = $end->copy();
+                            }
+
+                            $channelProgrammes[] = [
+                                'id' => 'dummy-'.md5($streamId.$current->timestamp),
+                                'title' => $channel->name ?? 'Unknown Channel',
+                                'desc' => 'No information available',
+                                'start' => $current->format('Y-m-d H:i:s'),
+                                'stop' => $chunkEnd->format('Y-m-d H:i:s'),
+                                'lang' => 'en',
+                            ];
+                            $current = $chunkEnd;
+                        }
+                    } else {
+                        usort($channelProgrammes, function ($a, $b) {
+                            return strcmp($a['start'], $b['start']);
+                        });
+
+                        $filled = [];
+                        $lastEnd = Carbon::parse($date)->startOfDay();
+                        $finalEnd = Carbon::parse($nextDate)->endOfDay();
+
+                        foreach ($channelProgrammes as $prog) {
+                            $start = Carbon::parse($prog['start']);
+                            $stop = Carbon::parse($prog['stop']);
+
+                            if ($start->gt($lastEnd) && $start->diffInMinutes($lastEnd) > 1) {
+                                $gapStart = $lastEnd->copy();
+                                while ($gapStart->lt($start)) {
+                                    $gapEnd = $gapStart->copy()->addHour();
+                                    if ($gapEnd->gt($start)) {
+                                        $gapEnd = $start->copy();
+                                    }
+
+                                    $filled[] = [
+                                        'id' => 'dummy-'.md5($streamId.$gapStart->timestamp),
+                                        'title' => $channel->name ?? 'Unknown Channel',
+                                        'desc' => 'No information available',
+                                        'start' => $gapStart->format('Y-m-d H:i:s'),
+                                        'stop' => $gapEnd->format('Y-m-d H:i:s'),
+                                        'lang' => 'en',
+                                    ];
+                                    $gapStart = $gapEnd;
+                                }
+                            }
+
+                            $filled[] = $prog;
+
+                            if ($stop->gt($lastEnd)) {
+                                $lastEnd = $stop;
+                            }
+                        }
+
+                        if ($finalEnd->gt($lastEnd) && $finalEnd->diffInMinutes($lastEnd) > 1) {
+                            $gapStart = $lastEnd->copy();
+                            while ($gapStart->lt($finalEnd)) {
+                                $gapEnd = $gapStart->copy()->addHour();
+                                if ($gapEnd->gt($finalEnd)) {
+                                    $gapEnd = $finalEnd->copy();
+                                }
+
+                                $filled[] = [
+                                    'id' => 'dummy-'.md5($streamId.$gapStart->timestamp),
+                                    'title' => $channel->name ?? 'Unknown Channel',
+                                    'desc' => 'No information available',
+                                    'start' => $gapStart->format('Y-m-d H:i:s'),
+                                    'stop' => $gapEnd->format('Y-m-d H:i:s'),
+                                    'lang' => 'en',
+                                ];
+                                $gapStart = $gapEnd;
+                            }
+                        }
+                        $channelProgrammes = $filled;
+                    }
+
                     $isNowPlaying = $proxyEnabled ? M3uProxyService::isChannelActive($channel) : false;
 
                     $epgListings = [];
