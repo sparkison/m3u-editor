@@ -673,8 +673,7 @@ class PlaylistResource extends Resource
                             ->modalSubmitActionLabel('Purge now')
                             ->hidden(fn ($record): bool => ! $record->xtream),
                         DeleteAction::make()
-                            ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
-                            ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
+                            ->disabled(fn ($record): bool => $record->isProcessing()),
                     ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
                 ViewAction::make()
@@ -974,8 +973,7 @@ class PlaylistResource extends Resource
                     ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                     ->modalSubmitActionLabel('Yes, reset now'),
                 DeleteAction::make()
-                    ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
-                    ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
+                    ->disabled(fn ($record): bool => $record->isProcessing()),
             ])->button(),
         ];
     }
