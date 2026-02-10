@@ -6,9 +6,9 @@ use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\GroupResource;
 use App\Jobs\MergeChannels;
 use App\Jobs\UnmergeChannels;
-use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Services\PlaylistService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -19,7 +19,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 
 class EditGroup extends EditRecord
 {
@@ -29,59 +28,15 @@ class EditGroup extends EditRecord
     {
         return [
             ActionGroup::make([
-                Action::make('add')
-                    ->label('Add to Custom Playlist')
-                    ->schema([
-                        Select::make('playlist')
-                            ->required()
-                            ->live()
-                            ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add group channels to.')
-                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->afterStateUpdated(function (Set $set, $state) {
-                                if ($state) {
-                                    $set('category', null);
-                                }
-                            })
-                            ->searchable(),
-                        Select::make('category')
-                            ->label('Custom Group')
-                            ->disabled(fn (Get $get) => ! $get('playlist'))
-                            ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the channels to.')
-                            ->options(function ($get) {
-                                $customList = CustomPlaylist::find($get('playlist'));
-
-                                return $customList ? $customList->groupTags()->get()
-                                    ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                    ->toArray() : [];
-                            })
-                            ->searchable(),
-                    ])
-                    ->action(function ($record, array $data): void {
-                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                        $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
-                        if ($data['category']) {
-                            $tags = $playlist->groupTags()->get();
-                            $tag = $playlist->groupTags()->where('name->en', $data['category'])->first();
-                            foreach ($record->channels()->cursor() as $channel) {
-                                // Need to detach any existing tags from this playlist first
-                                $channel->detachTags($tags);
-                                $channel->attachTag($tag);
-                            }
-                        }
-                    })->after(function ($livewire) {
+                PlaylistService::getAddToPlaylistAction('add', 'channel', fn ($record) => $record->channels())
+                    ->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
                             ->success()
                             ->title('Group channels added to custom playlist')
                             ->body('The groups channels have been added to the chosen custom playlist.')
                             ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-play')
-                    ->modalIcon('heroicon-o-play')
-                    ->modalDescription('Add the group channels to the chosen custom playlist.')
-                    ->modalSubmitActionLabel('Add now'),
+                    }),
                 Action::make('move')
                     ->label('Move to Group')
                     ->schema([

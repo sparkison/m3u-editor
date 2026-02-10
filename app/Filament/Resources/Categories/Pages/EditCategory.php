@@ -6,14 +6,13 @@ use App\Filament\Resources\Categories\CategoryResource;
 use App\Jobs\ProcessM3uImportSeriesEpisodes;
 use App\Jobs\SyncSeriesStrmFiles;
 use App\Models\Category;
-use App\Models\CustomPlaylist;
+use App\Services\PlaylistService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 
 class EditCategory extends EditRecord
 {
@@ -23,58 +22,7 @@ class EditCategory extends EditRecord
     {
         return [
             ActionGroup::make([
-                Action::make('add')
-                    ->label('Add to Custom Playlist')
-                    ->schema([
-                        Select::make('playlist')
-                            ->required()
-                            ->live()
-                            ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add the category series to.')
-                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->afterStateUpdated(function (Set $set, $state) {
-                                if ($state) {
-                                    $set('category', null);
-                                }
-                            })
-                            ->searchable(),
-                        Select::make('category')
-                            ->label('Custom Category')
-                            ->disabled(fn (Get $get) => ! $get('playlist'))
-                            ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the series to.')
-                            ->options(function ($get) {
-                                $customList = CustomPlaylist::find($get('playlist'));
-
-                                return $customList ? $customList->categoryTags()->get()
-                                    ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                    ->toArray() : [];
-                            })
-                            ->searchable(),
-                    ])
-                    ->action(function ($record, array $data): void {
-                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                        $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                        if ($data['category']) {
-                            $tags = $playlist->categoryTags()->get();
-                            $tag = $playlist->categoryTags()->where('name->en', $data['category'])->first();
-                            foreach ($record->series()->cursor() as $series) {
-                                // Need to detach any existing tags from this playlist first
-                                $series->detachTags($tags);
-                                $series->attachTag($tag);
-                            }
-                        }
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Series added to custom playlist')
-                            ->body('The selected series have been added to the chosen custom playlist.')
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-play')
-                    ->modalIcon('heroicon-o-play')
-                    ->modalDescription('Add the selected series to the chosen custom playlist.')
-                    ->modalSubmitActionLabel('Add now'),
+                PlaylistService::getAddToPlaylistAction('add', 'series', fn ($record) => $record->series()),
                 Action::make('move')
                     ->label('Move Series to Category')
                     ->schema([
