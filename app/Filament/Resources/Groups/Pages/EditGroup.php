@@ -207,11 +207,18 @@ class EditGroup extends EditRecord
 
                 Action::make('unmerge')
                     ->label('Unmerge Same ID')
-                    ->action(function (Group $record, $data): void {
+                    ->schema([
+                        Toggle::make('reactivate_channels')
+                            ->label('Reactivate disabled channels')
+                            ->helperText('Enable channels that were previously disabled during merge.')
+                            ->default(false),
+                    ])
+                    ->action(function (Group $record, array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(command: new UnmergeChannels(
+                            ->dispatch(new UnmergeChannels(
                                 user: auth()->user(),
                                 groupId: $record->id,
+                                reactivateChannels: $data['reactivate_channels'] ?? false,
                             ));
                     })->after(function () {
                         Notification::make()
