@@ -12,7 +12,9 @@ use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -723,7 +725,7 @@ class PlaylistService
     {
         $isSeries = $type === 'series';
         $itemLabel = $isSeries ? 'series' : 'channel(s)';
-        $groupLabel = $isSeries ? 'Custom Category' : 'Custom Group';
+        $groupLabel = $isSeries ? 'Category' : 'Group';
         $tagFunction = $isSeries ? 'categoryTags' : 'groupTags';
 
         return [
@@ -733,24 +735,44 @@ class PlaylistService
                 ->label('Custom Playlist')
                 ->helperText("Select the custom playlist you would like to add the selected $itemLabel to.")
                 ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                ->afterStateUpdated(function (Set $set, $state) {
-                    if ($state) {
-                        $set('category', null);
-                    }
+                ->afterStateUpdated(function (Set $set) {
+                    $set('category', null);
+                    $set('mode', 'select');
                 })
                 ->searchable(),
+
+            Radio::make('mode')
+                ->label("$groupLabel Selection")
+                ->default('select')
+                ->options([
+                    'select' => "Select Existing $groupLabel",
+                    'create' => "Create New $groupLabel",
+                    'original' => "Use Original Item $groupLabel",
+                ])
+                ->live()
+                ->visible(fn (Get $get) => (bool) $get('playlist')),
+
             Select::make('category')
-                ->label($groupLabel)
-                ->disabled(fn (Get $get) => ! $get('playlist'))
-                ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : "Select the group you would like to assign to the selected $itemLabel to.")
+                ->label("Select $groupLabel")
+                ->required(fn (Get $get) => $get('mode') === 'select')
+                ->visible(fn (Get $get) => $get('playlist') && $get('mode') === 'select')
                 ->options(function (Get $get) use ($tagFunction) {
                     $customList = CustomPlaylist::find($get('playlist'));
 
-                    return $customList ? $customList->$tagFunction()->get()
+                    if (! $customList) {
+                        return [];
+                    }
+
+                    return $customList->$tagFunction()->get()
                         ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                        ->toArray() : [];
+                        ->toArray();
                 })
                 ->searchable(),
+
+            TextInput::make('new_category')
+                ->label("New $groupLabel Name")
+                ->required(fn (Get $get) => $get('mode') === 'create')
+                ->visible(fn (Get $get) => $get('playlist') && $get('mode') === 'create'),
         ];
     }
 
@@ -758,12 +780,14 @@ class PlaylistService
      * Add items to a custom playlist and optionally tag them.
      *
      * @param  iterable|Relation|Builder  $items
+     * @param  array|string|null  $data
      */
-    public static function addItemsToPlaylist(CustomPlaylist $playlist, $items, ?string $tagName, string $type = 'channel'): void
+    public static function addItemsToPlaylist(CustomPlaylist $playlist, $items, $data, string $type = 'channel'): void
     {
         $isSeries = $type === 'series';
         $tagFunction = $isSeries ? 'categoryTags' : 'groupTags';
         $relation = $isSeries ? 'series' : 'channels';
+        $tagType = $isSeries ? $playlist->uuid.'-category' : $playlist->uuid;
 
         // Get IDs for syncing
         $ids = [];
@@ -779,20 +803,52 @@ class PlaylistService
 
         $playlist->$relation()->syncWithoutDetaching($ids);
 
-        if ($tagName) {
-            $tags = $playlist->$tagFunction()->get();
-            $tag = $playlist->$tagFunction()->where('name->en', $tagName)->first();
+        // Parse data
+        $mode = 'select';
+        $tagName = null;
 
-            // Get iterator for tagging
-            $cursor = ($items instanceof Builder || $items instanceof Relation)
-                ? $items->cursor()
-                : $items;
+        if (is_array($data)) {
+            $mode = $data['mode'] ?? 'select';
+            if ($mode === 'select') {
+                $tagName = $data['category'] ?? null;
+            } elseif ($mode === 'create') {
+                $tagName = $data['new_category'] ?? null;
+            }
+        } else {
+            $tagName = $data;
+        }
 
-            if ($tag) {
-                foreach ($cursor as $item) {
-                    $item->detachTags($tags);
+        $playlistTags = $playlist->$tagFunction()->get();
+        // Get iterator for tagging
+        $cursor = ($items instanceof Builder || $items instanceof Relation)
+            ? $items->cursor()
+            : $items;
+
+        if ($mode === 'original') {
+            foreach ($cursor as $item) {
+                // Determine original name
+                $originalName = null;
+                if ($isSeries) {
+                    $originalName = $item->category->name ?? null;
+                } else {
+                    $originalName = $item->group;
+                }
+
+                if ($originalName) {
+                    $tag = \Spatie\Tags\Tag::findOrCreate($originalName, $tagType);
+                    $playlist->attachTag($tag);
+
+                    $item->detachTags($playlistTags);
                     $item->attachTag($tag);
                 }
+            }
+        } elseif ($tagName) {
+            $tag = \Spatie\Tags\Tag::findOrCreate($tagName, $tagType);
+            $playlist->attachTag($tag);
+
+            foreach ($cursor as $item) {
+                $item->detachTags($playlistTags);
+                $item->attachTag($tag);
             }
         }
     }
@@ -815,7 +871,7 @@ class PlaylistService
                     $items = $resolveRecordsCallback($records);
                 }
 
-                self::addItemsToPlaylist($playlist, $items, $data['category'] ?? null, $type);
+                self::addItemsToPlaylist($playlist, $items, $data, $type);
             })
             ->after(function () {
                 Notification::make()
@@ -850,7 +906,7 @@ class PlaylistService
                     $items = $resolveRecordsCallback($record);
                 }
 
-                self::addItemsToPlaylist($playlist, $items, $data['category'] ?? null, $type);
+                self::addItemsToPlaylist($playlist, $items, $data, $type);
             })
             ->after(function () {
                 Notification::make()
