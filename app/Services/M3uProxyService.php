@@ -815,6 +815,8 @@ class M3uProxyService
                 'original_channel_id' => $originalChannelId,  // For cross-provider failover pooling
                 'original_playlist_uuid' => $originalPlaylistUuid,  // For cross-provider failover pooling
                 'is_failover' => $isFailover,
+                'strict_live_ts' => $playlist->strict_live_ts ?? false,
+                'use_sticky_session' => $playlist->use_sticky_session ?? false,
             ];
 
             // Add provider profile ID if using profiles
@@ -860,7 +862,8 @@ class M3uProxyService
                 'id' => $actualChannel->id,  // Actual channel being streamed
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,  // Actual playlist being used
-                'strict_live_ts' => $playlist->strict_live_ts,
+                'strict_live_ts' => $playlist->strict_live_ts ?? false,
+                'use_sticky_session' => $playlist->use_sticky_session ?? false,
                 'original_channel_id' => $originalChannelId,  // For cross-provider failover pooling
                 'original_playlist_uuid' => $originalPlaylistUuid,  // For cross-provider failover pooling
                 'is_failover' => $isFailover,
@@ -1008,6 +1011,8 @@ class M3uProxyService
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
                 'profile_id' => $profile->id,
+                'strict_live_ts' => $playlist->strict_live_ts ?? false,
+                'use_sticky_session' => $playlist->use_sticky_session ?? false,
             ];
 
             // Add provider profile ID if using profiles
@@ -1037,7 +1042,8 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
-                'strict_live_ts' => $playlist->strict_live_ts,
+                'strict_live_ts' => $playlist->strict_live_ts ?? false,
+                'use_sticky_session' => $playlist->use_sticky_session ?? false,
             ];
 
             // Add provider profile ID if using profiles
@@ -1278,6 +1284,12 @@ class M3uProxyService
                 unset($metadata['strict_live_ts']);
             }
 
+            // Handle use_sticky_session flag if set in metadata
+            if ($metadata['use_sticky_session'] ?? false) {
+                $payload['use_sticky_session'] = true;
+                unset($metadata['use_sticky_session']);
+            }
+
             // If using failovers, provide the callback URL for smart failover handling, or list of URLs
             if ($failovers) {
                 if (is_array($failovers)) {
@@ -1369,6 +1381,18 @@ class M3uProxyService
                 'profile' => $profile->getProfileIdentifier(),  // Custom args template or predefined profile name
                 'metadata' => $metadata,
             ];
+
+            // Handle strict_live_ts flag if set in metadata
+            if ($metadata['strict_live_ts'] ?? false) {
+                $payload['strict_live_ts'] = true;
+                unset($metadata['strict_live_ts']);
+            }
+
+            // Handle use_sticky_session flag if set in metadata
+            if ($metadata['use_sticky_session'] ?? false) {
+                $payload['use_sticky_session'] = true;
+                unset($metadata['use_sticky_session']);
+            }
 
             // If using failovers, provide the callback URL for smart failover handling, or list of URLs
             if ($failovers) {

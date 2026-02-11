@@ -53,6 +53,7 @@ class Playlist extends Model
         'emby_config' => 'array',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
+        'use_sticky_session' => 'boolean',
         'profiles_enabled' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
