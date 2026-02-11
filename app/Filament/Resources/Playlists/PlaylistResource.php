@@ -286,6 +286,7 @@ class PlaylistResource extends Resource
                         ? 'Proxy is required when Provider Profiles are enabled'
                         : 'Toggle proxy status')
                     ->disabled(fn (Playlist $record): bool => $record->profiles_enabled)
+                    ->hidden(fn () => ! auth()->user()->canUseProxy())
                     ->sortable(),
                 ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -2265,6 +2266,7 @@ class PlaylistResource extends Resource
                 ->collapsible()
                 ->collapsed($creating)
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')

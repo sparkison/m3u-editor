@@ -49,6 +49,15 @@ class UserResource extends Resource
                     ->label('Email address')
                     ->email()
                     ->required(),
+                Forms\Components\CheckboxList::make('permissions')
+                    ->label('Permissions')
+                    ->options(User::getAvailablePermissions())
+                    ->descriptions([
+                        'use_proxy' => 'Allow this user to access proxy features and stream via the m3u-proxy server',
+                    ])
+                    ->columnSpanFull()
+                    ->gridDirection('row')
+                    ->columns(2),
                 Forms\Components\Toggle::make('update_password')
                     ->label('Update Password')
                     ->default(false)

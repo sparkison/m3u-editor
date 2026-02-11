@@ -86,6 +86,13 @@ class PlaylistGenerateController extends Controller
         } else {
             $proxyEnabled = $playlist->enable_proxy;
         }
+
+        // Check if user has permission to use proxy
+        // If not, force proxy to be disabled regardless of settings
+        if ($proxyEnabled && ! $playlist->user->canUseProxy()) {
+            $proxyEnabled = false;
+        }
+
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Get the base URL

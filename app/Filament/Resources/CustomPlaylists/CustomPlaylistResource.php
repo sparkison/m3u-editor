@@ -138,6 +138,7 @@ class CustomPlaylistResource extends Resource
 
                         return $state;
                     })
+                    ->hidden(fn () => ! auth()->user()->canUseProxy())
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -321,6 +322,7 @@ class CustomPlaylistResource extends Resource
                 ->collapsible()
                 ->collapsed($creating)
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')

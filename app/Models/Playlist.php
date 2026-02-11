@@ -325,6 +325,22 @@ class Playlist extends Model
         return collect($configs)->sortBy('priority')->values()->all();
     }
 
+    public function enableProxy(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value) {
+                    // Check playlist user has access to proxy features
+                    if (! $this->user?->canUseProxy()) {
+                        return false;
+                    }
+                }
+
+                return $value;
+            }
+        );
+    }
+
     public function xtreamStatus(): Attribute
     {
         return Attribute::make(

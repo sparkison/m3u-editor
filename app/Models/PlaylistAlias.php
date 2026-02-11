@@ -290,6 +290,22 @@ class PlaylistAlias extends Model
             ->where('enabled', true);
     }
 
+    public function enableProxy(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value) {
+                    // Check playlist user has access to proxy features
+                    if (! $this->user?->canUseProxy()) {
+                        return false;
+                    }
+                }
+
+                return $value;
+            }
+        );
+    }
+
     public function liveCount(): Attribute
     {
         return Attribute::make(
