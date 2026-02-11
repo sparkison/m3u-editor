@@ -418,6 +418,15 @@ class PlaylistAliasResource extends Resource
                                 ->default(false),
                             Forms\Components\Toggle::make('use_sticky_session')
                                 ->label('Enable Sticky Session Handler')
+                                ->hintAction(
+                                    Actions\Action::make('learn_more_sticky_session')
+                                        ->label('Learn More')
+                                        ->icon('heroicon-o-arrow-top-right-on-square')
+                                        ->iconPosition('after')
+                                        ->size('sm')
+                                        ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STICKY_SESSION.md')
+                                        ->openUrlInNewTab(true)
+                                )
                                 ->helperText('')
                                 ->inline(false)
                                 ->default(false)

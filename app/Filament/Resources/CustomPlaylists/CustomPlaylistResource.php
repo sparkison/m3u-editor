@@ -403,6 +403,15 @@ class CustomPlaylistResource extends Resource
                                 ->inline(false)
                                 ->default(false),
                             Toggle::make('use_sticky_session')
+                                ->hintAction(
+                                    Action::make('learn_more_sticky_session')
+                                        ->label('Learn More')
+                                        ->icon('heroicon-o-arrow-top-right-on-square')
+                                        ->iconPosition('after')
+                                        ->size('sm')
+                                        ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STICKY_SESSION.md')
+                                        ->openUrlInNewTab(true)
+                                )
                                 ->label('Enable Sticky Session Handler')
                                 ->helperText('')
                                 ->inline(false)
