@@ -582,7 +582,7 @@ class Preferences extends SettingsPage
                                     ->collapsible(false)
                                     ->schema([
                                         Toggle::make('invalidate_import')
-                                            ->label('Enable import invalidation')
+                                            ->label('Enable sync invalidation')
                                             ->disabled(fn () => ! empty(config('dev.invalidate_import')))
                                             ->live()
                                             ->hint(fn () => ! empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
@@ -594,14 +594,13 @@ class Preferences extends SettingsPage
                                                     $component->state((bool) config('dev.invalidate_import'));
                                                 }
                                             })
-                                            ->dehydrated(fn () => empty(config('dev.invalidate_import')))
-                                            ->helperText('Invalidate Playlist sync if conditon met.'),
+                                            ->dehydrated(fn () => empty(config('dev.invalidate_import'))),
                                         TextInput::make('invalidate_import_threshold')
-                                            ->label('Import invalidation threshold')
+                                            ->label('Sync invalidation threshold')
                                             ->columnSpan(2)
                                             ->hintIcon(
                                                 'heroicon-m-question-mark-circle',
-                                                tooltip: 'Some providers frequently remove and re-add groups/categories, which can lead to channels be removed during sync. This setting helps prevent large-scale removals by canceling the sync if too many channels would be removed.'
+                                                tooltip: 'Some providers frequently remove and re-add groups/categories, which can lead to channels be removed during sync. This setting helps prevent large-scale removals by canceling the sync if the defined number of channels would be removed.'
                                             )
                                             ->suffixIcon(fn () => ! empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
                                             ->disabled(fn () => ! empty(config('dev.invalidate_import_threshold')))
@@ -610,7 +609,7 @@ class Preferences extends SettingsPage
                                             ->placeholder(fn () => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
                                             ->hidden(fn ($get) => ! empty(config('dev.invalidate_import')) || ! $get('invalidate_import'))
                                             ->numeric()
-                                            ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
+                                            ->helperText('If sync will remove more than this number of channels, the sync will be canceled.'),
                                     ]),
                                 Section::make('Series stream file settings')
                                     ->description('Select a Stream File Setting for series .strm file generation.')
