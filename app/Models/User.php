@@ -211,12 +211,30 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * Check if user can use integrations.
+     */
+    public function canUseIntegrations(): bool
+    {
+        return $this->hasPermission('use_integrations');
+    }
+
+    /**
+     * Check if user can access tools.
+     */
+    public function canAccessTools(): bool
+    {
+        return $this->hasPermission('tools');
+    }
+
+    /**
      * Get all available permissions.
      */
     public static function getAvailablePermissions(): array
     {
         return [
             'use_proxy' => 'Use Proxy',
+            'use_integrations' => 'Use Integrations',
+            'tools' => 'Access Tools',
         ];
     }
 }

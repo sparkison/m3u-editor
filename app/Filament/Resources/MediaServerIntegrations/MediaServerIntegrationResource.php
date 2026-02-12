@@ -62,6 +62,15 @@ class MediaServerIntegrationResource extends Resource
 
     protected static ?int $navigationSort = 100;
 
+    /**
+     * Check if the user can access this page.
+     * Only users with the "integrations" permission can access this page.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->canUseIntegrations();
+    }
+
     public static function getRecordTitle(?Model $record): string|null|Htmlable
     {
         return $record?->name;
