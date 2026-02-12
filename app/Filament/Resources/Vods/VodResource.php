@@ -254,6 +254,11 @@ class VodResource extends Resource
                 ->formatStateUsing(fn ($state) => new HtmlString(LanguageFlags::renderFlags($state)))
                 ->tooltip(function ($record): string {
                     $languages = $record->audio_languages ?? [];
+                    // Handle string input (JSON encoded)
+                    if (is_string($languages)) {
+                        $decoded = json_decode($languages, true);
+                        $languages = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$languages];
+                    }
                     if (empty($languages)) {
                         return 'No audio languages detected. Run "Scan Audio Languages" to detect.';
                     }

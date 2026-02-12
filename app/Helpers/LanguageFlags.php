@@ -401,12 +401,23 @@ class LanguageFlags
     /**
      * Generate HTML for displaying language flags.
      *
-     * @param  array|null  $languages  Array of ISO 639-2/3 language codes
+     * @param  array|string|null  $languages  Array or JSON string of ISO 639-2/3 language codes
      * @param  int  $flagWidth  Width of each flag (default 20)
      * @return string HTML string with flag images
      */
-    public static function renderFlags(?array $languages, int $flagWidth = 20): string
+    public static function renderFlags(array|string|null $languages, int $flagWidth = 20): string
     {
+        // Handle string input (JSON encoded or single language code)
+        if (is_string($languages)) {
+            $decoded = json_decode($languages, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $languages = $decoded;
+            } else {
+                // Single language code as string
+                $languages = [$languages];
+            }
+        }
+
         if (empty($languages)) {
             return '<span class="text-gray-400">-</span>';
         }
