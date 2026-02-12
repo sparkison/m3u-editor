@@ -197,10 +197,13 @@ class NetworkBroadcastService
         // Get the callback URL
         $callbackUrl = $this->proxyService->getBroadcastCallbackUrl();
 
-        // Check if the stream URL already has seeking built in (e.g., Plex's offset= or StartTimeTicks=)
-        // If so, don't also add FFmpeg's -ss seeking (double-seeking causes corruption, especially with AC3 audio)
+        // Only trust URL-based seeking when using server-side transcoding (TranscodeMode::Server).
+        // For direct streams (static=true), media servers like Emby/Jellyfin ignore StartTimeTicks,
+        // so FFmpeg must always handle seeking via -ss. Double-seeking is only a risk when the
+        // server is actively transcoding and applying the seek itself.
+        $isServerTranscode = ($network->transcode_mode ?? null) === TranscodeMode::Server;
         $urlHasSeeking = preg_match('/[?&](offset|StartTimeTicks)=/', $streamUrl);
-        $ffmpegSeekSeconds = $urlHasSeeking ? 0 : $seekPosition;
+        $ffmpegSeekSeconds = ($isServerTranscode && $urlHasSeeking) ? 0 : $seekPosition;
 
         // If using server-side transcoding, ensure we have a valid transcode start URL from the media server
         if ((($network->transcode_mode ?? null) === TranscodeMode::Server) && empty($streamUrl)) {
