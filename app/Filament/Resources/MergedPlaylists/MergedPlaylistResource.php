@@ -114,6 +114,7 @@ class MergedPlaylistResource extends Resource
                     ->label('Proxy')
                     ->toggleable()
                     ->tooltip('Toggle proxy status')
+                    ->hidden(fn () => ! auth()->user()->canUseProxy())
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -285,6 +286,7 @@ class MergedPlaylistResource extends Resource
                 ->collapsible()
                 ->collapsed($creating)
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')

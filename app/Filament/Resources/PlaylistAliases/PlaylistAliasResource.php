@@ -355,6 +355,7 @@ class PlaylistAliasResource extends Resource
 
             Schemas\Components\Fieldset::make('Proxy Options')
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Forms\Components\Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')
