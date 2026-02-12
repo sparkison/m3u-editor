@@ -11,6 +11,7 @@ use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\FetchTmdbIds;
 use App\Jobs\ProcessVodChannels;
+use App\Jobs\ScanAudioLanguages;
 use App\Jobs\SyncVodStrmFiles;
 use App\Models\Channel;
 use App\Models\ChannelFailover;
@@ -481,6 +482,37 @@ class VodResource extends Resource
                 ->query(function ($query) {
                     return $query->where('epg_channel_id', '=', null);
                 }),
+            SelectFilter::make('audio_language')
+                ->label('Audio Language')
+                ->options(function () {
+                    // Get all unique audio languages from the database
+                    $languages = Channel::where('is_vod', true)
+                        ->whereNotNull('audio_languages')
+                        ->pluck('audio_languages')
+                        ->flatten()
+                        ->unique()
+                        ->sort()
+                        ->mapWithKeys(fn ($lang) => [$lang => strtoupper($lang)])
+                        ->toArray();
+
+                    return $languages;
+                })
+                ->query(function (Builder $query, array $data) {
+                    if (! empty($data['value'])) {
+                        // PostgreSQL JSON contains
+                        $query->whereRaw("audio_languages::jsonb ? ?", [$data['value']]);
+                    }
+                })
+                ->searchable()
+                ->preload(),
+            Filter::make('has_audio_languages')
+                ->label('Has audio language info')
+                ->toggle()
+                ->query(fn (Builder $query) => $query->whereNotNull('audio_scanned_at')),
+            Filter::make('missing_audio_scan')
+                ->label('Not scanned for audio')
+                ->toggle()
+                ->query(fn (Builder $query) => $query->whereNull('audio_scanned_at')),
         ];
     }
 
@@ -1014,6 +1046,38 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-magnifying-glass')
                     ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for the selected VOD channels? This enables Trash Guides compatibility for Radarr/Sonarr.')
                     ->modalSubmitActionLabel('Yes, fetch IDs now'),
+                BulkAction::make('scan_audio_languages')
+                    ->label('Scan Audio Languages')
+                    ->icon('heroicon-o-speaker-wave')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Scans')
+                            ->helperText('Overwrite existing audio language data? If disabled, it will only scan items that haven\'t been scanned yet.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, $data) {
+                        $vodIds = $records->pluck('id')->toArray();
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new ScanAudioLanguages(
+                                vodChannelIds: $vodIds,
+                                episodeIds: null,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title('Scanning audio languages for '.count($vodIds).' VOD channel(s)')
+                            ->body('The audio language scan has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-speaker-wave')
+                    ->modalDescription('Scan the selected VOD channels for available audio languages using ffprobe? This extracts audio stream metadata without encoding.')
+                    ->modalSubmitActionLabel('Yes, scan now'),
                 BulkAction::make('sync')
                     ->label('Sync VOD .strm files')
                     ->action(function ($records) {

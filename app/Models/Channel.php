@@ -48,6 +48,8 @@ class Channel extends Model
         'last_metadata_fetch' => 'datetime',
         'epg_map_enabled' => 'boolean',
         'logo_type' => ChannelLogoType::class,
+        'audio_languages' => 'array',
+        'audio_scanned_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

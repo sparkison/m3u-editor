@@ -33,6 +33,8 @@ class Episode extends Model
         'episode_num' => 'integer',
         'season' => 'integer',
         'info' => 'array',
+        'audio_languages' => 'array',
+        'audio_scanned_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -149,6 +151,8 @@ class Episode extends Model
                             'sample_rate' => $stream['sample_rate'] ?? null,
                             'channels' => $stream['channels'] ?? null,
                             'channel_layout' => $stream['channel_layout'] ?? null,
+                            'language' => $stream['tags']['language'] ?? null,
+                            'language_title' => $stream['tags']['title'] ?? null,
                         ];
                     }
                 }
