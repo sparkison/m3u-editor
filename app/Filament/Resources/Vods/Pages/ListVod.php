@@ -10,6 +10,7 @@ use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\FetchTmdbIds;
 use App\Jobs\MergeChannels;
 use App\Jobs\ProcessVodChannels;
+use App\Jobs\ScanAudioLanguages;
 use App\Jobs\SyncVodStrmFiles;
 use App\Jobs\UnmergeChannels;
 use App\Models\Channel;
@@ -303,6 +304,85 @@ class ListVod extends ListRecords
                     ->modalIcon('heroicon-o-magnifying-glass')
                     ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for all VOD channels in the selected playlist? This enables Trash Guides compatibility for Radarr.')
                     ->modalSubmitActionLabel('Yes, fetch IDs now'),
+                Action::make('scan_audio_languages')
+                    ->label('Scan Audio Languages')
+                    ->icon('heroicon-o-speaker-wave')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Scans')
+                            ->helperText('Re-scan channels that have already been scanned? If disabled, only unscanned channels will be processed.')
+                            ->default(false),
+                        Select::make('playlist')
+                            ->label('Playlist')
+                            ->required()
+                            ->helperText('Select the Playlist you would like to scan for audio languages.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($data) {
+                        $settings = app(GeneralSettings::class);
+                        if (empty($settings->ffprobe_path)) {
+                            Notification::make()
+                                ->danger()
+                                ->title('FFprobe Path Required')
+                                ->body('Please configure your ffprobe path in Settings before using this feature.')
+                                ->duration(10000)
+                                ->send();
+
+                            return;
+                        }
+
+                        $playlistId = $data['playlist'] ?? null;
+                        $playlist = Playlist::find($playlistId);
+                        if (! $playlist) {
+                            return;
+                        }
+
+                        $query = $playlist->channels()
+                            ->where('is_vod', true)
+                            ->where('enabled', true);
+
+                        if (! ($data['overwrite_existing'] ?? false)) {
+                            $query->whereNull('audio_scanned_at');
+                        }
+
+                        $vodCount = $query->count();
+
+                        if ($vodCount === 0) {
+                            Notification::make()
+                                ->warning()
+                                ->title('No VOD channels to scan')
+                                ->body($data['overwrite_existing'] ?? false
+                                    ? 'No enabled VOD channels found in the selected playlist.'
+                                    : 'All VOD channels in this playlist have already been scanned. Enable "Overwrite Existing Scans" to re-scan.')
+                                ->send();
+
+                            return;
+                        }
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new ScanAudioLanguages(
+                                vodChannelIds: null,
+                                episodeIds: null,
+                                playlistId: $playlistId,
+                                allPlaylists: false,
+                                vodOnly: true,
+                                seriesOnly: false,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title("Scanning audio languages for {$vodCount} VOD channel(s)")
+                            ->body('The audio language scan has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-speaker-wave')
+                    ->modalDescription('Scan VOD channels using ffprobe to detect available audio languages. This may take several minutes depending on the number of channels.')
+                    ->modalSubmitActionLabel('Yes, scan now'),
                 Action::make('sync')
                     ->label('Sync VOD .strm files')
                     ->schema([

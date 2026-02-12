@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Vods;
 use App\Facades\LogoFacade;
 use App\Facades\ProxyFacade;
 use App\Facades\SortFacade;
+use App\Helpers\LanguageFlags;
 use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\Vods\Pages\ListVod;
 use App\Jobs\ChannelFindAndReplace;
@@ -246,6 +247,21 @@ class VodResource extends Resource
                     return 'No TMDB/IMDB ID available';
                 })
                 ->getStateUsing(fn ($record) => ! empty($record->info['tmdb_id'] ?? $record->movie_data['tmdb_id'] ?? null))
+                ->toggleable(),
+            TextColumn::make('audio_languages')
+                ->label('Audio')
+                ->getStateUsing(fn ($record) => $record->audio_languages)
+                ->formatStateUsing(fn ($state) => new HtmlString(LanguageFlags::renderFlags($state)))
+                ->tooltip(function ($record): string {
+                    $languages = $record->audio_languages ?? [];
+                    if (empty($languages)) {
+                        return 'No audio languages detected. Run "Scan Audio Languages" to detect.';
+                    }
+                    $names = array_map(fn ($lang) => LanguageFlags::getLanguageName($lang).' ('.strtoupper($lang).')', $languages);
+
+                    return implode(', ', $names);
+                })
+                ->html()
                 ->toggleable(),
             TextInputColumn::make('stream_id_custom')
                 ->label('ID')
