@@ -429,12 +429,12 @@ class LanguageFlags
 
             if ($url) {
                 $flags[] = sprintf(
-                    '<img src="%s" alt="%s" title="%s (%s)" style="height: %dpx; display: inline-block; margin-right: 4px; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">',
+                    '<img src="%s" alt="%s" title="%s (%s)" style="width: %dpx; display: inline-block; margin-right: 4px; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">',
                     htmlspecialchars($url),
                     htmlspecialchars($name),
                     htmlspecialchars($name),
                     strtoupper($lang),
-                    $flagWidth * 0.75 // Approximate height based on flag aspect ratio
+                    $flagWidth
                 );
             } else {
                 // Fallback to text badge if no flag found
