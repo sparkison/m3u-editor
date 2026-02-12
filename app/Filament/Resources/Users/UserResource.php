@@ -99,6 +99,10 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email address')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('permissions')
+                    ->label('Permissions')
+                    ->badge()
+                    ->toggleable(),
                 // Tables\Columns\TextColumn::make('email_verified_at')
                 //     ->dateTime()
                 //     ->sortable(),
