@@ -235,12 +235,12 @@ class FetchTmdbIds implements ShouldQueue
 
                 // Populate cast if available
                 if (! empty($details['cast'])) {
-                    $info['cast'] = $details['cast'];
+                    $info['cast'] = is_array($details['cast']) ? implode(', ', $details['cast']) : $details['cast'];
                 }
 
                 // Populate director if available
                 if (! empty($details['director'])) {
-                    $info['director'] = $details['director'];
+                    $info['director'] = is_array($details['director']) ? implode(', ', $details['director']) : $details['director'];
                 }
 
                 // Populate YouTube trailer if available
@@ -429,12 +429,12 @@ class FetchTmdbIds implements ShouldQueue
 
                 // Populate cast if available
                 if (! empty($details['cast'])) {
-                    $updateData['cast'] = $details['cast'];
+                    $updateData['cast'] = is_array($details['cast']) ? implode(', ', $details['cast']) : $details['cast'];
                 }
 
                 // Populate director if available
                 if (! empty($details['director'])) {
-                    $updateData['director'] = $details['director'];
+                    $updateData['director'] = is_array($details['director']) ? implode(', ', $details['director']) : $details['director'];
                 }
 
                 // Populate YouTube trailer if available
