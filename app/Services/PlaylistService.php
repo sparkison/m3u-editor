@@ -10,7 +10,18 @@ use App\Models\PlaylistAuth;
 use App\Settings\GeneralSettings;
 use Carbon\Carbon;
 use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -422,6 +433,11 @@ class PlaylistService
             ->first();
 
         if ($alias) {
+            // If alias found but expired, treat as not found
+            if ($alias->isExpired()) {
+                return false;
+            }
+
             return [
                 $alias,
                 'alias_auth',
@@ -705,5 +721,209 @@ class PlaylistService
         }
 
         return $streamUrl;
+    }
+
+    /**
+     * Get the schema for adding items to a custom playlist.
+     */
+    public static function getAddToPlaylistSchema(string $type = 'channel'): array
+    {
+        $isSeries = $type === 'series';
+        $itemLabel = $isSeries ? 'series' : 'channel(s)';
+        $groupLabel = $isSeries ? 'Category' : 'Group';
+        $tagFunction = $isSeries ? 'categoryTags' : 'groupTags';
+
+        return [
+            Select::make('playlist')
+                ->required()
+                ->live()
+                ->label('Custom Playlist')
+                ->helperText("Select the custom playlist you would like to add the selected $itemLabel to.")
+                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->afterStateUpdated(function (Set $set) {
+                    $set('category', null);
+                    $set('mode', 'select');
+                })
+                ->searchable(),
+
+            Radio::make('mode')
+                ->label("$groupLabel Selection")
+                ->default('select')
+                ->options([
+                    'select' => "Select Existing $groupLabel",
+                    'create' => "Create New $groupLabel",
+                    'original' => "Use Original Item $groupLabel",
+                ])
+                ->live()
+                ->visible(fn (Get $get) => (bool) $get('playlist')),
+
+            Select::make('category')
+                ->label("Select $groupLabel")
+                ->required(fn (Get $get) => $get('mode') === 'select')
+                ->visible(fn (Get $get) => $get('playlist') && $get('mode') === 'select')
+                ->options(function (Get $get) use ($tagFunction) {
+                    $customList = CustomPlaylist::find($get('playlist'));
+
+                    if (! $customList) {
+                        return [];
+                    }
+
+                    return $customList->$tagFunction()->get()
+                        ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                        ->toArray();
+                })
+                ->searchable(),
+
+            TextInput::make('new_category')
+                ->label("New $groupLabel Name")
+                ->required(fn (Get $get) => $get('mode') === 'create')
+                ->visible(fn (Get $get) => $get('playlist') && $get('mode') === 'create'),
+        ];
+    }
+
+    /**
+     * Add items to a custom playlist and optionally tag them.
+     *
+     * @param  iterable|Relation|Builder  $items
+     * @param  array|string|null  $data
+     */
+    public static function addItemsToPlaylist(CustomPlaylist $playlist, $items, $data, string $type = 'channel'): void
+    {
+        $isSeries = $type === 'series';
+        $tagFunction = $isSeries ? 'categoryTags' : 'groupTags';
+        $relation = $isSeries ? 'series' : 'channels';
+        $tagType = $isSeries ? $playlist->uuid.'-category' : $playlist->uuid;
+
+        // Get IDs for syncing
+        $ids = [];
+        if ($items instanceof Relation || $items instanceof Builder) {
+            $ids = $items->pluck('id');
+        } elseif ($items instanceof Collection) {
+            $ids = $items->pluck('id');
+        } else {
+            foreach ($items as $item) {
+                $ids[] = $item->id;
+            }
+        }
+
+        $playlist->$relation()->syncWithoutDetaching($ids);
+
+        // Parse data
+        $mode = 'select';
+        $tagName = null;
+
+        if (is_array($data)) {
+            $mode = $data['mode'] ?? 'select';
+            if ($mode === 'select') {
+                $tagName = $data['category'] ?? null;
+            } elseif ($mode === 'create') {
+                $tagName = $data['new_category'] ?? null;
+            }
+        } else {
+            $tagName = $data;
+        }
+
+        $playlistTags = $playlist->$tagFunction()->get();
+        // Get iterator for tagging
+        $cursor = ($items instanceof Builder || $items instanceof Relation)
+            ? $items->cursor()
+            : $items;
+
+        if ($mode === 'original') {
+            foreach ($cursor as $item) {
+                // Determine original name
+                $originalName = null;
+                if ($isSeries) {
+                    $originalName = $item->category->name ?? null;
+                } else {
+                    $originalName = $item->group;
+                }
+
+                if ($originalName) {
+                    $tag = \Spatie\Tags\Tag::findOrCreate($originalName, $tagType);
+                    $playlist->attachTag($tag);
+
+                    $item->detachTags($playlistTags);
+                    $item->attachTag($tag);
+                }
+            }
+        } elseif ($tagName) {
+            $tag = \Spatie\Tags\Tag::findOrCreate($tagName, $tagType);
+            $playlist->attachTag($tag);
+
+            foreach ($cursor as $item) {
+                $item->detachTags($playlistTags);
+                $item->attachTag($tag);
+            }
+        }
+    }
+
+    /**
+     * Get the BulkAction for adding items to a custom playlist.
+     *
+     * @param  \Closure|null  $resolveRecordsCallback  Returns the items to add from the records: fn($records) => $records->flatMap->channels
+     */
+    public static function getAddToPlaylistBulkAction(string $name = 'add', string $type = 'channel', ?\Closure $resolveRecordsCallback = null): BulkAction
+    {
+        return BulkAction::make($name)
+            ->label('Add to Custom Playlist')
+            ->schema(self::getAddToPlaylistSchema($type))
+            ->action(function (Collection $records, array $data) use ($type, $resolveRecordsCallback): void {
+                $playlist = CustomPlaylist::findOrFail($data['playlist']);
+
+                $items = $records;
+                if ($resolveRecordsCallback) {
+                    $items = $resolveRecordsCallback($records);
+                }
+
+                self::addItemsToPlaylist($playlist, $items, $data, $type);
+            })
+            ->after(function () {
+                Notification::make()
+                    ->success()
+                    ->title('Items added to custom playlist')
+                    ->body('The selected items have been added to the chosen custom playlist.')
+                    ->send();
+            })
+            ->deselectRecordsAfterCompletion()
+            ->requiresConfirmation()
+            ->icon('heroicon-o-play')
+            ->modalIcon('heroicon-o-play')
+            ->modalDescription('Add the selected item(s) to the chosen custom playlist.')
+            ->modalSubmitActionLabel('Add now');
+    }
+
+    /**
+     * Get the Action for adding items to a custom playlist.
+     *
+     * @param  \Closure|null  $resolveRecordsCallback  Returns the items to add from the record: fn($record) => $record->channels()
+     */
+    public static function getAddToPlaylistAction(string $name = 'add', string $type = 'channel', ?\Closure $resolveRecordsCallback = null): Action
+    {
+        return Action::make($name)
+            ->label('Add to Custom Playlist')
+            ->schema(self::getAddToPlaylistSchema($type))
+            ->action(function ($record, array $data) use ($type, $resolveRecordsCallback): void {
+                $playlist = CustomPlaylist::findOrFail($data['playlist']);
+
+                $items = $record;
+                if ($resolveRecordsCallback) {
+                    $items = $resolveRecordsCallback($record);
+                }
+
+                self::addItemsToPlaylist($playlist, $items, $data, $type);
+            })
+            ->after(function () {
+                Notification::make()
+                    ->success()
+                    ->title('Items added to custom playlist')
+                    ->body('The selected items have been added to the chosen custom playlist.')
+                    ->send();
+            })
+            ->requiresConfirmation()
+            ->icon('heroicon-o-play')
+            ->modalIcon('heroicon-o-play')
+            ->modalDescription('Add the items to the chosen custom playlist.')
+            ->modalSubmitActionLabel('Add now');
     }
 }

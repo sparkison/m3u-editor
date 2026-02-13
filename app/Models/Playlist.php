@@ -53,6 +53,7 @@ class Playlist extends Model
         'emby_config' => 'array',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
+        'use_sticky_session' => 'boolean',
         'profiles_enabled' => 'boolean',
         'is_network_playlist' => 'boolean',
         'status' => Status::class,
@@ -322,6 +323,22 @@ class Playlist extends Model
         }
 
         return collect($configs)->sortBy('priority')->values()->all();
+    }
+
+    public function enableProxy(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value) {
+                    // Check playlist user has access to proxy features
+                    if (! $this->user?->canUseProxy()) {
+                        return false;
+                    }
+                }
+
+                return $value;
+            }
+        );
     }
 
     public function xtreamStatus(): Attribute

@@ -9,7 +9,7 @@ use App\Filament\Resources\CategoryResource\Pages;
 use App\Jobs\ProcessM3uImportSeriesEpisodes;
 use App\Jobs\SyncSeriesStrmFiles;
 use App\Models\Category;
-use App\Models\CustomPlaylist;
+use App\Services\PlaylistService;
 use App\Traits\HasUserFiltering;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -24,7 +24,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Group as ComponentsGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
@@ -107,8 +106,13 @@ class CategoryResource extends Resource
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->defaultSort('sort_order', 'asc')
+            ->reorderable('sort_order')
             ->columns([
                 TextInputColumn::make('name')
                     ->label('Name')
@@ -153,56 +157,7 @@ class CategoryResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    Action::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->schema([
-                            Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn (Get $get) => ! $get('playlist'))
-                                ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-
-                                    return $customList ? $customList->categoryTags()->get()
-                                        ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function ($record, array $data): void {
-                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                            $tags = $playlist->categoryTags()->get();
-                            $tag = $playlist->categoryTags()->where('name->en', $data['category'])->first();
-                            foreach ($record->series()->cursor() as $series) {
-                                // Need to detach any existing tags from this playlist first
-                                $series->detachTags($tags);
-                                $series->attachTag($tag);
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Series added to custom playlist')
-                                ->body('The selected series have been added to the chosen custom playlist.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-play')
-                        ->modalIcon('heroicon-o-play')
-                        ->modalDescription('Add the selected series to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Add now'),
+                    PlaylistService::getAddToPlaylistAction('add', 'series', fn ($record) => $record->series()),
                     Action::make('move')
                         ->label('Move Series to Category')
                         ->schema([
@@ -318,63 +273,9 @@ class CategoryResource extends Resource
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
-                    BulkAction::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->schema([
-                            Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected category series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn (Get $get) => ! $get('playlist'))
-                                ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-
-                                    return $customList ? $customList->categoryTags()->get()
-                                        ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function (Collection $records, array $data): void {
-                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            $tags = $playlist->categoryTags()->get();
-                            $tag = $data['category'] ? $playlist->categoryTags()->where('name->en', $data['category'])->first() : null;
-                            foreach ($records as $record) {
-                                // Sync the series to the custom playlist
-                                // This will add the series to the playlist without detaching existing ones
-                                // Prevents duplicates in the playlist
-                                $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                                if ($data['category']) {
-                                    foreach ($record->series()->cursor() as $series) {
-                                        // Need to detach any existing tags from this playlist first
-                                        $series->detachTags($tags);
-                                        $series->attachTag($tag);
-                                    }
-                                }
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Category series added to custom playlist')
-                                ->body('The selected category series have been added to the chosen custom playlist.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-play')
-                        ->modalIcon('heroicon-o-play')
-                        ->modalDescription('Add the selected category series to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Add now'),
+                    PlaylistService::getAddToPlaylistBulkAction('add', 'series', function (Collection $records) {
+                        return $records->flatMap->series;
+                    }),
                     BulkAction::make('move')
                         ->label('Move Series to Category')
                         ->schema([

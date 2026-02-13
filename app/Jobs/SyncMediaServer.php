@@ -246,6 +246,22 @@ class SyncMediaServer implements ShouldQueue
         $integration->update(['playlist_id' => $playlist->id]);
 
         return $playlist;
+        // Create a new playlist for this integration
+        $playlist = Playlist::createQuietly([
+            'uuid' => Str::orderedUuid()->toString(),
+            'name' => $integration->name,
+            'url' => $url,
+            'user_id' => $integration->user_id,
+            'source_type' => $integration->type,
+            'status' => Status::Processing,
+            'auto_sync' => false, // Sync is managed by the integration, not the playlist
+            'user_agent' => 'M3U-Editor-MediaServer-Sync/1.0', // required value for playlist, set to something meaningful
+        ]);
+
+        // Link the playlist to the integration
+        $integration->update(['playlist_id' => $playlist->id]);
+
+        return $playlist;
     }
 
     /**

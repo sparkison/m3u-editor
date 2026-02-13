@@ -121,7 +121,7 @@ class VodRelationManager extends RelationManager
         $defaultColumns = VodResource::getTableColumns(showGroup: true, showPlaylist: true);
 
         // Inject the custom group column after the group column
-        array_splice($defaultColumns, 13, 0, [$groupColumn]);
+        array_splice($defaultColumns, 14, 0, [$groupColumn]);
 
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
@@ -277,6 +277,7 @@ class VodRelationManager extends RelationManager
                     ->schema([
                         Select::make('group')
                             ->label('Select group')
+                            ->native(false)
                             ->options(
                                 $ownerRecord->groupTags()->get()
                                     ->map(fn ($name) => [

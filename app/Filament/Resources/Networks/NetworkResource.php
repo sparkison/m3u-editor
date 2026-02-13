@@ -60,6 +60,15 @@ class NetworkResource extends Resource
 
     protected static ?int $navigationSort = 110;
 
+    /**
+     * Check if the user can access this page.
+     * Only users with the "integrations" permission can access this page.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->canUseIntegrations();
+    }
+
     public static function getDescription(): ?string
     {
         return 'Networks are your own personal TV station that contain your lineups (local media content). Create custom broadcast channels with scheduled programming from your media library.';

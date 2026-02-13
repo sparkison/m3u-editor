@@ -286,6 +286,7 @@ class PlaylistResource extends Resource
                         ? 'Proxy is required when Provider Profiles are enabled'
                         : 'Toggle proxy status')
                     ->disabled(fn (Playlist $record): bool => $record->profiles_enabled)
+                    ->hidden(fn () => ! auth()->user()->canUseProxy())
                     ->sortable(),
                 ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -352,7 +353,7 @@ class PlaylistResource extends Resource
                             ->icon('heroicon-o-arrow-path')
                             ->action(function ($record) {
                                 // For media server playlists, dispatch the media server sync job
-                                if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin])) {
+                                if (in_array($record->source_type, [PlaylistSourceType::Emby, PlaylistSourceType::Jellyfin, PlaylistSourceType::Plex])) {
                                     $integration = MediaServerIntegration::where('playlist_id', $record->id)->first();
                                     if ($integration) {
                                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -420,7 +421,7 @@ class PlaylistResource extends Resource
                                     ->body('The playlist is no longer processing. You can now run new syncs.')
                                     ->send();
                             })
-                            ->visible(fn (Playlist $record) => $record->isProcessing() && ! $record->is_network_playlist),
+                            ->visible(fn (Playlist $record) => $record->isProcessing() && ! ($record->is_network_playlist || $record->source_type !== null)),
                         Action::make('process_series')
                             ->label('Fetch Series Metadata')
                             ->icon('heroicon-o-arrow-down-tray')
@@ -513,7 +514,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-document-duplicate')
                             ->modalDescription('Duplicate playlist now?')
                             ->modalSubmitActionLabel('Yes, duplicate now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->source_type !== null),
 
                         Action::make('Copy Changes')
                             ->label('Copy Changes')
@@ -615,7 +616,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-clipboard-document')
                             ->modalDescription('Select the target playlist and channel attributes to copy')
                             ->modalSubmitActionLabel('Copy now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->source_type !== null),
 
                         Action::make('view_sync_logs')
                             ->label('View Sync Logs')
@@ -625,7 +626,7 @@ class PlaylistResource extends Resource
                                 return "/playlists/{$record->id}/playlist-sync-statuses";
                             })
                             ->openUrlInNewTab(false)
-                            ->hidden(fn (Playlist $record): bool => $record->is_network_playlist),
+                            ->hidden(fn (Playlist $record): bool => $record->is_network_playlist || $record->source_type !== null),
                         Action::make('reset')
                             ->label('Reset status')
                             ->icon('heroicon-o-arrow-uturn-left')
@@ -658,7 +659,7 @@ class PlaylistResource extends Resource
                             ->modalIcon('heroicon-o-arrow-uturn-left')
                             ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                             ->modalSubmitActionLabel('Yes, reset now')
-                            ->hidden(fn ($record): bool => $record->is_network_playlist),
+                            ->hidden(fn ($record): bool => $record->is_network_playlist || $record->source_type !== null),
                         Action::make('purge_series')
                             ->label('Purge Series')
                             ->icon('heroicon-s-trash')
@@ -673,8 +674,7 @@ class PlaylistResource extends Resource
                             ->modalSubmitActionLabel('Purge now')
                             ->hidden(fn ($record): bool => ! $record->xtream),
                         DeleteAction::make()
-                            ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
-                            ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
+                            ->disabled(fn ($record): bool => $record->isProcessing()),
                     ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
                 ViewAction::make()
@@ -974,8 +974,7 @@ class PlaylistResource extends Resource
                     ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                     ->modalSubmitActionLabel('Yes, reset now'),
                 DeleteAction::make()
-                    ->tooltip(fn ($record): string => $record->source_type !== null ? 'Cannot directly delete an integration playlist' : '')
-                    ->disabled(fn ($record): bool => $record->isProcessing() || $record->source_type !== null),
+                    ->disabled(fn ($record): bool => $record->isProcessing()),
             ])->button(),
         ];
     }
@@ -2205,7 +2204,7 @@ class PlaylistResource extends Resource
                                 ->addActionLabel('Add priority attribute')
                                 ->defaultItems(0)
                                 ->afterStateHydrated(function ($component, $state) {
-                                    // Convert stored format to repeater format
+                                    // Convert stored format to repeater format (Array of config attributes)
                                     if (is_array($state) && ! empty($state)) {
                                         $formatted = [];
                                         foreach ($state as $item) {
@@ -2217,18 +2216,6 @@ class PlaylistResource extends Resource
                                         }
                                         $component->state($formatted);
                                     }
-                                })
-                                ->dehydrateStateUsing(function ($state) {
-                                    // Convert repeater format to simple array
-                                    if (is_array($state) && ! empty($state)) {
-                                        return collect($state)
-                                            ->pluck('attribute')
-                                            ->filter()
-                                            ->values()
-                                            ->toArray();
-                                    }
-
-                                    return [];
                                 }),
                         ]),
                 ]),
@@ -2279,6 +2266,7 @@ class PlaylistResource extends Resource
                 ->collapsible()
                 ->collapsed($creating)
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')
@@ -2322,26 +2310,45 @@ class PlaylistResource extends Resource
                         ->default(0) // Default to 0 streams (for unlimted)
                         ->required()
                         ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
-                    TextInput::make('server_timezone')
-                        ->label('Provider Timezone')
-                        ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
-                        ->placeholder('Etc/UTC')
-                        ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
-                    Toggle::make('strict_live_ts')
-                        ->label('Enable Strict Live TS Handling')
-                        ->hintAction(
-                            Action::make('learn_more_strict_live_ts')
-                                ->label('Learn More')
-                                ->icon('heroicon-o-arrow-top-right-on-square')
-                                ->iconPosition('after')
-                                ->size('sm')
-                                ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STRICT_LIVE_TS_MODE.md')
-                                ->openUrlInNewTab(true)
-                        )
-                        ->helperText('Enhanced stability for live MPEG-TS streams with PVR clients like Kodi and HDHomeRun (only used when not using transcoding profiles).')
-                        ->inline(false)
-                        ->default(false)
-                        ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
+
+                    Grid::make()
+                        ->columns(3)
+                        ->schema([
+                            TextInput::make('server_timezone')
+                                ->label('Provider Timezone')
+                                ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
+                                ->placeholder('Etc/UTC'),
+                            Toggle::make('strict_live_ts')
+                                ->label('Enable Strict Live TS Handling')
+                                ->hintAction(
+                                    Action::make('learn_more_strict_live_ts')
+                                        ->label('Learn More')
+                                        ->icon('heroicon-o-arrow-top-right-on-square')
+                                        ->iconPosition('after')
+                                        ->size('sm')
+                                        ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STRICT_LIVE_TS_MODE.md')
+                                        ->openUrlInNewTab(true)
+                                )
+                                ->helperText('Enhanced stability for live MPEG-TS streams with PVR clients like Kodi and HDHomeRun (only used when not using transcoding profiles).')
+                                ->inline(false)
+                                ->default(false),
+                            Toggle::make('use_sticky_session')
+                                ->label('Enable Sticky Session Handler')
+                                ->hintAction(
+                                    Action::make('learn_more_sticky_session')
+                                        ->label('Learn More')
+                                        ->icon('heroicon-o-arrow-top-right-on-square')
+                                        ->iconPosition('after')
+                                        ->size('sm')
+                                        ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STICKY_SESSION.md')
+                                        ->openUrlInNewTab(true)
+                                )
+                                ->helperText('')
+                                ->inline(false)
+                                ->default(false)
+                                ->helperText('Lock clients to specific backend origins after redirects to prevent playback loops when load balancers bounce between origins. Disable if your provider doesn\'t use load balancing.'),
+                        ])->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
+
                     Fieldset::make('Transcoding Settings (optional)')
                         ->columnSpanFull()
                         ->schema([
