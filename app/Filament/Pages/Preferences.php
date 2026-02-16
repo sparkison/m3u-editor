@@ -13,6 +13,7 @@ use Cron\CronExpression;
 use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -58,60 +59,62 @@ class Preferences extends SettingsPage
     protected function getActions(): array
     {
         return [
-            Action::make('Reset Queue')
-                ->label('Reset Queue')
-                ->action(function () {
-                    app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new RestartQueue);
-                })
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Queue reset')
-                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
-                ->modalSubmitActionLabel('I understand, reset now'),
-            Action::make('Clear Logo Cache')
-                ->label('Refresh All Logo Cache')
-                ->action(fn () => Artisan::call('app:logo-cleanup --force --all'))
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Logo cache refresh queued')
-                        ->body('The logo cache has been cleared. Logos will be fetched again on next request.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
-                ->modalSubmitActionLabel('I understand, refresh all logos now'),
-            Action::make('Clear Expired Logo Cache')
-                ->label('Clear Expired Logo Cache')
-                ->action(fn () => Artisan::call('app:logo-cleanup --force'))
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Expired logo cache cleared')
-                        ->body('Expired logo cache files were removed successfully.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-trash')
-                ->modalIcon('heroicon-o-trash')
-                ->modalDescription('Only expired logo cache entries will be removed. If permanent cache is enabled, nothing will be removed.')
-                ->modalSubmitActionLabel('Clear expired cache'),
+            ActionGroup::make([
+                Action::make('Clear Expired Logo Cache')
+                    ->label('Clear Expired Logo Cache')
+                    ->action(fn () => Artisan::call('app:logo-cleanup --force'))
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Expired logo cache cleared')
+                            ->body('Expired logo cache files were removed successfully.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-trash')
+                    ->modalIcon('heroicon-o-trash')
+                    ->modalDescription('Only expired logo cache entries (those older than 30 days). If permanent cache is enabled, nothing will be removed.')
+                    ->modalSubmitActionLabel('Clear expired cache'),
+                Action::make('Clear Logo Cache')
+                    ->label('Clear All Logo Cache')
+                    ->action(fn () => Artisan::call('app:logo-cleanup --force --all'))
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Logo cache cleared')
+                            ->body('The logo cache has been cleared. Logos will be fetched again on next request wherever logo proxy is enabled.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalDescription('Clearing the logo cache will remove all cached logo images. If permanent cache is enabled, it will be ignored. This action cannot be undone.')
+                    ->modalSubmitActionLabel('I understand, clear now'),
+                Action::make('Reset Queue')
+                    ->label('Reset Queue')
+                    ->action(function () {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new RestartQueue);
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Queue reset')
+                            ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
+                    ->modalSubmitActionLabel('I understand, reset now'),
+            ])->button()->color('gray')->label('Actions'),
         ];
     }
 
