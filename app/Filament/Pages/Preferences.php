@@ -699,6 +699,9 @@ class Preferences extends SettingsPage
                                         Toggle::make('logo_cache_permanent')
                                             ->label('Keep cache permanently (disable expiry cleanup)')
                                             ->helperText('When enabled, expired cache cleanup will skip deletion. You can still refresh/clear cache manually.'),
+                                        Toggle::make('logo_repository_enabled')
+                                            ->label('Enable Logo Repository endpoint')
+                                            ->helperText('When enabled, /logo-repository endpoints are publicly accessible for apps like UHF.'),
 
                                     ]),
                                 Section::make('Placeholder Images')

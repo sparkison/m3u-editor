@@ -2,6 +2,7 @@
 
 use App\Models\Channel;
 use App\Services\LogoRepositoryService;
+use App\Settings\GeneralSettings;
 
 it('returns a logo repository index payload', function () {
     /** @var \Tests\TestCase $this */
@@ -38,4 +39,14 @@ it('resolves repository logo filenames to logo urls', function () {
     $response = $this->get('/logo-repository/logos/bbc-news.png');
 
     $response->assertRedirect('https://example.com/bbc-news.png');
+});
+
+it('returns 404 when logo repository is disabled', function () {
+    /** @var \Tests\TestCase $this */
+    $mockSettings = \Mockery::mock(GeneralSettings::class);
+    $mockSettings->logo_repository_enabled = false;
+    app()->instance(GeneralSettings::class, $mockSettings);
+
+    $this->get('/logo-repository/index.json')->assertNotFound();
+    $this->get('/logo-repository/logos/anything.png')->assertNotFound();
 });

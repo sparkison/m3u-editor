@@ -68,6 +68,8 @@ class GeneralSettings extends Settings
 
     public ?array $managed_logo_assets = null;
 
+    public ?bool $logo_repository_enabled = false;
+
     // SMTP settings
     public ?string $smtp_host = null;
 

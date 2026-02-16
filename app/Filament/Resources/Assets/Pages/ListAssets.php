@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Assets\Pages;
 use App\Filament\Resources\Assets\AssetResource;
 use App\Models\Asset;
 use App\Services\AssetInventoryService;
+use App\Services\LogoRepositoryService;
+use App\Settings\GeneralSettings;
 use Filament\Actions;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
@@ -26,6 +28,8 @@ class ListAssets extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        $isRepositoryEnabled = (bool) (app(GeneralSettings::class)->logo_repository_enabled ?? true);
+
         return [
             Actions\Action::make('rescanAssets')
                 ->label('Rescan storage')
@@ -59,6 +63,25 @@ class ListAssets extends ListRecords
                         ->success()
                         ->send();
                 }),
+            Actions\Action::make('refreshLogoRepositoryCache')
+                ->label('Refresh Logo Repository')
+                ->icon('heroicon-o-arrow-path-rounded-square')
+                ->visible($isRepositoryEnabled)
+                ->action(function (): void {
+                    app(LogoRepositoryService::class)->clearCache();
+                    $count = count(app(LogoRepositoryService::class)->getIndex());
+
+                    Notification::make()
+                        ->title('Logo repository refreshed')
+                        ->body("Indexed {$count} repository entries.")
+                        ->success()
+                        ->send();
+                }),
+            Actions\Action::make('openLogoRepository')
+                ->label('Open Logo Repository')
+                ->icon('heroicon-o-link')
+                ->visible($isRepositoryEnabled)
+                ->url(route('logo.repository.index'), shouldOpenInNewTab: true),
             Actions\Action::make('clearLogoCache')
                 ->label('Clear all cached logos')
                 ->icon('heroicon-o-trash')
