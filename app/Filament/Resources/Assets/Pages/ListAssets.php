@@ -31,18 +31,6 @@ class ListAssets extends ListRecords
         $isRepositoryEnabled = (bool) (app(GeneralSettings::class)->logo_repository_enabled ?? true);
 
         return [
-            Actions\Action::make('rescanAssets')
-                ->label('Rescan storage')
-                ->icon('heroicon-o-arrow-path')
-                ->action(function (): void {
-                    $count = app(AssetInventoryService::class)->sync();
-
-                    Notification::make()
-                        ->title('Asset scan complete')
-                        ->body("Indexed {$count} files.")
-                        ->success()
-                        ->send();
-                }),
             Actions\Action::make('uploadAsset')
                 ->label('Upload Asset')
                 ->icon('heroicon-o-arrow-up-tray')
@@ -63,43 +51,57 @@ class ListAssets extends ListRecords
                         ->success()
                         ->send();
                 }),
-            Actions\Action::make('refreshLogoRepositoryCache')
-                ->label('Refresh Logo Repository')
-                ->icon('heroicon-o-arrow-path-rounded-square')
-                ->visible($isRepositoryEnabled)
-                ->action(function (): void {
-                    app(LogoRepositoryService::class)->clearCache();
-                    $count = count(app(LogoRepositoryService::class)->getIndex());
+            Actions\ActionGroup::make([
+                Actions\Action::make('rescanAssets')
+                    ->label('Rescan storage')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function (): void {
+                        $count = app(AssetInventoryService::class)->sync();
 
-                    Notification::make()
-                        ->title('Logo repository refreshed')
-                        ->body("Indexed {$count} repository entries.")
-                        ->success()
-                        ->send();
-                }),
-            Actions\Action::make('openLogoRepository')
-                ->label('Open Logo Repository')
-                ->icon('heroicon-o-link')
-                ->visible($isRepositoryEnabled)
-                ->url(route('logo.repository.index'), shouldOpenInNewTab: true),
-            Actions\Action::make('clearLogoCache')
-                ->label('Clear all cached logos')
-                ->icon('heroicon-o-trash')
-                ->color('danger')
-                ->requiresConfirmation()
-                ->action(function (): void {
-                    $service = app(AssetInventoryService::class);
+                        Notification::make()
+                            ->title('Asset scan complete')
+                            ->body("Indexed {$count} files.")
+                            ->success()
+                            ->send();
+                    }),
+                Actions\Action::make('refreshLogoRepositoryCache')
+                    ->label('Refresh Logo Repository')
+                    ->icon('heroicon-o-arrow-path-rounded-square')
+                    ->visible($isRepositoryEnabled)
+                    ->action(function (): void {
+                        app(LogoRepositoryService::class)->clearCache();
+                        $count = count(app(LogoRepositoryService::class)->getIndex());
 
-                    Asset::query()
-                        ->where('source', 'logo_cache')
-                        ->get()
-                        ->each(fn (Asset $asset) => $service->deleteAsset($asset));
+                        Notification::make()
+                            ->title('Logo repository refreshed')
+                            ->body("Indexed {$count} repository entries.")
+                            ->success()
+                            ->send();
+                    }),
+                Actions\Action::make('openLogoRepository')
+                    ->label('View Logo Repository')
+                    ->icon('heroicon-o-eye')
+                    ->visible($isRepositoryEnabled)
+                    ->url(route('logo.repository'), shouldOpenInNewTab: true),
+                Actions\Action::make('clearLogoCache')
+                    ->label('Clear all cached logos')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->action(function (): void {
+                        $service = app(AssetInventoryService::class);
 
-                    Notification::make()
-                        ->title('Cached logos removed')
-                        ->success()
-                        ->send();
-                }),
+                        Asset::query()
+                            ->where('source', 'logo_cache')
+                            ->get()
+                            ->each(fn (Asset $asset) => $service->deleteAsset($asset));
+
+                        Notification::make()
+                            ->title('Cached logos removed')
+                            ->success()
+                            ->send();
+                    }),
+            ])->button()->color('gray')->label('Actions'),
         ];
     }
 

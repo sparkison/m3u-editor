@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\Assets\AssetResource;
 use App\Jobs\RestartQueue;
 use App\Models\StreamProfile;
 use App\Rules\Cron;
@@ -695,12 +696,29 @@ class Preferences extends SettingsPage
                                 Section::make('Logo Cache')
                                     ->description('Manage logo cache behavior and storage used by logo proxy URLs.')
                                     ->columns(1)
+                                    ->headerActions([
+                                        Action::make('manage_assets')
+                                            ->label('Manage Assets')
+                                            ->color('gray')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url(AssetResource::getUrl('index')),
+                                        Action::make('view_repo')
+                                            ->label('View Logo Repository')
+                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url('/logo-repository')
+                                            ->hidden(fn ($get) => ! $get('logo_repository_enabled'))
+                                            ->openUrlInNewTab(true),
+                                    ])
                                     ->schema([
                                         Toggle::make('logo_cache_permanent')
                                             ->label('Keep cache permanently (disable expiry cleanup)')
                                             ->helperText('When enabled, expired cache cleanup will skip deletion. You can still refresh/clear cache manually.'),
                                         Toggle::make('logo_repository_enabled')
                                             ->label('Enable Logo Repository endpoint')
+                                            ->live()
                                             ->helperText('When enabled, /logo-repository endpoints are publicly accessible for apps like UHF.'),
 
                                     ]),
