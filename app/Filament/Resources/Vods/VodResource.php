@@ -19,6 +19,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
+use App\Services\LogoCacheService;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use App\Traits\HasUserFiltering;
@@ -766,6 +767,61 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-photo')
                     ->modalDescription('Update the preferred icon for the selected channel(s).')
                     ->modalSubmitActionLabel('Update now'),
+                BulkAction::make('set_logo_override_url')
+                    ->label('Set logo override URL')
+                    ->schema([
+                        TextInput::make('logo')
+                            ->label('Logo override URL')
+                            ->url()
+                            ->nullable()
+                            ->helperText('Leave empty to remove the custom logo and use provider/EPG logo.'),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        Channel::whereIn('id', $records->pluck('id')->toArray())
+                            ->update([
+                                'logo' => empty($data['logo']) ? null : $data['logo'],
+                            ]);
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Logo override updated')
+                            ->body('The logo override URL has been updated for the selected VOD channels.')
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-link')
+                    ->modalIcon('heroicon-o-link')
+                    ->modalDescription('Apply a single logo override URL to all selected VOD channels. Leave empty to remove overrides.')
+                    ->modalSubmitActionLabel('Apply URL'),
+                BulkAction::make('refresh_logo_cache')
+                    ->label('Refresh logo cache (selected)')
+                    ->action(function (Collection $records): void {
+                        $urls = [];
+
+                        foreach ($records as $record) {
+                            $urls[] = $record->logo;
+                            $urls[] = $record->logo_internal;
+                            $urls[] = $record->epgChannel?->icon_custom;
+                            $urls[] = $record->epgChannel?->icon;
+                            $urls[] = $record->info['movie_image'] ?? null;
+                            $urls[] = $record->info['cover_big'] ?? null;
+                        }
+
+                        $cleared = LogoCacheService::clearByUrls($urls);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Selected VOD cache refreshed')
+                            ->body("Removed {$cleared} cache file(s) for selected VOD resources.")
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Clear cached logos and poster images for selected VOD channels so they are fetched again on the next request.')
+                    ->modalSubmitActionLabel('Refresh selected cache'),
                 BulkAction::make('failover')
                     ->label('Add as failover')
                     ->schema(function (Collection $records) {
