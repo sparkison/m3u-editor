@@ -6,11 +6,10 @@ use App\Enums\EpgSourceType;
 use App\Enums\Status;
 use App\Filament\Resources\MergedEpgs\Pages\EditMergedEpg;
 use App\Filament\Resources\MergedEpgs\Pages\ListMergedEpgs;
-use App\Filament\Resources\MergedEpgs\RelationManagers\SourceEpgsRelationManager;
-use App\Jobs\GenerateEpgCache;
 use App\Jobs\ProcessEpgImport;
 use App\Models\Epg;
 use App\Rules\Cron;
+use App\Traits\HasUserFiltering;
 use Cron\CronExpression;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -40,6 +39,8 @@ use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class MergedEpgResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Epg::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -52,7 +53,7 @@ class MergedEpgResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 4;
     }
 
     public static function getGloballySearchableAttributes(): array
@@ -82,7 +83,14 @@ class MergedEpgResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return $table->persistFiltersInSession()
+            ->persistSortInSession()
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->withCount([
+                    'channels',
+                ]);
+            })
+            ->deferLoading()
             ->columns([
                 TextColumn::make('id')
                     ->searchable()
@@ -108,12 +116,6 @@ class MergedEpgResource extends Resource
                 ProgressColumn::make('progress')
                     ->label('Sync Progress')
                     ->tooltip('Progress of merged EPG import/sync')
-                    ->sortable()
-                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
-                    ->toggleable(),
-                ProgressColumn::make('cache_progress')
-                    ->label('Cache Progress')
-                    ->tooltip('Progress of EPG cache generation')
                     ->sortable()
                     ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
@@ -149,7 +151,6 @@ class MergedEpgResource extends Resource
                                 'status' => Status::Processing,
                                 'progress' => 0,
                                 'sd_progress' => 0,
-                                'cache_progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessEpgImport($record, force: true));
@@ -165,33 +166,38 @@ class MergedEpgResource extends Resource
                         ->requiresConfirmation()
                         ->modalDescription('Process merged EPG now?')
                         ->modalSubmitActionLabel('Yes, process now'),
-                    Action::make('cache')
-                        ->label('Generate Cache')
-                        ->icon('heroicon-o-arrows-pointing-in')
-                        ->action(function ($record) {
-                            $record->update([
-                                'status' => Status::Processing,
-                                'cache_progress' => 0,
-                            ]);
-                            app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new GenerateEpgCache($record->uuid, notify: true));
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('EPG Cache is being generated')
-                                ->body('EPG Cache is being generated in the background. You will be notified when complete.')
-                                ->duration(5000)
-                                ->send();
-                        })
-                        ->disabled(fn ($record) => $record->status === Status::Processing)
-                        ->requiresConfirmation()
-                        ->modalDescription('Generate EPG Cache now? This will create a cache for the merged EPG data.')
-                        ->modalSubmitActionLabel('Yes, generate cache now'),
                     Action::make('download')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
                         ->url(fn ($record) => route('epg.file', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
+                    Action::make('reset')
+                        ->label('Reset status')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => Status::Pending,
+                                'processing' => false,
+                                'progress' => 0,
+                                'sd_progress' => 0,
+                                'cache_progress' => 0,
+                                'synced' => null,
+                                'errors' => null,
+                            ]);
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('EPG status reset')
+                                ->body('EPG status has been reset.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset EPG status so it can be processed again. Only perform this action if you are having problems with the EPG syncing.')
+                        ->modalSubmitActionLabel('Yes, reset now'),
                     DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->slideOver()
@@ -207,7 +213,6 @@ class MergedEpgResource extends Resource
                                     'status' => Status::Processing,
                                     'progress' => 0,
                                     'sd_progress' => 0,
-                                    'cache_progress' => 0,
                                 ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
                                     ->dispatch(new ProcessEpgImport($record, force: true));
@@ -234,16 +239,14 @@ class MergedEpgResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            SourceEpgsRelationManager::class,
-        ];
+        return [];
     }
 
     public static function getPages(): array
     {
         return [
             'index' => ListMergedEpgs::route('/'),
-            'edit' => EditMergedEpg::route('/{record}/edit'),
+            // 'edit' => EditMergedEpg::route('/{record}/edit'),
         ];
     }
 
@@ -269,6 +272,7 @@ class MergedEpgResource extends Resource
                     name: 'sourceEpgs',
                     titleAttribute: 'name',
                     modifyQueryUsing: fn (Builder $query) => $query
+                        ->select(['epgs.id', 'epgs.name'])
                         ->where('user_id', Auth::id())
                         ->where('is_merged', false)
                         ->orderBy('name')
@@ -307,6 +311,8 @@ class MergedEpgResource extends Resource
                         ->native(false)
                         ->label('Last Synced')
                         ->disabled()
+                        ->hiddenOn('create')
+                        ->hidden(fn (Get $get, $record): bool => ! $record?->id || ! $get('auto_sync'))
                         ->dehydrated(false),
                 ]),
         ];

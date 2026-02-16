@@ -91,12 +91,13 @@ class EpgResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->filtersTriggerAction(function ($action) {
-                return $action->button()->label('Filters');
+        return $table->persistSortInSession()
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->withCount([
+                    'channels',
+                ]);
             })
-            ->paginated([10, 25, 50, 100])
-            ->defaultPaginationPageOption(25)
+            ->deferLoading()
             ->columns([
                 TextColumn::make('id')
                     ->searchable()

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MergedEpgs\Pages;
 
 use App\Filament\Resources\MergedEpgs\MergedEpgResource;
+use App\Jobs\ProcessEpgImport;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -15,7 +16,10 @@ class ListMergedEpgs extends ListRecords
         return [
             CreateAction::make()
                 ->slideOver()
-                ->successRedirectUrl(fn ($record): string => EditMergedEpg::getUrl(['record' => $record])),
+                ->after(function ($record): void {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new ProcessEpgImport($record, force: true));
+                }),
         ];
     }
 }
