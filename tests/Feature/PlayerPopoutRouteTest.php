@@ -21,4 +21,25 @@ class PlayerPopoutRouteTest extends TestCase
             ->assertSee('data-url="http://example.test/stream.ts"', false)
             ->assertSee('data-format="ts"', false);
     }
+
+    public function test_rejects_unsupported_stream_url_schemes(): void
+    {
+        $this->get('/player/popout?url=javascript:alert(1)')
+            ->assertNotFound();
+    }
+
+    public function test_accepts_relative_stream_url_path(): void
+    {
+        $this->get('/player/popout?url=/api/m3u-proxy/channel/1/player&format=hls')
+            ->assertOk()
+            ->assertSee('data-url="/api/m3u-proxy/channel/1/player"', false)
+            ->assertSee('data-format="hls"', false);
+    }
+
+    public function test_falls_back_to_ts_for_unsupported_stream_format(): void
+    {
+        $this->get('/player/popout?url=http://example.test/stream.ts&format=avi')
+            ->assertOk()
+            ->assertSee('data-format="ts"', false);
+    }
 }
