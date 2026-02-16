@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Str;
@@ -129,12 +128,8 @@ class Epg extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function channels(): HasMany|HasManyThrough
+    public function channels(): HasMany
     {
-        if ($this->isMerged()) {
-            return $this->hasManyThrough(EpgChannel::class, 'merged_epg_epg', 'merged_epg_id', 'epg_id');
-        }
-
         return $this->hasMany(EpgChannel::class);
     }
 

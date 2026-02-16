@@ -85,11 +85,6 @@ class MergedEpgResource extends Resource
     {
         return $table->persistFiltersInSession()
             ->persistSortInSession()
-            ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount([
-                    'channels',
-                ]);
-            })
             ->deferLoading()
             ->columns([
                 TextColumn::make('id')
@@ -103,9 +98,9 @@ class MergedEpgResource extends Resource
                     ->counts('sourceEpgs')
                     ->label('Source EPGs')
                     ->sortable(),
-                TextColumn::make('channels_count')
+                TextColumn::make('channel_count')
                     ->label('Channels')
-                    ->counts('channels')
+                    ->formatStateUsing(fn ($state): int => (int) ($state ?? 0))
                     ->toggleable()
                     ->sortable(),
                 TextColumn::make('status')
