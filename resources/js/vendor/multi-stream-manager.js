@@ -166,6 +166,21 @@ function multiStreamManager() {
             }
         },
 
+        openInNewTab(player, popoutRoute) {
+            if (!player || !player.url || !popoutRoute) {
+                return;
+            }
+
+            const params = new URLSearchParams({
+                title: player.title ?? '',
+                logo: player.logo ?? '',
+                url: player.url ?? '',
+                format: player.format ?? 'ts',
+            });
+
+            window.open(popoutRoute + '?' + params.toString(), '_blank', 'noopener');
+        },
+
         // Drag functionality
         startDrag(playerId, event) {
             event.preventDefault();
