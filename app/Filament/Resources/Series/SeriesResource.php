@@ -17,6 +17,7 @@ use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Rules\CheckIfUrlOrLocalPath;
+use App\Services\LogoCacheService;
 use App\Services\PlaylistService;
 use App\Services\XtreamService;
 use App\Settings\GeneralSettings;
@@ -563,6 +564,56 @@ class SeriesResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Process selected series now? This will fetch all episodes and seasons for this series. This may take a while depending on the number of series selected.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                BulkAction::make('set_poster_url')
+                    ->label('Set poster URL')
+                    ->schema([
+                        TextInput::make('cover')
+                            ->label('Series poster URL')
+                            ->url()
+                            ->nullable()
+                            ->helperText('Leave empty to remove custom poster URL and use placeholder fallback.'),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        Series::whereIn('id', $records->pluck('id')->toArray())
+                            ->update([
+                                'cover' => empty($data['cover']) ? null : $data['cover'],
+                            ]);
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Poster URL updated')
+                            ->body('The poster URL has been updated for the selected series.')
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-link')
+                    ->modalIcon('heroicon-o-link')
+                    ->modalDescription('Apply a single poster URL to all selected series. Leave empty to remove custom posters.')
+                    ->modalSubmitActionLabel('Apply URL'),
+                BulkAction::make('refresh_logo_cache')
+                    ->label('Refresh poster cache (selected)')
+                    ->action(function (Collection $records): void {
+                        $urls = $records
+                            ->pluck('cover')
+                            ->filter()
+                            ->values()
+                            ->toArray();
+
+                        $cleared = LogoCacheService::clearByUrls($urls);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Selected series cache refreshed')
+                            ->body("Removed {$cleared} cache file(s) for selected series posters.")
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Clear cached poster images for selected series so they are fetched again on the next request.')
+                    ->modalSubmitActionLabel('Refresh selected cache'),
                 BulkAction::make('fetch_tmdb_ids')
                     ->label('Fetch TMDB/TVDB IDs')
                     ->icon('heroicon-o-magnifying-glass')

@@ -16,6 +16,7 @@ use App\Models\PlaylistAlias;
 use App\Models\PlaylistAuth;
 use App\Models\Series;
 use App\Services\EpgCacheService;
+use App\Services\LogoCacheService;
 use App\Services\M3uProxyService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -893,7 +894,7 @@ class XtreamApiController extends Controller
                         'num' => $index + 1,
                         'name' => $seriesItem->name,
                         'series_id' => (int) $seriesItem->id,
-                        'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : $baseUrl."/$seriesItem->cover") : $baseUrl.'/placeholder.png',
+                        'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : $baseUrl."/$seriesItem->cover") : LogoCacheService::getPlaceholderUrl('poster'),
                         'plot' => $seriesItem->plot ?? '',
                         'cast' => $seriesItem->cast ?? '',
                         'director' => $seriesItem->director ?? '',
@@ -946,7 +947,7 @@ class XtreamApiController extends Controller
                 $seriesItem->load('seasons.episodes', 'category');
             }
 
-            $cover = $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : $baseUrl."/$seriesItem->cover") : $baseUrl.'/placeholder.png';
+            $cover = $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : $baseUrl."/$seriesItem->cover") : LogoCacheService::getPlaceholderUrl('poster');
             $backdropPaths = $seriesItem->backdrop_path ?? [];
             if ($playlist->enable_logo_proxy) {
                 $cover = LogoProxyController::generateProxyUrl($cover);

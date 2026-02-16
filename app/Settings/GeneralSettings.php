@@ -57,6 +57,17 @@ class GeneralSettings extends Settings
 
     public ?bool $proxy_stop_oldest_on_limit = false;
 
+    // Logo cache and placeholders
+    public ?bool $logo_cache_permanent = false;
+
+    public ?string $logo_placeholder_url = null;
+
+    public ?string $episode_placeholder_url = null;
+
+    public ?string $vod_series_poster_placeholder_url = null;
+
+    public ?array $managed_logo_assets = null;
+
     // SMTP settings
     public ?string $smtp_host = null;
 
