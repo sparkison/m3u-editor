@@ -4,6 +4,12 @@ use App\Models\Channel;
 use App\Services\LogoRepositoryService;
 use App\Settings\GeneralSettings;
 
+beforeEach(function () {
+    $mockSettings = \Mockery::mock(GeneralSettings::class);
+    $mockSettings->logo_repository_enabled = true;
+    app()->instance(GeneralSettings::class, $mockSettings);
+});
+
 it('returns a logo repository index payload', function () {
     /** @var \Tests\TestCase $this */
     Channel::factory()->create([
