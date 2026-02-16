@@ -59,6 +59,28 @@
                 </div>
                 
                 <div class="flex items-center space-x-1 flex-shrink-0">
+                    <!-- Open in New Tab Button -->
+                    <button
+                        @click.stop="
+                            if (!player.url) {
+                                return;
+                            }
+
+                            const params = new URLSearchParams({
+                                title: player.title ?? '',
+                                logo: player.logo ?? '',
+                                url: player.url ?? '',
+                                format: player.format ?? 'ts',
+                            });
+
+                            window.open('{{ route('player.popout') }}?' + params.toString(), '_blank', 'noopener');
+                        "
+                        class="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors focus:outline-none"
+                        title="Open in new tab"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="w-3 h-3" />
+                    </button>
+
                     <!-- Minimize Button -->
                     <button 
                         @click.stop="toggleMinimize(player.id)"

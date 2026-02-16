@@ -172,6 +172,21 @@ Route::get('/shared/stream/{encodedId}.{format?}', function (string $encodedId) 
     return redirect()->route('m3u-proxy.channel', ['id' => $id]);
 })->name('shared.stream.channel');
 
+Route::get('/player/popout', function (Request $request) {
+    $streamUrl = (string) $request->query('url', '');
+
+    if ($streamUrl === '') {
+        abort(404);
+    }
+
+    return view('player.popout', [
+        'streamUrl' => $streamUrl,
+        'streamFormat' => (string) $request->query('format', 'ts'),
+        'channelTitle' => (string) $request->query('title', 'Channel Player'),
+        'channelLogo' => (string) $request->query('logo', ''),
+    ]);
+})->name('player.popout');
+
 /*
  * API routes
  */
