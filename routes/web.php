@@ -11,8 +11,6 @@ use App\Http\Controllers\NetworkStreamController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
 use App\Services\ExternalIpService;
-use AshAllenDesign\ShortURL\Controllers\ShortURLController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // External IP refresh route for admin panel
@@ -23,6 +21,51 @@ Route::post('/admin/refresh-external-ip', function (ExternalIpService $ipService
     return response()->json(['success' => true, 'external_ip' => $ip]);
 })->middleware(['auth']);
 
+/*
+ * Short URL forwarding route
+ * This allows short URLs to forward to a target URL while preserving any additional path segments (e.g. for device.xml forwarding)
+ */
+Route::get('/s/{shortUrlKey}/{path?}', \App\Http\Controllers\ShortURLController::class)
+    ->where('shortUrlKey', '[A-Za-z0-9\-]+')
+    ->where('path', '.*')
+    ->name('shorturl.forward');
+
+/*
+ * In-app player route
+ */
+Route::get('/player/popout', [\App\Http\Controllers\PlayerController::class, 'popout'])
+    ->name('player.popout');
+
+/*
+ * DEBUG routes
+ */
+
+// Test webhook endpoint
+Route::post('/webhook/test', \App\Http\Controllers\WebhookTestController::class)
+    ->name('webhook.test.post');
+Route::get('/webhook/test', \App\Http\Controllers\WebhookTestController::class)
+    ->name('webhook.test.get');
+
+// If local env, show PHP info screen
+Route::get('/phpinfo', function () {
+    if (app()->environment('local')) {
+        phpinfo();
+    } else {
+        abort(404);
+    }
+});
+
+/*
+ * Logo proxy route - cache and serve remote logos
+ */
+Route::get('/logo-proxy/{encodedUrl}/{filename?}', [LogoProxyController::class, 'serveLogo'])
+    ->where('encodedUrl', '[A-Za-z0-9\-_=]+')
+    ->where('filename', '.*')
+    ->name('logo.proxy');
+
+/**
+ * Asset routes
+ */
 Route::get('/assets/{asset}/preview', AssetPreviewController::class)
     ->middleware(['auth'])
     ->name('assets.preview');
@@ -34,45 +77,6 @@ Route::get('/logo-repository/index.json', [LogoRepositoryController::class, 'ind
 Route::get('/logo-repository/logos/{filename}', [LogoRepositoryController::class, 'show'])
     ->where('filename', '.*')
     ->name('logo.repository.file');
-
-// Handle short URLs with optional path forwarding (e.g. /s/{key}/device.xml)
-Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $shortUrlKey, ?string $path = null) {
-    $response = app()->call(ShortURLController::class, [
-        'request' => $request,
-        'shortURLKey' => $shortUrlKey,
-    ]);
-
-    if (! $response instanceof \Illuminate\Http\RedirectResponse) {
-        return $response;
-    }
-
-    if ($path) {
-        $parsed = parse_url($response->getTargetUrl());
-
-        $base = ($parsed['scheme'] ?? '').'://'.($parsed['host'] ?? '');
-        if (isset($parsed['port'])) {
-            $base .= ':'.$parsed['port'];
-        }
-        $base .= $parsed['path'] ?? '';
-        $base = rtrim($base, '/').'/'.ltrim($path, '/');
-
-        if (! empty($parsed['query'])) {
-            $base .= '?'.$parsed['query'];
-        }
-
-        return redirect($base, $response->getStatusCode());
-    }
-
-    return $response;
-})->where('path', '.*');
-
-/*
- * Logo proxy route - cache and serve remote logos
- */
-Route::get('/logo-proxy/{encodedUrl}/{filename?}', [LogoProxyController::class, 'serveLogo'])
-    ->where('encodedUrl', '[A-Za-z0-9\-_=]+')
-    ->where('filename', '.*')
-    ->name('logo.proxy');
 
 /*
  * Playlist/EPG output routes
@@ -151,25 +155,6 @@ Route::get('/network/{network}/{segment}.ts', [\App\Http\Controllers\NetworkHlsC
     ->where('segment', 'live[0-9]+');
 
 /*
- * DEBUG routes
- */
-
-// Test webhook endpoint
-Route::post('/webhook/test', \App\Http\Controllers\WebhookTestController::class)
-    ->name('webhook.test.post');
-Route::get('/webhook/test', \App\Http\Controllers\WebhookTestController::class)
-    ->name('webhook.test.get');
-
-// If local env, show PHP info screen
-Route::get('/phpinfo', function () {
-    if (app()->environment('local')) {
-        phpinfo();
-    } else {
-        abort(404);
-    }
-});
-
-/*
  * Proxy routes (redirects to m3u-proxy API)
  */
 
@@ -186,9 +171,6 @@ Route::get('/shared/stream/{encodedId}.{format?}', function (string $encodedId) 
 
     return redirect()->route('m3u-proxy.channel', ['id' => $id]);
 })->name('shared.stream.channel');
-
-Route::get('/player/popout', [\App\Http\Controllers\PlayerController::class, 'popout'])
-    ->name('player.popout');
 
 /*
  * API routes
