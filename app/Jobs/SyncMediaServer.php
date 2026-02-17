@@ -404,7 +404,7 @@ class SyncMediaServer implements ShouldQueue
                 'year' => $movie['ProductionYear'] ?? null,
                 'rating' => $movie['CommunityRating'] ?? null,
                 'info' => $info,
-                'last_metadata_fetch' => now(), // Mark metadata as fetched so Xtream API doesn't try to fetch again
+                'last_metadata_fetch' => $integration->isLocal() ? null : now(), // Only mark as fetched for non-local integrations (local media needs TMDB lookup)
             ]
         );
     }
