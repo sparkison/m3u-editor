@@ -525,6 +525,15 @@ class FetchTmdbIds implements ShouldQueue
                 if (! empty($details['youtube_trailer'])) {
                     $info['youtube_trailer'] = $details['youtube_trailer'];
                 }
+
+                // Populate duration from TMDB runtime (in minutes)
+                if (! empty($details['runtime']) && (empty($info['duration_secs']) || ($info['duration_secs'] ?? 0) === 0)) {
+                    $runtimeMinutes = (int) $details['runtime'];
+                    $runtimeSeconds = $runtimeMinutes * 60;
+                    $info['duration_secs'] = $runtimeSeconds;
+                    $info['duration'] = gmdate('H:i:s', $runtimeSeconds);
+                    $info['episode_run_time'] = $runtimeMinutes;
+                }
             }
 
             $updateData['info'] = $info;
@@ -923,6 +932,19 @@ class FetchTmdbIds implements ShouldQueue
                         $info = $updateData['info'] ?? $episode->info ?? [];
                         $info['rating'] = $episodeData['vote_average'];
                         $updateData['info'] = $info;
+                    }
+
+                    // Populate duration from TMDB episode runtime (in minutes)
+                    if (! empty($episodeData['runtime'])) {
+                        $info = $updateData['info'] ?? $episode->info ?? [];
+                        $existingDurationSecs = $info['duration_secs'] ?? 0;
+                        if (empty($existingDurationSecs) || $existingDurationSecs === 0 || $this->overwriteExisting) {
+                            $runtimeMinutes = (int) $episodeData['runtime'];
+                            $runtimeSeconds = $runtimeMinutes * 60;
+                            $info['duration_secs'] = $runtimeSeconds;
+                            $info['duration'] = gmdate('H:i:s', $runtimeSeconds);
+                            $updateData['info'] = $info;
+                        }
                     }
 
                     if (! empty($updateData)) {

@@ -339,8 +339,8 @@ class SyncMediaServer implements ShouldQueue
         // Extract runtime in minutes and convert to formatted duration
         $runtimeTicks = $movie['RunTimeTicks'] ?? 0;
         $runtimeSeconds = $service->ticksToSeconds($runtimeTicks) ?? 0;
-        $runtimeMinutes = (int) ($runtimeSeconds / 60);
-        $duration = gmdate('H:i:s', $runtimeSeconds);
+        $runtimeMinutes = $runtimeSeconds > 0 ? (int) ($runtimeSeconds / 60) : null;
+        $duration = $runtimeSeconds > 0 ? gmdate('H:i:s', $runtimeSeconds) : null;
 
         // Extract director(s) from People array
         $directors = array_column(
@@ -373,7 +373,7 @@ class SyncMediaServer implements ShouldQueue
             'actors' => implode(', ', $actors),
             'cast' => implode(', ', $actors),
             'genre' => implode(', ', $genres),
-            'duration_secs' => $runtimeSeconds,
+            'duration_secs' => $runtimeSeconds ?: null,
             'duration' => $duration,
             'episode_run_time' => $runtimeMinutes,
             'backdrop_path' => $backdropUrl ? [$backdropUrl] : [],
@@ -679,8 +679,8 @@ class SyncMediaServer implements ShouldQueue
                 'info' => [
                     'media_server_id' => $episodeId,
                     'media_server_type' => $integration->type,
-                    'duration_secs' => $runtimeSeconds,
-                    'duration' => gmdate('H:i:s', $runtimeSeconds ?? 0),
+                    'duration_secs' => $runtimeSeconds ?: null,
+                    'duration' => $runtimeSeconds > 0 ? gmdate('H:i:s', $runtimeSeconds) : null,
                     'movie_image' => $imageUrl,
                     'cover_big' => $imageUrl,
                     'release_date' => $episodeData['PremiereDate'] ?? null,
