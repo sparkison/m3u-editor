@@ -196,6 +196,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 ->get();
 
             foreach ($seriesChunk as $series) {
+                if (! $series instanceof Series) {
+                    continue;
+                }
+
                 $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
                 $processedCount++;
             }
@@ -467,6 +471,13 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $cleanSpecialChars = $sync_settings['clean_special_chars'] ?? false;
             $tmdbIdFormat = $sync_settings['tmdb_id_format'] ?? 'square';
 
+            // Get filename metadata settings early so folder/episode naming can respect TMDB target settings
+            $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
+            $tmdbIdApplyTo = $sync_settings['tmdb_id_apply_to'] ?? 'episodes';
+            $tmdbEnabled = in_array('tmdb_id', $filenameMetadata, true);
+            $applyTmdbToSeriesFolder = $tmdbEnabled && in_array($tmdbIdApplyTo, ['series', 'both'], true);
+            $applyTmdbToEpisodes = $tmdbEnabled && in_array($tmdbIdApplyTo, ['episodes', 'both'], true);
+
             // Get name filtering settings
             $nameFilterEnabled = $sync_settings['name_filter_enabled'] ?? false;
             $nameFilterPatterns = $sync_settings['name_filter_patterns'] ?? [];
@@ -512,8 +523,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     }
                 }
 
-                // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility
-                // Priority: TVDB (Sonarr's source) > TMDB > IMDB
+                // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility.
+                // TMDB is only included in series folder names when explicitly enabled via tmdb_id_apply_to.
                 // Check dedicated columns first, then fall back to metadata JSON for legacy support
                 $tvdbId = $series->tvdb_id ?? $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
                 $tmdbId = $series->tmdb_id ?? $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
@@ -523,10 +534,16 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
                 $imdbId = is_scalar($imdbId) ? $imdbId : null;
                 $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
-                if (! empty($tvdbId)) {
+                if ($applyTmdbToSeriesFolder) {
+                    if (! empty($tmdbId)) {
+                        $seriesFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    } elseif (! empty($tvdbId)) {
+                        $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
+                    } elseif (! empty($imdbId)) {
+                        $seriesFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
+                    }
+                } elseif (! empty($tvdbId)) {
                     $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
-                } elseif (! empty($tmdbId)) {
-                    $seriesFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
                 } elseif (! empty($imdbId)) {
                     $seriesFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                 }
@@ -541,7 +558,6 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $seriesFolderPath = $path;
 
             // Get filename metadata settings
-            $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
             $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
 
             // NFO generation setting - instantiate service once if needed
@@ -580,7 +596,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $fileName .= " ({$year})";
                 }
 
-                if (in_array('tmdb_id', $filenameMetadata)) {
+                if ($applyTmdbToEpisodes) {
                     $tmdbId = $seriesMetadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
                     // Ensure ID is a scalar value (not an array)
                     $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
@@ -726,6 +742,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             'path_structure' => $settings->stream_file_sync_path_structure ?? ['category', 'series', 'season'],
             'filename_metadata' => $settings->stream_file_sync_filename_metadata ?? [],
             'tmdb_id_format' => $settings->stream_file_sync_tmdb_id_format ?? 'square',
+            'tmdb_id_apply_to' => 'episodes',
             'clean_special_chars' => $settings->stream_file_sync_clean_special_chars ?? false,
             'remove_consecutive_chars' => $settings->stream_file_sync_remove_consecutive_chars ?? false,
             'replace_char' => $settings->stream_file_sync_replace_char ?? 'space',

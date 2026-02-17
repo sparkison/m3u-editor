@@ -144,13 +144,17 @@ class MergeChannels implements ShouldQueue
             $failoverChannels = $this->sortChannelsByScore($failoverChannels, $playlistPriority);
 
             // Create failover relationships using updateOrCreate for compatibility
+            $sortOrder = 1;
             foreach ($failoverChannels as $failover) {
                 ChannelFailover::updateOrCreate(
                     [
                         'channel_id' => $master->id,
                         'channel_failover_id' => $failover->id,
                     ],
-                    ['user_id' => $this->user->id]
+                    [
+                        'user_id' => $this->user->id,
+                        'sort' => $sortOrder++,
+                    ]
                 );
 
                 // Deactivate failover channel if requested
@@ -252,12 +256,12 @@ class MergeChannels implements ShouldQueue
         if ($this->playlistId) {
             $preferredTop = $topChannels->where('playlist_id', $this->playlistId);
             if ($preferredTop->isNotEmpty()) {
-                return $preferredTop->sortBy('id')->first();
+                return $preferredTop->sortBy('sort')->first();
             }
         }
 
-        // Return first top scorer (sorted by ID for consistency)
-        return $topChannels->sortBy('id')->first();
+        // Return first top scorer (sorted by sort order for consistency)
+        return $topChannels->sortBy('sort')->first();
     }
 
     /**
@@ -403,9 +407,10 @@ class MergeChannels implements ShouldQueue
     protected function sortChannelsByScore($channels, array $playlistPriority)
     {
         if ($this->weightedConfig !== null) {
-            return $channels->sortByDesc(function ($channel) use ($playlistPriority) {
-                return $this->calculateChannelScore($channel, $playlistPriority);
-            });
+            return $channels->sortBy([
+                fn ($channel) => -$this->calculateChannelScore($channel, $playlistPriority),
+                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+            ]);
         }
 
         // Legacy sorting
@@ -414,14 +419,14 @@ class MergeChannels implements ShouldQueue
                 fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
                 fn ($channel) => -$this->getResolution($channel),
                 fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-                fn ($channel) => $channel->id,
+                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
             ]);
         }
 
         return $channels->sortBy([
             fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
             fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-            fn ($channel) => $channel->id,
+            fn ($channel) => $channel->sort ?? PHP_INT_MAX,
         ]);
     }
 
@@ -452,23 +457,23 @@ class MergeChannels implements ShouldQueue
             if ($this->playlistId) {
                 $preferredHighRes = $highestResChannels->where('playlist_id', $this->playlistId);
                 if ($preferredHighRes->isNotEmpty()) {
-                    return $preferredHighRes->sortBy('id')->first();
+                    return $preferredHighRes->sortBy('sort')->first();
                 }
             }
 
-            return $highestResChannels->sortBy('id')->first();
+            return $highestResChannels->sortBy('sort')->first();
         } else {
             // Simple selection without resolution check
             if ($this->playlistId) {
                 $preferredChannels = $selectionGroup->where('playlist_id', $this->playlistId);
                 if ($preferredChannels->isNotEmpty()) {
-                    return $preferredChannels->sortBy('id')->first();
+                    return $preferredChannels->sortBy('sort')->first();
                 }
             }
 
             return $selectionGroup->sortBy([
                 fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-                fn ($channel) => $channel->id,
+                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
             ])->first();
         }
     }
