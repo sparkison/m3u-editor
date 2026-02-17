@@ -45,6 +45,12 @@ it('can fetch TMDB ID for a VOD channel', function () {
         'https://api.themoviedb.org/3/movie/603/external_ids*' => Http::response([
             'imdb_id' => 'tt0133093',
         ], 200),
+        'https://api.themoviedb.org/3/movie/603*' => Http::response([
+            'id' => 603,
+            'title' => 'The Matrix',
+            'overview' => 'A computer hacker learns about the true nature of reality.',
+            'poster_path' => '/matrix.jpg',
+        ], 200),
     ]);
 
     $channel = Channel::factory()->create([
@@ -86,6 +92,12 @@ it('can fetch TMDB and TVDB IDs for a series', function () {
         'https://api.themoviedb.org/3/tv/4592/external_ids*' => Http::response([
             'tvdb_id' => 78020,
             'imdb_id' => 'tt0090390',
+        ], 200),
+        'https://api.themoviedb.org/3/tv/4592*' => Http::response([
+            'id' => 4592,
+            'name' => 'ALF',
+            'overview' => 'An alien lifestyle.',
+            'poster_path' => '/alf.jpg',
         ], 200),
     ]);
 
@@ -157,8 +169,12 @@ it('skips items that already have IDs and metadata when overwrite is false', fun
 
 it('processes items with IDs but missing metadata to populate them', function () {
     Http::fake([
+        'https://api.themoviedb.org/3/movie/603/external_ids*' => Http::response([
+            'imdb_id' => 'tt0133093',
+        ], 200),
         'https://api.themoviedb.org/3/movie/603*' => Http::response([
             'id' => 603,
+            'imdb_id' => 'tt0133093',
             'title' => 'The Matrix',
             'overview' => 'A computer hacker learns about the true nature of reality.',
             'poster_path' => '/matrix.jpg',
@@ -182,9 +198,6 @@ it('processes items with IDs but missing metadata to populate them', function ()
                     ['site' => 'YouTube', 'type' => 'Trailer', 'key' => 'abc123'],
                 ],
             ],
-        ], 200),
-        'https://api.themoviedb.org/3/movie/603/external_ids*' => Http::response([
-            'imdb_id' => 'tt0133093',
         ], 200),
     ]);
 
@@ -240,6 +253,11 @@ it('overwrites existing IDs when overwrite is true', function () {
         ], 200),
         'https://api.themoviedb.org/3/movie/603/external_ids*' => Http::response([
             'imdb_id' => 'tt0133093',
+        ], 200),
+        'https://api.themoviedb.org/3/movie/603*' => Http::response([
+            'id' => 603,
+            'title' => 'The Matrix',
+            'overview' => 'A computer hacker learns about the true nature of reality.',
         ], 200),
     ]);
 

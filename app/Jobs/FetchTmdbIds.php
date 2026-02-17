@@ -385,25 +385,21 @@ class FetchTmdbIds implements ShouldQueue
      */
     protected function processVodChannel(TmdbService $tmdb, Channel $channel): void
     {
-        // Check if already has TMDB ID in the dedicated column
-        // Only skip if we have the TMDB ID AND the metadata is populated
         $info = $channel->info ?? [];
         $hasMetadata = ! empty($info['plot']) && ! empty($info['cover_big']);
 
-        if ($channel->tmdb_id && $hasMetadata && ! $this->overwriteExisting) {
-            $this->skippedCount++;
-
-            return;
-        }
-
-        // Check legacy info/movie_data fields for existing ID
-        $legacyTmdbId = $channel->info['tmdb_id']
+        // Determine the best existing TMDB ID we have
+        $tmdbId = $channel->tmdb_id
+            ?? $info['tmdb_id']
             ?? $channel->movie_data['tmdb_id']
             ?? null;
 
-        // If legacy ID exists and we're not overwriting, migrate it to the column and skip
-        if ($legacyTmdbId && ! $this->overwriteExisting) {
-            $channel->update(['tmdb_id' => $legacyTmdbId]);
+        // If we have an ID AND metadata, and we're not overwriting, we can skip
+        if ($tmdbId && $hasMetadata && ! $this->overwriteExisting) {
+            // Ensure the ID is migrated to the dedicated column if it was only in legacy fields
+            if (empty($channel->tmdb_id)) {
+                $channel->update(['tmdb_id' => $tmdbId]);
+            }
             $this->skippedCount++;
 
             return;
@@ -423,15 +419,14 @@ class FetchTmdbIds implements ShouldQueue
 
         // If we already have tmdb_id but missing metadata, use it directly
         // Otherwise, search TMDB for the movie
-        $existingTmdbId = $channel->tmdb_id;
-        if ($existingTmdbId) {
+        if ($tmdbId && ! $this->overwriteExisting) {
             $result = [
-                'tmdb_id' => $existingTmdbId,
-                'imdb_id' => $channel->imdb_id,
+                'tmdb_id' => $tmdbId,
+                'imdb_id' => $channel->imdb_id ?? $info['imdb_id'] ?? null,
             ];
             Log::debug('FetchTmdbIds: Using existing TMDB ID to fetch metadata', [
                 'channel_id' => $channel->id,
-                'tmdb_id' => $existingTmdbId,
+                'tmdb_id' => $tmdbId,
             ]);
         } else {
             // Search TMDB
@@ -458,6 +453,12 @@ class FetchTmdbIds implements ShouldQueue
             // Fetch full movie details from TMDB to populate metadata
             $details = $tmdb->getMovieDetails($result['tmdb_id']);
             if ($details) {
+                // Populate IMDB ID if missing
+                if (! empty($details['imdb_id']) && empty($updateData['imdb_id'])) {
+                    $updateData['imdb_id'] = $details['imdb_id'];
+                    $info['imdb_id'] = $details['imdb_id'];
+                }
+
                 // Populate cover image if not already set
                 if (! empty($details['poster_url']) && empty($info['cover_big'])) {
                     $info['cover_big'] = $details['poster_url'];
@@ -696,6 +697,17 @@ class FetchTmdbIds implements ShouldQueue
             // Fetch full series details from TMDB to populate metadata
             $details = $tmdb->getTvSeriesDetails($result['tmdb_id']);
             if ($details) {
+                // Populate TVDB/IMDB ID if missing
+                if (! empty($details['tvdb_id']) && empty($updateData['tvdb_id'])) {
+                    $updateData['tvdb_id'] = $details['tvdb_id'];
+                    $metadata['tvdb_id'] = $details['tvdb_id'];
+                }
+                if (! empty($details['imdb_id']) && empty($updateData['imdb_id'])) {
+                    $updateData['imdb_id'] = $details['imdb_id'];
+                    $metadata['imdb_id'] = $details['imdb_id'];
+                }
+                $updateData['metadata'] = $metadata;
+
                 // Populate cover image if not already set
                 if (! empty($details['poster_url']) && empty($series->cover)) {
                     $updateData['cover'] = $details['poster_url'];
@@ -867,18 +879,21 @@ class FetchTmdbIds implements ShouldQueue
                 if ($episode) {
                     // Build update data - only update if field is empty or we're overwriting
                     $updateData = [];
-
-                    if (! empty($episodeData['id'])) {
-                        $updateData['tmdb_id'] = $episodeData['id'];
-                    }
+                    $info = $episode->info ?? [];
 
                     if (! empty($episodeData['name']) && (empty($episode->title) || $this->overwriteExisting)) {
                         $updateData['title'] = $episodeData['name'];
                     }
 
+                    if (! empty($episodeData['id'])) {
+                        if (empty($info['tmdb_id'] ?? true) || $this->overwriteExisting) {
+                            $info['tmdb_id'] = $episodeData['id'];
+                            $updateData['info'] = $info;
+                        }
+                    }
+
                     if (! empty($episodeData['overview'])) {
-                        $info = $episode->info ?? [];
-                        if (empty($info['plot']) || $this->overwriteExisting) {
+                        if (empty($info['plot'] ?? true) || $this->overwriteExisting) {
                             $info['plot'] = $episodeData['overview'];
                             $updateData['info'] = $info;
                         }

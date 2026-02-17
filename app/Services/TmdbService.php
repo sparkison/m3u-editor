@@ -511,6 +511,7 @@ class TmdbService
                 [
                     'api_key' => $this->apiKey,
                     'language' => $this->language,
+                    'append_to_response' => 'external_ids,credits,videos',
                 ]
             );
 
@@ -524,6 +525,10 @@ class TmdbService
             }
 
             $data = $response->json();
+
+            // Extract external IDs
+            $imdbId = $data['external_ids']['imdb_id'] ?? null;
+            $tvdbId = $data['external_ids']['tvdb_id'] ?? null;
 
             // Build poster URL
             $posterUrl = null;
@@ -577,6 +582,9 @@ class TmdbService
             }
 
             return [
+                'tmdb_id' => $data['id'] ?? null,
+                'tvdb_id' => $tvdbId,
+                'imdb_id' => $imdbId,
                 'name' => $data['name'] ?? null,
                 'original_name' => $data['original_name'] ?? null,
                 'overview' => $data['overview'] ?? null,
@@ -620,7 +628,7 @@ class TmdbService
                 [
                     'api_key' => $this->apiKey,
                     'language' => $this->language,
-                    'append_to_response' => 'credits,videos',
+                    'append_to_response' => 'external_ids,credits,videos',
                 ]
             );
 
@@ -682,6 +690,8 @@ class TmdbService
             }
 
             return [
+                'tmdb_id' => $data['id'] ?? null,
+                'imdb_id' => $data['imdb_id'] ?? $data['external_ids']['imdb_id'] ?? null,
                 'title' => $data['title'] ?? null,
                 'original_title' => $data['original_title'] ?? null,
                 'overview' => $data['overview'] ?? null,
@@ -1410,7 +1420,7 @@ class TmdbService
 
         try {
             $response = Http::timeout(15)->get(
-                self::BASE_URL."/tv/{$tmdbId}",
+                self::BASE_URL."/tv/{$tmdbId}/season/{$seasonNumber}",
                 [
                     'api_key' => $this->apiKey,
                     'language' => $this->language,
@@ -1436,9 +1446,11 @@ class TmdbService
                 'overview' => $data['overview'] ?? null,
                 'air_date' => $data['air_date'] ?? null,
                 'poster_path' => $data['poster_path'] ?? null,
+                'poster_url' => isset($data['poster_path']) ? "https://image.tmdb.org/t/p/w500{$data['poster_path']}" : null,
                 'episodes' => collect($data['episodes'] ?? [])->map(function ($episode) {
                     return [
                         'id' => $episode['id'] ?? null,
+                        'tmdb_id' => $episode['id'] ?? null,
                         'episode_number' => $episode['episode_number'] ?? null,
                         'name' => $episode['name'] ?? null,
                         'overview' => $episode['overview'] ?? null,
