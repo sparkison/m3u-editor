@@ -177,6 +177,7 @@ class StreamFileSettingResource extends Resource
                         $pathStructure = $get('path_structure') ?? [];
                         $filenameMetadata = $get('filename_metadata') ?? [];
                         $tmdbIdFormat = $get('tmdb_id_format') ?? 'square';
+                        $tmdbIdApplyTo = $get('tmdb_id_apply_to') ?? 'episodes';
                         $replaceChar = $map($get('replace_char') ?? 'space');
 
                         $preview = 'Preview: '.$path;
@@ -185,7 +186,37 @@ class StreamFileSettingResource extends Resource
                             $preview .= '/'.($series->category ?? 'Uncategorized');
                         }
                         if (in_array('series', $pathStructure)) {
-                            $preview .= '/'.($series->series->metadata['name'] ?? $series->series->name ?? 'Series');
+                            $seriesFolder = $series->series->metadata['name'] ?? $series->series->name ?? 'Series';
+
+                            if (! empty($series->series->release_date ?? null)) {
+                                $year = substr($series->series->release_date, 0, 4);
+                                if (strpos($seriesFolder, "({$year})") === false) {
+                                    $seriesFolder .= " ({$year})";
+                                }
+                            }
+
+                            $tvdbId = $series->series->tvdb_id ?? $series->series->metadata['tvdb_id'] ?? $series->series->metadata['tvdb'] ?? null;
+                            $tmdbId = $series->series->tmdb_id ?? $series->series->metadata['tmdb_id'] ?? $series->series->metadata['tmdb'] ?? null;
+                            $imdbId = $series->series->imdb_id ?? $series->series->metadata['imdb_id'] ?? $series->series->metadata['imdb'] ?? null;
+                            $tmdbEnabled = in_array('tmdb_id', $filenameMetadata, true);
+                            $applyTmdbToSeriesFolder = $tmdbEnabled && in_array($tmdbIdApplyTo, ['series', 'both'], true);
+                            $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
+
+                            if ($applyTmdbToSeriesFolder) {
+                                if (! empty($tmdbId)) {
+                                    $seriesFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                                } elseif (! empty($tvdbId)) {
+                                    $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
+                                } elseif (! empty($imdbId)) {
+                                    $seriesFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
+                                }
+                            } elseif (! empty($tvdbId)) {
+                                $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
+                            } elseif (! empty($imdbId)) {
+                                $seriesFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
+                            }
+
+                            $preview .= '/'.$seriesFolder;
                         }
                         if (in_array('season', $pathStructure)) {
                             $preview .= '/Season '.str_pad($series->info->season ?? 0, 2, '0', STR_PAD_LEFT);
@@ -199,7 +230,9 @@ class StreamFileSettingResource extends Resource
                             $year = substr($series->series->release_date, 0, 4);
                             $filename .= " ({$year})";
                         }
-                        if (in_array('tmdb_id', $filenameMetadata) && ! empty($series->info->tmdb_id ?? null)) {
+                        $tmdbEnabled = in_array('tmdb_id', $filenameMetadata, true);
+                        $applyTmdbToEpisodes = $tmdbEnabled && in_array($tmdbIdApplyTo, ['episodes', 'both'], true);
+                        if ($applyTmdbToEpisodes && ! empty($series->info->tmdb_id ?? null)) {
                             $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                             $filename .= " {$bracket[0]}tmdb-{$series->info->tmdb_id}{$bracket[1]}";
                         }
@@ -234,13 +267,13 @@ class StreamFileSettingResource extends Resource
 
                 Fieldset::make('Include Metadata')
                     ->columnSpanFull()
+                    ->columns(2)
                     ->schema([
                         ToggleButtons::make('filename_metadata')
                             ->label('Filename metadata')
                             ->live()
                             ->inline()
                             ->multiple()
-                            ->columnSpanFull()
                             ->options(fn ($get) => $get('type') === 'series'
                                 ? [
                                     'year' => 'Year',
@@ -264,6 +297,19 @@ class StreamFileSettingResource extends Resource
                             ])
                             ->default('square')
                             ->hidden(fn ($get) => ! in_array('tmdb_id', $get('filename_metadata') ?? [])),
+                        ToggleButtons::make('tmdb_id_apply_to')
+                            ->label('Apply TMDB ID to')
+                            ->inline()
+                            ->grouped()
+                            ->live()
+                            ->options([
+                                'episodes' => 'Episodes',
+                                'series' => 'Series folder',
+                                'both' => 'Both',
+                            ])
+                            ->default('episodes')
+                            ->helperText('How should the TMDB ID be used.')
+                            ->hidden(fn ($get) => $get('type') !== 'series' || ! in_array('tmdb_id', $get('filename_metadata') ?? [])),
                     ])
                     ->hidden(fn ($get) => ! $get('enabled')),
 

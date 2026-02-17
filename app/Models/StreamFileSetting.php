@@ -76,6 +76,7 @@ class StreamFileSetting extends Model
             'path_structure' => $this->path_structure ?? [],
             'filename_metadata' => $this->filename_metadata ?? [],
             'tmdb_id_format' => $this->tmdb_id_format,
+            'tmdb_id_apply_to' => $this->tmdb_id_apply_to ?? 'episodes',
             'clean_special_chars' => $this->clean_special_chars,
             'remove_consecutive_chars' => $this->remove_consecutive_chars,
             'replace_char' => $this->replace_char,

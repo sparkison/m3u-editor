@@ -367,8 +367,10 @@ class PlaylistService
             'series' => (object) [
                 'name' => 'My Hero Academia (2016)',
                 'release_date' => '2016-04-03',
+                'tmdb_id' => '65930',
                 'metadata' => [
                     'name' => 'My Hero Academia (2016)',
+                    'tmdb_id' => '65930',
                 ],
             ],
         ];
