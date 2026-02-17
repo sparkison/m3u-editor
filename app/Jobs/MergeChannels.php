@@ -144,13 +144,17 @@ class MergeChannels implements ShouldQueue
             $failoverChannels = $this->sortChannelsByScore($failoverChannels, $playlistPriority);
 
             // Create failover relationships using updateOrCreate for compatibility
+            $sortOrder = 1;
             foreach ($failoverChannels as $failover) {
                 ChannelFailover::updateOrCreate(
                     [
                         'channel_id' => $master->id,
                         'channel_failover_id' => $failover->id,
                     ],
-                    ['user_id' => $this->user->id]
+                    [
+                        'user_id' => $this->user->id,
+                        'sort' => $sortOrder++,
+                    ]
                 );
 
                 // Deactivate failover channel if requested
@@ -403,9 +407,10 @@ class MergeChannels implements ShouldQueue
     protected function sortChannelsByScore($channels, array $playlistPriority)
     {
         if ($this->weightedConfig !== null) {
-            return $channels->sortByDesc(function ($channel) use ($playlistPriority) {
-                return $this->calculateChannelScore($channel, $playlistPriority);
-            });
+            return $channels->sortBy([
+                fn ($channel) => -$this->calculateChannelScore($channel, $playlistPriority),
+                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+            ]);
         }
 
         // Legacy sorting

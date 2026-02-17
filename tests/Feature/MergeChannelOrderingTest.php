@@ -179,9 +179,9 @@ it('sorts failover channels by sort order', function () {
     ]);
 
     // Failovers should be in sort order: channel2 (sort=2.0) before channel3 (sort=3.0)
-    // MergeChannels inserts failovers in sorted order, so ordering by id reflects insertion order
+    // MergeChannels inserts failovers in sorted order, so we check the sort column
     $failovers = \App\Models\ChannelFailover::where('channel_id', $channel1->id)
-        ->orderBy('id')
+        ->orderBy('sort')
         ->pluck('channel_failover_id')
         ->toArray();
 
