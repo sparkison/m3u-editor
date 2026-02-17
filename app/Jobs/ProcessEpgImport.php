@@ -574,6 +574,7 @@ class ProcessEpgImport implements ShouldQueue
         $sourceEpgs = $epg->sourceEpgs()
             ->where('epgs.id', '!=', $epg->id)
             ->where('epgs.is_merged', false)
+            ->orderBy('merged_epg_epg.sort_order')
             ->get();
 
         if ($sourceEpgs->isEmpty()) {

@@ -140,7 +140,8 @@ class Epg extends Model
 
     public function sourceEpgs(): BelongsToMany
     {
-        return $this->belongsToMany(self::class, 'merged_epg_epg', 'merged_epg_id', 'epg_id');
+        return $this->belongsToMany(self::class, 'merged_epg_epg', 'merged_epg_id', 'epg_id')
+            ->withPivot('sort_order');
     }
 
     public function mergedByEpgs(): BelongsToMany

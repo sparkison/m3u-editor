@@ -263,14 +263,15 @@ class MergedEpgResource extends Resource
 
             Select::make('sourceEpgs')
                 ->label('Source EPGs')
+                ->reorderable()
                 ->relationship(
                     name: 'sourceEpgs',
                     titleAttribute: 'name',
                     modifyQueryUsing: fn (Builder $query) => $query
-                        ->select(['epgs.id', 'epgs.name'])
+                        ->select(['epgs.id', 'epgs.name', 'merged_epg_epg.sort_order'])
                         ->where('user_id', Auth::id())
                         ->where('is_merged', false)
-                        ->orderBy('name')
+                        ->orderBy('merged_epg_epg.sort_order')
                 )
                 ->multiple()
                 ->preload()
