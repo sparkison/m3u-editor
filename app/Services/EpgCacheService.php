@@ -97,15 +97,12 @@ class EpgCacheService
     {
         // Get the content
         $filePath = null;
-        if ($epg->isMerged() || $epg->source_type === EpgSourceType::SCHEDULES_DIRECT || ($epg->url && str_starts_with($epg->url, 'http'))) {
+        if ($epg->source_type === EpgSourceType::SCHEDULES_DIRECT || ($epg->url && str_starts_with($epg->url, 'http'))) {
             $filePath = Storage::disk('local')->path($epg->file_path);
-        } else {
-            $uploadPath = is_array($epg->uploads) ? ($epg->uploads[0] ?? null) : $epg->uploads;
-            if ($uploadPath && Storage::disk('local')->exists($uploadPath)) {
-                $filePath = Storage::disk('local')->path($uploadPath);
-            } elseif ($epg->url) {
-                $filePath = $epg->url;
-            }
+        } elseif ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+            $filePath = Storage::disk('local')->path($epg->uploads);
+        } elseif ($epg->url) {
+            $filePath = $epg->url;
         }
         if (! file_exists($filePath)) {
             Log::error("EPG file not found: {$filePath}");
