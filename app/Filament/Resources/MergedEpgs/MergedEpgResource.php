@@ -318,7 +318,11 @@ class MergedEpgResource extends Resource
                 ->searchable()
                 ->required()
                 ->minItems(2)
-                ->helperText('Select 2 or more source EPGs to merge into a single EPG output.'),
+                ->hintIcon(
+                    'heroicon-s-information-circle',
+                    tooltip: 'Select 2 or more source EPGs to merge into a single EPG output. Duplicates will be ignored based on channel name and number.',
+                )
+                ->helperText('Drag to re-order the assigned EPG sources. The first will be given the highest priority.'),
 
             Section::make('Scheduling')
                 ->description('Auto sync and scheduling options')

@@ -11,7 +11,7 @@ class ListMergedEpgs extends ListRecords
 {
     protected static string $resource = MergedEpgResource::class;
 
-    protected ?string $subheading = 'Combine multiple EPGs into one unified XML.';
+    protected ?string $subheading = 'Combine multiple EPGs into one unified XML for external players.';
 
     protected function getHeaderActions(): array
     {
