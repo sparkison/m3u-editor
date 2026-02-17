@@ -288,7 +288,7 @@ class CustomPlaylistResource extends Resource
                 ->columns(2)
                 ->schema([
                     Toggle::make('dummy_epg')
-                        ->label('Enably dummy EPG')
+                        ->label('Enable dummy EPG')
                         ->columnSpan(1)
                         ->live()
                         ->inline(false)

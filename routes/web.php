@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AssetPreviewController;
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\LogoProxyController;
+use App\Http\Controllers\LogoRepositoryController;
 use App\Http\Controllers\NetworkEpgController;
 use App\Http\Controllers\NetworkPlaylistController;
 use App\Http\Controllers\NetworkStreamController;
@@ -20,6 +22,18 @@ Route::post('/admin/refresh-external-ip', function (ExternalIpService $ipService
 
     return response()->json(['success' => true, 'external_ip' => $ip]);
 })->middleware(['auth']);
+
+Route::get('/assets/{asset}/preview', AssetPreviewController::class)
+    ->middleware(['auth'])
+    ->name('assets.preview');
+
+Route::get('/logo-repository', [LogoRepositoryController::class, 'index'])
+    ->name('logo.repository');
+Route::get('/logo-repository/index.json', [LogoRepositoryController::class, 'index'])
+    ->name('logo.repository.index');
+Route::get('/logo-repository/logos/{filename}', [LogoRepositoryController::class, 'show'])
+    ->where('filename', '.*')
+    ->name('logo.repository.file');
 
 // Handle short URLs with optional path forwarding (e.g. /s/{key}/device.xml)
 Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $shortUrlKey, ?string $path = null) {
@@ -55,8 +69,9 @@ Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $short
 /*
  * Logo proxy route - cache and serve remote logos
  */
-Route::get('/logo-proxy/{encodedUrl}', [LogoProxyController::class, 'serveLogo'])
+Route::get('/logo-proxy/{encodedUrl}/{filename?}', [LogoProxyController::class, 'serveLogo'])
     ->where('encodedUrl', '[A-Za-z0-9\-_=]+')
+    ->where('filename', '.*')
     ->name('logo.proxy');
 
 /*

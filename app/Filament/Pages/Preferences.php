@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\Assets\AssetResource;
 use App\Jobs\RestartQueue;
 use App\Models\StreamProfile;
 use App\Rules\Cron;
@@ -12,6 +13,8 @@ use Cron\CronExpression;
 use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -31,6 +34,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class Preferences extends SettingsPage
@@ -55,43 +59,62 @@ class Preferences extends SettingsPage
     protected function getActions(): array
     {
         return [
-            Action::make('Reset Queue')
-                ->label('Reset Queue')
-                ->action(function () {
-                    app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new RestartQueue);
-                })
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Queue reset')
-                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
-                ->modalSubmitActionLabel('I understand, reset now'),
-            Action::make('Clear Logo Cache')
-                ->label('Clear Logo Cache')
-                ->action(fn () => Artisan::call('app:logo-cleanup --force --all'))
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Logo cache cleared')
-                        ->body('The logo cache has been cleared successfully.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
-                ->modalSubmitActionLabel('I understand, clear logo cache now'),
+            ActionGroup::make([
+                Action::make('Clear Expired Logo Cache')
+                    ->label('Clear Expired Logo Cache')
+                    ->action(fn () => Artisan::call('app:logo-cleanup --force'))
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Expired logo cache cleared')
+                            ->body('Expired logo cache files were removed successfully.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-trash')
+                    ->modalIcon('heroicon-o-trash')
+                    ->modalDescription('Only expired logo cache entries (those older than 30 days). If permanent cache is enabled, nothing will be removed.')
+                    ->modalSubmitActionLabel('Clear expired cache'),
+                Action::make('Clear Logo Cache')
+                    ->label('Clear All Logo Cache')
+                    ->action(fn () => Artisan::call('app:logo-cleanup --force --all'))
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Logo cache cleared')
+                            ->body('The logo cache has been cleared. Logos will be fetched again on next request wherever logo proxy is enabled.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalDescription('Clearing the logo cache will remove all cached logo images. If permanent cache is enabled, it will be ignored. This action cannot be undone.')
+                    ->modalSubmitActionLabel('I understand, clear now'),
+                Action::make('Reset Queue')
+                    ->label('Reset Queue')
+                    ->action(function () {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new RestartQueue);
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Queue reset')
+                            ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
+                    ->modalSubmitActionLabel('I understand, reset now'),
+            ])->button()->color('gray')->label('Actions'),
         ];
     }
 
@@ -668,6 +691,83 @@ class Preferences extends SettingsPage
                                                     ->openUrlInNewTab(false)
                                             )
                                             ->helperText('Leave empty to disable .strm file generation for VOD. Priority: VOD > Group > Global.'),
+                                    ]),
+                            ]),
+
+                        Tab::make('Assets')
+                            ->schema([
+                                Section::make('Logo Cache')
+                                    ->description('Manage logo cache behavior and storage used by logo proxy URLs.')
+                                    ->columns(1)
+                                    ->headerActions([
+                                        Action::make('manage_assets')
+                                            ->label('Manage Assets')
+                                            ->color('gray')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url(AssetResource::getUrl('index')),
+                                        Action::make('view_repo')
+                                            ->label('View Logo Repository')
+                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url('/logo-repository')
+                                            ->hidden(fn ($get) => ! $get('logo_repository_enabled'))
+                                            ->openUrlInNewTab(true),
+                                    ])
+                                    ->schema([
+                                        Toggle::make('logo_cache_permanent')
+                                            ->label('Keep cache permanently (disable expiry cleanup)')
+                                            ->helperText('When enabled, expired cache cleanup will skip deletion. You can still refresh/clear cache manually.'),
+                                        Toggle::make('logo_repository_enabled')
+                                            ->label('Enable Logo Repository endpoint')
+                                            ->live()
+                                            ->helperText('When enabled, /logo-repository endpoints are publicly accessible for apps like UHF.'),
+
+                                    ]),
+                                Section::make('Placeholder Images')
+                                    ->description('Override app-wide placeholder images for logos, episode previews, and VOD/Series poster fallbacks.')
+                                    ->columns(3)
+                                    ->schema([
+                                        FileUpload::make('logo_placeholder_url')
+                                            ->label('Logo placeholder')
+                                            ->image()
+                                            ->disk('public')
+                                            ->directory('assets/placeholders')
+                                            ->visibility('public')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Used when a channel logo is missing. Clear to use the default placeholder.'
+                                            )
+                                            ->helperText(new HtmlString('<strong>Recommended size:</strong> 300x300px for best results.<br/>Default image: <img src="'.url('/placeholder.png').'" alt="Default Logo Placeholder" style="width:80px; height:80px; margin-top:5px;">')),
+                                        FileUpload::make('episode_placeholder_url')
+                                            ->label('Episode preview placeholder')
+                                            ->image()
+                                            ->disk('public')
+                                            ->directory('assets/placeholders')
+                                            ->visibility('public')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Used when an episode preview image is missing. Clear to use the default placeholder.'
+                                            )
+                                            ->helperText(new HtmlString('<strong>Recommended size:</strong> 600x400px for best results.<br/>Default image: <img src="'.url('/episode-placeholder.png').'" alt="Default Episode Placeholder" style="width:120px; height:80px; margin-top:5px;">')),
+                                        FileUpload::make('vod_series_poster_placeholder_url')
+                                            ->label('VOD/Series poster placeholder')
+                                            ->image()
+                                            ->disk('public')
+                                            ->directory('assets/placeholders')
+                                            ->visibility('public')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Used when VOD/Series poster or cover images are missing. Clear to use the default placeholder.'
+                                            )
+                                            ->helperText(new HtmlString('<strong>Recommended size:</strong> 600x900px for best results.<br/>Default image: <img src="'.url('/vod-series-poster-placeholder.png').'" alt="Default VOD/Series Poster Placeholder" style="width:80px; height:120px; margin-top:5px;">')),
                                     ]),
                             ]),
 
