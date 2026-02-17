@@ -34,6 +34,7 @@ use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
@@ -100,7 +101,6 @@ class MergedEpgResource extends Resource
                     ->sortable(),
                 TextColumn::make('channel_count')
                     ->label('Channels')
-                    ->formatStateUsing(fn ($state): int => (int) ($state ?? 0))
                     ->toggleable()
                     ->sortable(),
                 TextColumn::make('status')
@@ -268,11 +268,51 @@ class MergedEpgResource extends Resource
                     name: 'sourceEpgs',
                     titleAttribute: 'name',
                     modifyQueryUsing: fn (Builder $query) => $query
-                        ->select(['epgs.id', 'epgs.name', 'merged_epg_epg.sort_order'])
+                        ->select(['epgs.id', 'epgs.name'])
                         ->where('user_id', Auth::id())
                         ->where('is_merged', false)
-                        ->orderBy('merged_epg_epg.sort_order')
+                        ->orderBy('name')
                 )
+                ->loadStateFromRelationshipsUsing(static function (Select $component, $state): void {
+                    if (filled($state)) {
+                        return;
+                    }
+
+                    $record = $component->getRecord();
+
+                    if (! $record instanceof Epg) {
+                        return;
+                    }
+
+                    $component->state(
+                        $record->sourceEpgs()
+                            ->where('epgs.id', '!=', $record->id)
+                            ->orderBy('merged_epg_epg.sort_order')
+                            ->pluck('epgs.id')
+                            ->map(static fn ($id): string => (string) $id)
+                            ->values()
+                            ->all()
+                    );
+                })
+                ->saveRelationshipsUsing(static function (Select $component, Model $record, $state): void {
+                    if (! $record instanceof Epg) {
+                        return;
+                    }
+
+                    $sourceEpgIds = collect(is_array($state) ? $state : [])
+                        ->map(static fn ($id): int => (int) $id)
+                        ->filter(static fn (int $id): bool => $id > 0)
+                        ->unique()
+                        ->values();
+
+                    $syncData = [];
+
+                    foreach ($sourceEpgIds as $index => $sourceEpgId) {
+                        $syncData[$sourceEpgId] = ['sort_order' => $index];
+                    }
+
+                    $record->sourceEpgs()->sync($syncData);
+                })
                 ->multiple()
                 ->preload()
                 ->searchable()
