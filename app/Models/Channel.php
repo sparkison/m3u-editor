@@ -49,6 +49,7 @@ class Channel extends Model
         'last_metadata_fetch' => 'datetime',
         'epg_map_enabled' => 'boolean',
         'logo_type' => ChannelLogoType::class,
+        'sort' => 'decimal:4',
     ];
 
     public function user(): BelongsTo

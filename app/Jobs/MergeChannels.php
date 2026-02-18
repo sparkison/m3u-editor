@@ -72,7 +72,7 @@ class MergeChannels implements ShouldQueue
             $playlistIds->prepend($this->playlistId); // Add preferred playlist at the beginning
         }
 
-        $playlistIds = $playlistIds->unique()->toArray();
+        $playlistIds = $playlistIds->unique()->values()->toArray();
 
         // Create playlist priority lookup for efficient sorting
         $playlistPriority = $playlistIds ? array_flip($playlistIds) : [];
@@ -407,26 +407,26 @@ class MergeChannels implements ShouldQueue
     protected function sortChannelsByScore($channels, array $playlistPriority)
     {
         if ($this->weightedConfig !== null) {
-            return $channels->sortBy([
-                fn ($channel) => -$this->calculateChannelScore($channel, $playlistPriority),
-                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+            return $channels->sortBy(fn ($channel) => [
+                -$this->calculateChannelScore($channel, $playlistPriority),
+                $channel->sort ?? 999999,
             ]);
         }
 
         // Legacy sorting
         if ($this->checkResolution) {
-            return $channels->sortBy([
-                fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
-                fn ($channel) => -$this->getResolution($channel),
-                fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+            return $channels->sortBy(fn ($channel) => [
+                $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
+                -(int) $this->getResolution($channel),
+                (int) ($playlistPriority[$channel->playlist_id] ?? 999),
+                $channel->sort ?? 999999,
             ]);
         }
 
-        return $channels->sortBy([
-            fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
-            fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-            fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+        return $channels->sortBy(fn ($channel) => [
+            $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
+            (int) ($playlistPriority[$channel->playlist_id] ?? 999),
+            $channel->sort ?? 999999,
         ]);
     }
 
@@ -471,9 +471,9 @@ class MergeChannels implements ShouldQueue
                 }
             }
 
-            return $selectionGroup->sortBy([
-                fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-                fn ($channel) => $channel->sort ?? PHP_INT_MAX,
+            return $selectionGroup->sortBy(fn ($channel) => [
+                (int) ($playlistPriority[$channel->playlist_id] ?? 999),
+                $channel->sort ?? 999999,
             ])->first();
         }
     }
