@@ -30,6 +30,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -79,9 +82,69 @@ class MediaServerIntegrationResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
-            ->components([
+            ->components(self::getForm());
+    }
+
+    public static function getForm(): array
+    {
+        $tabs = [];
+        foreach (collect(self::getFormSections(creating: false)) as $section => $fields) {
+            // Determine icon for section
+            $icon = match (strtolower($section)) {
+                'connection' => 'heroicon-m-signal',
+                'import' => 'heroicon-m-arrow-down-tray',
+                'schedule' => 'heroicon-m-calendar',
+                'status' => 'heroicon-m-information-circle',
+                'networks' => 'heroicon-m-tv',
+                default => null,
+            };
+
+            $tabs[] = Tab::make($section)
+                ->icon($icon)
+                ->schema($fields);
+        }
+
+        return [
+            Tabs::make('Media Server Integration')
+                ->tabs($tabs)
+                ->columnSpanFull()
+                ->contained(false)
+                ->persistTabInQueryString(),
+        ];
+    }
+
+    public static function getFormSteps(): array
+    {
+        $wizard = [];
+        foreach (self::getFormSections(creating: true) as $step => $fields) {
+            if ($step === 'Status' || $step === 'Networks') {
+                continue;
+            }
+
+            // Determine icon for step
+            $icon = match (strtolower($step)) {
+                'connection' => 'heroicon-m-signal',
+                'import' => 'heroicon-m-arrow-down-tray',
+                'schedule' => 'heroicon-m-calendar',
+                default => null,
+            };
+
+            $wizard[] = Step::make($step)
+                ->icon($icon)
+                ->schema($fields);
+        }
+
+        return $wizard;
+    }
+
+    public static function getFormSections($creating = false): array
+    {
+        return [
+            'Connection' => [
                 Section::make('Server Configuration')
-                    ->description('Configure your Emby or Jellyfin media server connection')
+                    ->description('Configure your media server connection')
+                    ->collapsible(! $creating)
+                    ->collapsed(! $creating)
                     ->schema([
                         Grid::make(2)->schema([
                             TextInput::make('name')
@@ -145,66 +208,10 @@ class MediaServerIntegrationResource extends Resource
                                 };
                             }),
 
-                        Actions::make([
-                            Action::make('testAndDiscover')
-                                ->label('Test Connection & Discover Libraries')
-                                ->icon('heroicon-o-signal')
-                                ->action(function (callable $get, callable $set, $livewire) {
-                                    // Create temporary model from form state
-                                    $tempIntegration = new MediaServerIntegration([
-                                        'type' => $get('type'),
-                                        'host' => $get('host'),
-                                        'port' => $get('port'),
-                                        'ssl' => $get('ssl'),
-                                        'api_key' => $get('api_key') ?: $livewire->record?->api_key,
-                                    ]);
-
-                                    // Test connection
-                                    $service = MediaServerService::make($tempIntegration);
-                                    $result = $service->testConnection();
-
-                                    if (! $result['success']) {
-                                        Notification::make()
-                                            ->danger()
-                                            ->title('Connection Failed')
-                                            ->body($result['message'])
-                                            ->send();
-
-                                        return;
-                                    }
-
-                                    // Fetch libraries
-                                    $libraries = $service->fetchLibraries();
-
-                                    if ($libraries->isEmpty()) {
-                                        Notification::make()
-                                            ->warning()
-                                            ->title('Connected but No Libraries Found')
-                                            ->body("Connected to {$result['server_name']}. No movie or TV show libraries were found.")
-                                            ->send();
-                                        $set('available_libraries', []);
-
-                                        return;
-                                    }
-
-                                    // Store libraries in form state
-                                    $set('available_libraries', $libraries->toArray());
-
-                                    // Preserve existing selections if valid
-                                    $existingSelections = $get('selected_library_ids') ?? [];
-                                    $newLibraryIds = $libraries->pluck('id')->toArray();
-                                    $validSelections = array_intersect($existingSelections, $newLibraryIds);
-                                    $set('selected_library_ids', array_values($validSelections));
-
-                                    Notification::make()
-                                        ->success()
-                                        ->title('Connection Successful')
-                                        ->body("Connected to {$result['server_name']} (v{$result['version']}). Found {$libraries->count()} libraries.")
-                                        ->send();
-                                }),
-                        ])->fullWidth(),
+                        Actions::make(self::getServerActions())->fullWidth(),
                     ]),
-
+            ],
+            'Import' => [
                 Section::make('Import Settings')
                     ->description('Control what content is synced from the media server')
                     ->schema([
@@ -240,6 +247,7 @@ class MediaServerIntegrationResource extends Resource
 
                 Section::make('Library Selection')
                     ->description('Select which libraries to import from your media server')
+                    ->headerActions(self::getServerActions())
                     ->schema([
                         Hidden::make('available_libraries')
                             ->dehydrateStateUsing(fn ($state) => $state)
@@ -316,13 +324,14 @@ class MediaServerIntegrationResource extends Resource
                             ->columns(1)
                             ->bulkToggleable()
                             ->live()
-                            ->visible(fn (callable $get) => ! empty($get('available_libraries')))
+                            // ->visible(fn (callable $get) => ! empty($get('available_libraries')))
                             ->required(fn (callable $get) => $get('enabled') && ($get('import_movies') || $get('import_series')))
                             ->validationMessages([
                                 'required' => 'Please select at least one library to import.',
                             ]),
                     ]),
-
+            ],
+            'Schedule' => [
                 Section::make('Sync Schedule')
                     ->description('Configure automatic sync schedule')
                     ->schema([
@@ -349,7 +358,8 @@ class MediaServerIntegrationResource extends Resource
                                 ->disabled(fn (callable $get) => ! $get('auto_sync')),
                         ]),
                     ]),
-
+            ],
+            'Status' => [
                 Section::make('Sync Status')
                     ->description('Information about the last sync operation')
                     ->schema([
@@ -388,8 +398,9 @@ class MediaServerIntegrationResource extends Resource
                                 }),
                         ]),
                     ])
-                    ->visibleOn('edit'),
-
+                    ->visible(! $creating),
+            ],
+            'Networks' => [
                 Section::make('Networks (Pseudo-Live Channels)')
                     ->description('Create live TV channels from your media server content')
                     ->schema([
@@ -451,8 +462,9 @@ class MediaServerIntegrationResource extends Resource
                             })
                             ->helperText('Create Networks in the Networks section to build pseudo-live channels'),
                     ])
-                    ->visibleOn('edit'),
-            ]);
+                    ->visible(! $creating),
+            ],
+        ];
     }
 
     public static function table(Table $table): Table
@@ -908,5 +920,79 @@ class MediaServerIntegrationResource extends Resource
         }
 
         return $stats;
+    }
+
+    private static function getServerActions(): array
+    {
+        return [
+            Action::make('testAndDiscover')
+                ->label('Test Connection & Discover Libraries')
+                ->icon('heroicon-o-signal')
+                ->action(function (callable $get, callable $set, $livewire) {
+                    // Create temporary model from form state
+                    $values = [
+                        'type' => $get('type'),
+                        'host' => $get('host'),
+                        'port' => $get('port'),
+                        'ssl' => $get('ssl') ?? false,
+                        'api_key' => $get('api_key') ?: $livewire->record?->api_key,
+                    ];
+
+                    if (array_filter($values, fn ($value) => empty($value) && ! is_bool($value))) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Validation Error')
+                            ->body('Please fill in all required connection fields before testing the connection.')
+                            ->send();
+
+                        return;
+                    }
+
+                    $tempIntegration = new MediaServerIntegration($values);
+
+                    // Test connection
+                    $service = MediaServerService::make($tempIntegration);
+                    $result = $service->testConnection();
+
+                    if (! $result['success']) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Connection Failed')
+                            ->body($result['message'])
+                            ->send();
+
+                        return;
+                    }
+
+                    // Fetch libraries
+                    $libraries = $service->fetchLibraries();
+
+                    if ($libraries->isEmpty()) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Connected but No Libraries Found')
+                            ->body("Connected to {$result['server_name']}. No movie or TV show libraries were found.")
+                            ->send();
+                        $set('available_libraries', []);
+
+                        return;
+                    }
+
+                    // Store libraries in form state
+                    $set('available_libraries', $libraries->toArray());
+
+                    // Preserve existing selections if valid
+                    $existingSelections = $get('selected_library_ids') ?? [];
+                    $newLibraryIds = $libraries->pluck('id')->toArray();
+                    $validSelections = array_intersect($existingSelections, $newLibraryIds);
+                    $set('selected_library_ids', array_values($validSelections));
+
+                    Notification::make()
+                        ->success()
+                        ->title('Connection Successful')
+                        ->body("Connected to {$result['server_name']} (v{$result['version']}). Found {$libraries->count()} libraries.")
+                        ->send();
+                }),
+        ];
     }
 }
