@@ -223,7 +223,40 @@ class MediaServerIntegrationResource extends Resource
                             ->fullWidth(),
                     ]),
             ],
-            'Local Libraries' => [
+            'Import' => [
+                Section::make('Import Settings')
+                    ->description('Control what content is synced from the media server')
+                    ->schema([
+                        Toggle::make('enabled')
+                            ->label('Enabled')
+                            ->live()
+                            ->helperText('Disable to pause syncing without deleting the integration')
+                            ->default(true),
+
+                        Grid::make(2)->schema([
+                            Toggle::make('import_movies')
+                                ->label('Import Movies')
+                                ->helperText('Sync movies as VOD channels')
+                                ->default(true),
+
+                            Toggle::make('import_series')
+                                ->label('Import Series')
+                                ->helperText('Sync TV series with episodes')
+                                ->default(true),
+                        ])->visible(fn (callable $get) => $get('enabled')),
+
+                        Select::make('genre_handling')
+                            ->label('Genre Handling')
+                            ->options([
+                                'primary' => 'Primary Genre Only (recommended)',
+                                'all' => 'All Genres (creates duplicates)',
+                            ])
+                            ->default('primary')
+                            ->helperText('How to handle content with multiple genres')
+                            ->native(false)
+                            ->visible(fn (callable $get) => $get('enabled')),
+                    ]),
+
                 // Local Media Configuration Section
                 Section::make('Local Media Libraries')
                     ->description(new HtmlString(
@@ -296,41 +329,6 @@ class MediaServerIntegrationResource extends Resource
 
                         Actions::make(self::getLocalActions())->fullWidth(),
                     ])->visible(fn (callable $get) => $get('type') === 'local'),
-
-            ],
-            'Import' => [
-                Section::make('Import Settings')
-                    ->description('Control what content is synced from the media server')
-                    ->schema([
-                        Toggle::make('enabled')
-                            ->label('Enabled')
-                            ->live()
-                            ->helperText('Disable to pause syncing without deleting the integration')
-                            ->default(true),
-
-                        Grid::make(2)->schema([
-                            Toggle::make('import_movies')
-                                ->label('Import Movies')
-                                ->helperText('Sync movies as VOD channels')
-                                ->default(true),
-
-                            Toggle::make('import_series')
-                                ->label('Import Series')
-                                ->helperText('Sync TV series with episodes')
-                                ->default(true),
-                        ])->visible(fn (callable $get) => $get('enabled')),
-
-                        Select::make('genre_handling')
-                            ->label('Genre Handling')
-                            ->options([
-                                'primary' => 'Primary Genre Only (recommended)',
-                                'all' => 'All Genres (creates duplicates)',
-                            ])
-                            ->default('primary')
-                            ->helperText('How to handle content with multiple genres')
-                            ->native(false)
-                            ->visible(fn (callable $get) => $get('enabled')),
-                    ]),
 
                 Section::make('Library Selection')
                     ->description('Select which libraries to import from your media server')
@@ -422,12 +420,11 @@ class MediaServerIntegrationResource extends Resource
                             ->columns(1)
                             ->bulkToggleable()
                             ->live()
-                            ->visible(fn (callable $get) => $get('type') !== 'local')
                             ->required(fn (callable $get) => $get('enabled') && ($get('import_movies') || $get('import_series')) && $get('type') !== 'local')
                             ->validationMessages([
                                 'required' => 'Please select at least one library to import.',
                             ]),
-                    ])->visible(fn (callable $get) => $get('type') !== 'local' || ! empty($get('available_libraries'))),
+                    ])->visible(fn (callable $get) => $get('type') !== 'local'),
             ],
             'Schedule' => [
                 Section::make('Sync Schedule')
