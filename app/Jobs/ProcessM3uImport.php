@@ -1353,19 +1353,22 @@ class ProcessM3uImport implements ShouldQueue
             ->catch(function (Throwable $e) use ($playlist) {
                 $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                 Log::error($error);
+            
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
+            
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
                     ->sendToDatabase($playlist->user);
+            
                 $playlist->update([
                     'status' => Status::Failed,
-                    'channels' => 0, // not using...
+                    'channels' => 0,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -1373,10 +1376,18 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
+                        'series_processing' => false, // <-- IMPORTANT
                     ],
                 ]);
+            
+                // Auto retry on HTTP 503
+                if ($this->isHttp503($e)) {
+                    $this->resetProcessingState($playlist);
+                    $this->scheduleRetry503($playlist);
+                }
+            
                 event(new SyncCompleted($playlist));
-            })->dispatch();
+            })
     }
 
     /**
@@ -1567,19 +1578,22 @@ class ProcessM3uImport implements ShouldQueue
             ->catch(function (Throwable $e) use ($playlist) {
                 $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                 Log::error($error);
+            
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
+            
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
                     ->sendToDatabase($playlist->user);
+            
                 $playlist->update([
                     'status' => Status::Failed,
-                    'channels' => 0, // not using...
+                    'channels' => 0,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -1587,10 +1601,18 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
+                        'series_processing' => false, // <-- IMPORTANT
                     ],
                 ]);
+            
+                // Auto retry on HTTP 503
+                if ($this->isHttp503($e)) {
+                    $this->resetProcessingState($playlist);
+                    $this->scheduleRetry503($playlist);
+                }
+            
                 event(new SyncCompleted($playlist));
-            })->dispatch();
+            })
     }
 
     /**
