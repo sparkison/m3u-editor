@@ -61,3 +61,10 @@ Schedule::command('profiles:reconcile')
 Schedule::job(new \App\Jobs\RefreshPlaylistProfiles)
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+// Regenerate network schedules (hourly check, regenerates when needed)
+Schedule::command('networks:regenerate-schedules')
+    ->hourly()
+    ->withoutOverlapping();
+
+// Note: HLS broadcast files are managed by m3u-proxy service

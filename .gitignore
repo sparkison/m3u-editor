@@ -49,6 +49,7 @@ data/
 *FIXES*.md
 app/context.md
 docs/provider-profiles-plan.md
+npm_output.log
 .github/agents
 .github/instructions
 .github/prompts

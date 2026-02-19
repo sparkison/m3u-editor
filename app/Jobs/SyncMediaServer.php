@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
+use App\Interfaces\MediaServer;
 use App\Models\Category;
 use App\Models\Channel;
 use App\Models\Episode;
@@ -112,6 +112,9 @@ class SyncMediaServer implements ShouldQueue
                 throw new Exception('Connection failed: '.$connectionTest['message']);
             }
 
+            // Validate selected libraries still exist
+            $this->validateSelectedLibraries($integration, $service);
+
             $integration->update(['progress' => 10]);
 
             // Sync movies (as VOD channels)
@@ -155,7 +158,7 @@ class SyncMediaServer implements ShouldQueue
                 'stats' => $this->stats,
             ]);
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->stats['errors'][] = $e->getMessage();
 
             // Update integration with error
@@ -198,18 +201,13 @@ class SyncMediaServer implements ShouldQueue
             return $integration->playlist;
         }
 
-        // Determine source type based on integration type
-        $sourceType = $integration->type === 'emby'
-            ? PlaylistSourceType::Emby
-            : PlaylistSourceType::Jellyfin;
-
         // Create a new playlist for this integration
         $playlist = Playlist::createQuietly([
             'uuid' => Str::orderedUuid()->toString(),
             'name' => $integration->name,
             'url' => $integration->base_url, // Store the server URL for reference
             'user_id' => $integration->user_id,
-            'source_type' => $sourceType,
+            'source_type' => $integration->type,
             'status' => Status::Processing,
             'auto_sync' => false, // Sync is managed by the integration, not the playlist
             'user_agent' => 'M3U-Editor-MediaServer-Sync/1.0', // required value for playlist, set to something meaningful
@@ -227,7 +225,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovies(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $movies = $service->fetchMovies();
 
@@ -247,7 +245,20 @@ class SyncMediaServer implements ShouldQueue
                 // Update progress every 10 movies or on last movie
                 if (($index + 1) % 10 === 0 || ($index + 1) === $totalMovies) {
                     $progress = $totalMovies > 0 ? (int) ((($index + 1) / $totalMovies) * 100) : 100;
-                    $integration->update(['movie_progress' => $progress]);
+
+                    // Read current DB value and only update if computed progress is greater
+                    $currentDbProgress = MediaServerIntegration::find($integration->id)->movie_progress;
+
+                    if ($progress > $currentDbProgress) {
+                        $integration->update(['movie_progress' => $progress]);
+                    } else {
+                        // Sparse debug log for unexpected regressions
+                        Log::debug('SyncMediaServer: Skipping movie_progress update because computed progress <= current DB value', [
+                            'integration_id' => $integration->id,
+                            'computed' => $progress,
+                            'current_db' => $currentDbProgress,
+                        ]);
+                    }
                 }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Movie '{$movie['Name']}': {$e->getMessage()}";
@@ -265,7 +276,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncMovie(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $movie
     ): void {
         $itemId = $movie['Id'];
@@ -382,7 +393,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service
+        MediaServer $service
     ): void {
         $seriesList = $service->fetchSeries();
 
@@ -402,7 +413,20 @@ class SyncMediaServer implements ShouldQueue
                 // Update progress every 5 series or on last series
                 if (($index + 1) % 5 === 0 || ($index + 1) === $totalSeries) {
                     $progress = $totalSeries > 0 ? (int) ((($index + 1) / $totalSeries) * 100) : 100;
-                    $integration->update(['series_progress' => $progress]);
+
+                    // Read current DB value and only update if computed progress is greater
+                    $currentDbProgress = MediaServerIntegration::find($integration->id)->series_progress;
+
+                    if ($progress > $currentDbProgress) {
+                        $integration->update(['series_progress' => $progress]);
+                    } else {
+                        // Keep a single sparse debug log for unexpected regressions
+                        Log::debug('SyncMediaServer: Skipping series_progress update because computed progress <= current DB value', [
+                            'integration_id' => $integration->id,
+                            'computed' => $progress,
+                            'current_db' => $currentDbProgress,
+                        ]);
+                    }
                 }
             } catch (Exception $e) {
                 $this->stats['errors'][] = "Series '{$seriesData['Name']}': {$e->getMessage()}";
@@ -420,10 +444,17 @@ class SyncMediaServer implements ShouldQueue
     protected function syncOneSeries(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         array $seriesData
     ): void {
         $seriesId = $seriesData['Id'];
+
+        // Fetch detailed series info for cast, directors, and external IDs
+        $detailedData = $service->fetchSeriesDetails($seriesId);
+        if ($detailedData) {
+            $seriesData = array_merge($seriesData, $detailedData);
+        }
+
         $genres = $service->extractGenres($seriesData);
         if (empty($genres)) {
             $genres = ['Uncategorized'];
@@ -431,6 +462,40 @@ class SyncMediaServer implements ShouldQueue
 
         // Ensure category exists for the first genre
         $category = $this->ensureCategory($playlist, $genres[0]);
+
+        // Extract cast and directors
+        $people = $seriesData['People'] ?? [];
+        $actors = array_slice(array_column(
+            array_filter($people, fn ($p) => ($p['Type'] ?? '') === 'Actor'),
+            'Name'
+        ), 0, 10);
+        $directors = $seriesData['Directors'] ?? array_column(
+            array_filter($people, fn ($p) => ($p['Type'] ?? '') === 'Director'),
+            'Name'
+        );
+
+        // Extract external IDs (Plex uses ProviderIds, Emby uses ProviderIds directly)
+        $providerIds = $seriesData['ProviderIds'] ?? [];
+        $tmdbId = $providerIds['Tmdb'] ?? $providerIds['Tmdb'] ?? null;
+        $tvdbId = $providerIds['Tvdb'] ?? $providerIds['Tvdb'] ?? null;
+        $imdbId = $providerIds['Imdb'] ?? $providerIds['Imdb'] ?? null;
+
+        // Extract backdrop paths
+        $backdropPaths = $seriesData['BackdropImageTags'] ?? [];
+        if (! empty($backdropPaths)) {
+            // Convert to full URLs if they're just paths
+            $backdropPaths = array_map(function ($path) use ($service, $seriesId) {
+                if (str_starts_with($path, '/') || str_starts_with($path, 'http')) {
+                    return $service->getImageUrl($seriesId, 'Backdrop');
+                }
+
+                return $service->getImageUrl($seriesId, 'Backdrop');
+            }, is_array($backdropPaths) ? $backdropPaths : [$backdropPaths]);
+        }
+
+        // Calculate rating on 5-based scale
+        $communityRating = $seriesData['CommunityRating'] ?? null;
+        $rating5Based = $communityRating ? round($communityRating / 2, 1) : null;
 
         // Create or update the series
         $series = Series::updateOrCreate(
@@ -448,12 +513,21 @@ class SyncMediaServer implements ShouldQueue
                 'cover' => $service->getImageUrl($seriesId, 'Primary'),
                 'plot' => $seriesData['Overview'] ?? null,
                 'genre' => implode(', ', $genres),
-                'release_date' => $seriesData['ProductionYear'] ?? null,
-                'rating' => $seriesData['CommunityRating'] ?? null,
-                'last_metadata_fetch' => now(), // Mark metadata as fetched so Xtream API doesn't try to fetch again
+                'release_date' => $seriesData['PremiereDate'] ?? $seriesData['ProductionYear'] ?? null,
+                'cast' => ! empty($actors) ? implode(', ', $actors) : null,
+                'director' => ! empty($directors) ? implode(', ', $directors) : null,
+                'rating' => $communityRating,
+                'rating_5based' => $rating5Based,
+                'backdrop_path' => ! empty($backdropPaths) ? $backdropPaths : null,
+                'tmdb_id' => $tmdbId,
+                'tvdb_id' => $tvdbId,
+                'imdb_id' => $imdbId,
+                'last_metadata_fetch' => now(),
                 'metadata' => [
                     'media_server_id' => $seriesId,
                     'media_server_type' => $integration->type,
+                    'official_rating' => $seriesData['OfficialRating'] ?? null,
+                    'original_title' => $seriesData['OriginalTitle'] ?? null,
                 ],
             ]
         );
@@ -471,7 +545,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncSeason(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         Series $series,
         array $seasonData
     ): void {
@@ -512,7 +586,7 @@ class SyncMediaServer implements ShouldQueue
     protected function syncEpisode(
         MediaServerIntegration $integration,
         Playlist $playlist,
-        MediaServerService $service,
+        MediaServer $service,
         Series $series,
         Season $season,
         array $episodeData
@@ -522,6 +596,21 @@ class SyncMediaServer implements ShouldQueue
         $streamUrl = $service->getStreamUrl($episodeId, $container);
         $imageUrl = $service->getImageUrl($episodeId, 'Primary');
         $runtimeSeconds = $service->ticksToSeconds($episodeData['RunTimeTicks'] ?? 0);
+
+        // Extract bitrate from media sources
+        $bitrate = $episodeData['Bitrate'] ?? null;
+        if (! $bitrate && ! empty($episodeData['MediaSources'][0]['Bitrate'])) {
+            $bitrate = (int) $episodeData['MediaSources'][0]['Bitrate'];
+        }
+
+        // Extract external IDs
+        $providerIds = $episodeData['ProviderIds'] ?? [];
+        $tmdbId = $providerIds['Tmdb'] ?? null;
+        $tvdbId = $providerIds['Tvdb'] ?? null;
+        $imdbId = $providerIds['Imdb'] ?? null;
+
+        // Extract rating
+        $rating = $episodeData['CommunityRating'] ?? null;
 
         Episode::updateOrCreate(
             [
@@ -546,9 +635,17 @@ class SyncMediaServer implements ShouldQueue
                     'media_server_id' => $episodeId,
                     'media_server_type' => $integration->type,
                     'duration_secs' => $runtimeSeconds,
-                    'duration' => gmdate('H:i:s', $runtimeSeconds),
-                    'movie_image' => $imageUrl, // Store image in info for UI compatibility
-                    'cover_big' => $imageUrl, // Also store as cover_big for fallback
+                    'duration' => gmdate('H:i:s', $runtimeSeconds ?? 0),
+                    'movie_image' => $imageUrl,
+                    'cover_big' => $imageUrl,
+                    'release_date' => $episodeData['PremiereDate'] ?? null,
+                    'rating' => $rating,
+                    'bitrate' => $bitrate,
+                    'season' => $season->season_number,
+                    'tmdb_id' => $tmdbId,
+                    'tvdb_id' => $tvdbId,
+                    'imdb_id' => $imdbId,
+                    'official_rating' => $episodeData['OfficialRating'] ?? null,
                 ],
             ]
         );
@@ -576,7 +673,58 @@ class SyncMediaServer implements ShouldQueue
         return $category;
     }
 
-    public function failed(Exception $exception): void
+    /**
+     * Validate that selected libraries still exist on the media server.
+     * If libraries are missing, send a warning notification.
+     */
+    protected function validateSelectedLibraries(
+        MediaServerIntegration $integration,
+        MediaServer $service
+    ): void {
+        // Skip validation if no libraries are selected (backwards compatibility)
+        if (empty($integration->selected_library_ids)) {
+            return;
+        }
+
+        // Fetch current libraries from the media server
+        $currentLibraries = $service->fetchLibraries()->toArray();
+
+        // Check for missing libraries
+        $missingIds = $integration->validateSelectedLibraries($currentLibraries);
+
+        if (! empty($missingIds)) {
+            // Get names of missing libraries from the cached available_libraries
+            $availableLibraries = $integration->available_libraries ?? [];
+            $missingNames = collect($availableLibraries)
+                ->filter(fn ($lib) => in_array($lib['id'], $missingIds))
+                ->pluck('name')
+                ->toArray();
+
+            $missingNamesStr = ! empty($missingNames)
+                ? implode(', ', $missingNames)
+                : implode(', ', $missingIds);
+
+            // Log warning
+            Log::warning('SyncMediaServer: Some selected libraries no longer exist', [
+                'integration_id' => $integration->id,
+                'missing_library_ids' => $missingIds,
+                'missing_library_names' => $missingNames,
+            ]);
+
+            // Send warning notification to user
+            Notification::make()
+                ->warning()
+                ->title('Missing Libraries Detected')
+                ->body("The following libraries no longer exist on {$integration->name}: {$missingNamesStr}. Please update your library selection.")
+                ->broadcast($integration->user)
+                ->sendToDatabase($integration->user);
+
+            // Track in sync stats
+            $this->stats['errors'][] = "Missing libraries: {$missingNamesStr}";
+        }
+    }
+
+    public function failed(\Throwable $exception): void
     {
         $integration = MediaServerIntegration::find($this->integrationId);
         if ($integration) {

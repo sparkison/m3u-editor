@@ -12,7 +12,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
@@ -215,11 +214,10 @@ class VodResource extends Resource
                     ->button()
                     ->hiddenLabel()
                     ->size('sm'),
-                // ViewAction::make()
-                //     ->button()
-                //     ->icon('heroicon-s-information-circle')
-                //     ->hiddenLabel()
-                //     ->slideOver(),
+                ViewAction::make()
+                    ->button()
+                    ->icon('heroicon-s-eye')
+                    ->hiddenLabel(),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 //
@@ -237,7 +235,7 @@ class VodResource extends Resource
     {
         return [
             'index' => Pages\ListVod::route('/'),
-            // 'view' => Pages\ViewVod::route('/{record}'),
+            'view' => Pages\ViewVod::route('/{record}'),
         ];
     }
 }

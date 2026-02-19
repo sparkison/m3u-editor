@@ -20,6 +20,15 @@ class StreamProfileResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Proxy';
 
+    /**
+     * Check if the user can access this resource.
+     * Only users with proxy permission can access stream profiles.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->canUseProxy();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

@@ -116,7 +116,29 @@ class CustomPlaylistResource extends Resource
                 ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
                     ->toggleable()
-                    ->tooltip('Toggle proxy status')
+                    ->tooltip(fn (CustomPlaylist $record): string => $record->hasPooledSourcePlaylists()
+                        ? 'Required (pooled sources)'
+                        : 'Toggle proxy status')
+                    ->disabled(fn (CustomPlaylist $record): bool => $record->hasPooledSourcePlaylists())
+                    ->getStateUsing(function (CustomPlaylist $record): bool {
+                        // If has pooled sources and proxy is off, turn it on in the database
+                        if ($record->hasPooledSourcePlaylists() && ! $record->enable_proxy) {
+                            $record->updateQuietly(['enable_proxy' => true]);
+
+                            return true;
+                        }
+
+                        return $record->enable_proxy;
+                    })
+                    ->beforeStateUpdated(function (CustomPlaylist $record, bool $state): bool {
+                        // Force proxy on if playlist has pooled sources
+                        if ($record->hasPooledSourcePlaylists()) {
+                            return true;
+                        }
+
+                        return $state;
+                    })
+                    ->hidden(fn () => ! auth()->user()->canUseProxy())
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -300,13 +322,34 @@ class CustomPlaylistResource extends Resource
                 ->collapsible()
                 ->collapsed($creating)
                 ->columns(2)
+                ->hidden(fn () => ! auth()->user()->canUseProxy())
                 ->schema([
                     Toggle::make('enable_proxy')
                         ->label('Enable Stream Proxy')
-                        ->hint(fn (Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hint(function (Get $get, ?CustomPlaylist $record): string {
+                            if ($record?->hasPooledSourcePlaylists()) {
+                                return 'Required (pooled sources)';
+                            }
+
+                            return $get('enable_proxy') ? 'Proxied' : 'Not proxied';
+                        })
                         ->hintIcon(fn (Get $get): string => ! $get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
                         ->live()
-                        ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->helperText(function (?CustomPlaylist $record): string {
+                            if ($record?->hasPooledSourcePlaylists()) {
+                                return 'Proxy mode is required because this playlist contains channels from source playlists with Provider Profiles enabled.';
+                            }
+
+                            return 'When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.';
+                        })
+                        ->disabled(fn (?CustomPlaylist $record): bool => (bool) $record?->hasPooledSourcePlaylists())
+                        ->dehydrateStateUsing(fn (bool $state, ?CustomPlaylist $record): bool => $record?->hasPooledSourcePlaylists() ? true : $state)
+                        ->afterStateHydrated(function (Toggle $component, ?CustomPlaylist $record): void {
+                            if ($record?->hasPooledSourcePlaylists()) {
+                                $component->state(true);
+                            }
+                        })
+                        ->dehydrated()
                         ->inline(false)
                         ->default(false),
                     Toggle::make('enable_logo_proxy')
@@ -362,6 +405,15 @@ class CustomPlaylistResource extends Resource
                                 ->inline(false)
                                 ->default(false),
                             Toggle::make('use_sticky_session')
+                                ->hintAction(
+                                    Action::make('learn_more_sticky_session')
+                                        ->label('Learn More')
+                                        ->icon('heroicon-o-arrow-top-right-on-square')
+                                        ->iconPosition('after')
+                                        ->size('sm')
+                                        ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STICKY_SESSION.md')
+                                        ->openUrlInNewTab(true)
+                                )
                                 ->label('Enable Sticky Session Handler')
                                 ->helperText('')
                                 ->inline(false)

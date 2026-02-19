@@ -57,6 +57,11 @@ class Series extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function streamFileSetting(): BelongsTo
+    {
+        return $this->belongsTo(StreamFileSetting::class);
+    }
+
     public function customPlaylists(): BelongsToMany
     {
         return $this->belongsToMany(CustomPlaylist::class, 'series_custom_playlist');

@@ -37,6 +37,7 @@ class Channel extends Model
         'shift' => 'integer',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
+        'network_id' => 'integer',
         'group_id' => 'integer',
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
@@ -48,6 +49,7 @@ class Channel extends Model
         'last_metadata_fetch' => 'datetime',
         'epg_map_enabled' => 'boolean',
         'logo_type' => ChannelLogoType::class,
+        'sort' => 'decimal:4',
     ];
 
     public function user(): BelongsTo
@@ -58,6 +60,22 @@ class Channel extends Model
     public function playlist(): BelongsTo
     {
         return $this->belongsTo(Playlist::class);
+    }
+
+    /**
+     * Get the network this channel represents (if any).
+     */
+    public function network(): BelongsTo
+    {
+        return $this->belongsTo(Network::class);
+    }
+
+    /**
+     * Check if this channel is a network channel.
+     */
+    public function isNetworkChannel(): bool
+    {
+        return $this->network_id !== null;
     }
 
     /**
@@ -72,6 +90,11 @@ class Channel extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
+    }
+
+    public function streamFileSetting(): BelongsTo
+    {
+        return $this->belongsTo(StreamFileSetting::class);
     }
 
     public function epgChannel(): BelongsTo
