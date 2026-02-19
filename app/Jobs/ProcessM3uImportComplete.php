@@ -298,6 +298,14 @@ class ProcessM3uImportComplete implements ShouldQueue
             $update['vod_progress'] = 100; // Only set if VOD import was run
         }
         $playlist->update($update);
+        $playlist->update([
+            'auto_retry_503_count' => 0,
+            'auto_retry_503_last_at' => null,
+            'processing' => [
+                ...$playlist->processing ?? [],
+                'series_processing' => false, // por si acaso
+            ],
+        ]);
 
         // Send notification
         if ($this->maxHit) {
