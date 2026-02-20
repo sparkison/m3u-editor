@@ -1384,7 +1384,6 @@ class ProcessM3uImport implements ShouldQueue
                 // Auto retry on HTTP 503
                 if (self::isHttp503($e)) {
                     $playlist->update([
-                        'status' => Status::Pending,
                         'processing' => [
                             ...$playlist->processing ?? [],
                             'live_processing' => false,
@@ -1617,7 +1616,6 @@ class ProcessM3uImport implements ShouldQueue
                 // Auto retry on HTTP 503
                 if (self::isHttp503($e)) {
                     $playlist->update([
-                        'status' => Status::Pending,
                         'processing' => [
                             ...$playlist->processing ?? [],
                             'live_processing' => false,
