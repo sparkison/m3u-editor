@@ -403,26 +403,17 @@ class Preferences extends SettingsPage
                                                     ->modalDescription('This will clear all playlists currently marked as invalid, allowing them to be used for failover again immediately.')
                                                     ->modalSubmitActionLabel('Clear all')
                                                     ->action(function () {
-                                                        $prefix = config('cache.prefix');
-                                                        $pattern = $prefix.'playlist_invalid:*';
-                                                        $connection = config('cache.stores.redis.connection', 'cache');
-                                                        $redis = Redis::connection($connection);
-                                                        $cleared = 0;
-                                                        $cursor = '0';
-                                                        do {
-                                                            [$cursor, $keys] = $redis->scan($cursor, ['match' => $pattern, 'count' => 100]);
-                                                            if (! empty($keys)) {
-                                                                $redis->del(...$keys);
-                                                                $cleared += count($keys);
-                                                            }
-                                                        } while ($cursor !== '0');
+                                                        $count = Redis::hlen('playlist_invalid');
+                                                        if ($count > 0) {
+                                                            Redis::del('playlist_invalid');
+                                                        }
 
                                                         Notification::make()
                                                             ->success()
                                                             ->title('Failed playlists cleared')
-                                                            ->body($cleared > 0
-                                                                ? "Cleared {$cleared} invalid playlist(s). They are now eligible for failover again."
-                                                                : 'No invalid playlists found in cache.')
+                                                            ->body($count > 0
+                                                                ? "Cleared {$count} invalid playlist(s). They are now eligible for failover again."
+                                                                : 'No invalid playlists found.')
                                                             ->duration(5000)
                                                             ->send();
                                                     }),

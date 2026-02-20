@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 class M3uProxyService
 {
@@ -1900,7 +1901,10 @@ class M3uProxyService
                 }
 
                 // Check if this failover's playlist is marked invalid due to fail conditions
-                if ($failConditionsEnabled && Cache::has("playlist_invalid:{$failoverPlaylist->uuid}")) {
+                $invalidExpiresAt = $failConditionsEnabled
+                    ? Redis::hget('playlist_invalid', $failoverPlaylist->uuid)
+                    : null;
+                if ($invalidExpiresAt && now()->timestamp < (int) $invalidExpiresAt) {
                     Log::debug('Failover playlist marked invalid by fail condition, skipping', [
                         'playlist_uuid' => $failoverPlaylist->uuid,
                         'playlist' => $failoverPlaylist->title_custom ?? $failoverPlaylist->title,
@@ -1975,9 +1979,11 @@ class M3uProxyService
      */
     protected function markPlaylistInvalidForFailover(int $channelId, string $playlistUuid, int $index, int $statusCode, int $timeoutMinutes): void
     {
+        $expiresAt = now()->addMinutes($timeoutMinutes)->timestamp;
+
         if ($index <= 0) {
             // The original playlist is failing
-            Cache::put("playlist_invalid:{$playlistUuid}", $statusCode, now()->addMinutes($timeoutMinutes));
+            Redis::hset('playlist_invalid', $playlistUuid, $expiresAt);
             Log::info('Marked original playlist as invalid due to fail condition', [
                 'playlist_uuid' => $playlistUuid,
                 'status_code' => $statusCode,
@@ -2007,7 +2013,7 @@ class M3uProxyService
                 $failedChannel = $failoverChannels[$failedIdx];
                 $failedPlaylist = $failedChannel->getEffectivePlaylist();
                 if ($failedPlaylist) {
-                    Cache::put("playlist_invalid:{$failedPlaylist->uuid}", $statusCode, now()->addMinutes($timeoutMinutes));
+                    Redis::hset('playlist_invalid', $failedPlaylist->uuid, $expiresAt);
                     Log::info('Marked failover playlist as invalid due to fail condition', [
                         'playlist_uuid' => $failedPlaylist->uuid,
                         'channel_id' => $failedChannel->id,
