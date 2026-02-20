@@ -634,6 +634,9 @@ class XtreamApiController extends Controller
                     // Use stream_icon as thumbnail (or a dedicated thumbnail if available)
                     $thumbnail = $streamIcon;
 
+                    // Get direct source URL if use_direct_urls is enabled
+                    $directSource = ($playlist->use_direct_urls ?? false) ? $url : '';
+
                     $liveStreams[] = [
                         'num' => $channelNo,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -648,7 +651,7 @@ class XtreamApiController extends Controller
                         'tv_archive_duration' => $channel->shift ?? 0,
                         'custom_sid' => $channel->stream_id_custom ?? '',
                         'thumbnail' => $thumbnail,
-                        'direct_source' => '',
+                        'direct_source' => $directSource,
                     ];
                 }
             }
@@ -765,6 +768,10 @@ class XtreamApiController extends Controller
                     $extension = $channel->container_extension ?? 'mkv';
                     $tmdb = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? 0;
 
+                    // Get direct source URL if use_direct_urls is enabled
+                    $vodUrl = $channel->url_custom ?? $channel->url;
+                    $directSource = ($playlist->use_direct_urls ?? false) ? $vodUrl : '';
+
                     $vodStreams[] = [
                         'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -782,7 +789,7 @@ class XtreamApiController extends Controller
                         'tmdb_id' => (int) $tmdb,
                         'container_extension' => $channel->container_extension ?? 'mkv',
                         'custom_sid' => $channel->stream_id_custom ?? '',
-                        'direct_source' => '',
+                        'direct_source' => $directSource,
                     ];
                 }
             }
@@ -1000,6 +1007,9 @@ class XtreamApiController extends Controller
                                     : $episode->info['cover_big'];
                             }
 
+                            // Get direct source URL if use_direct_urls is enabled
+                            $episodeDirectSource = ($playlist->use_direct_urls ?? false) ? ($episode->url ?? '') : '';
+
                             $seasonEpisodes[] = [
                                 'id' => (string) $episode->id,
                                 'episode_num' => $episode->episode_num,
@@ -1013,7 +1023,7 @@ class XtreamApiController extends Controller
                                 'season' => $episode->season,
                                 'custom_sid' => $episode->custom_sid ?? '',
                                 'stream_id' => $episode->id,
-                                'direct_source' => '',
+                                'direct_source' => $episodeDirectSource,
                             ];
                         }
                     }
@@ -1400,6 +1410,9 @@ class XtreamApiController extends Controller
             // Build movie_data section - use channel's movie_data field if available, otherwise build from channel data
             $movieData = $channel->movie_data ?? [];
 
+            // Get direct source URL if use_direct_urls is enabled
+            $vodDirectSource = ($playlist->use_direct_urls ?? false) ? ($channel->url_custom ?? $channel->url ?? '') : '';
+
             $extension = $movieData['container_extension'] ?? $channel->container_extension ?? 'mp4';
             $defaultMovieData = [
                 'stream_id' => $channel->id,
@@ -1411,7 +1424,7 @@ class XtreamApiController extends Controller
                 'category_ids' => ($channel->group_id ? [(int) $channel->group_id] : []),
                 'container_extension' => $extension,
                 'custom_sid' => $movieData['custom_sid'] ?? '',
-                'direct_source' => '',
+                'direct_source' => $vodDirectSource,
             ];
 
             // Return response with metadata at BOTH root level (for compatibility with buggy players
