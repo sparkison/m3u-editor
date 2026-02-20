@@ -40,7 +40,7 @@ class RefreshPlaylist extends Command
             $this->info('Refreshing all playlists');
             // Auto-reset stuck playlists (processing for too long)
             $stuckMinutes = (int) config('dev.stuck_processing_minutes', 120);
-            
+
             Playlist::query()
                 ->where('status', Status::Processing)
                 ->where('updated_at', '<', now()->subMinutes($stuckMinutes))
@@ -52,7 +52,7 @@ class RefreshPlaylist extends Command
                         'series_processing' => false,
                     ],
                 ]);
-            
+
             // Get all playlists that are not currently processing
             // Exclude network playlists as they don't have M3U sources
             $playlists = Playlist::query()->where([
