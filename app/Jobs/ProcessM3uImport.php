@@ -1377,7 +1377,7 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
-                        'series_processing' => false, // <-- IMPORTANT
+                        'series_processing' => false,
                     ],
                 ]);
 
@@ -1388,7 +1388,7 @@ class ProcessM3uImport implements ShouldQueue
                 }
 
                 event(new SyncCompleted($playlist));
-            });
+            })->dispatch();
     }
 
     /**
@@ -1602,7 +1602,7 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
-                        'series_processing' => false, // <-- IMPORTANT
+                        'series_processing' => false,
                     ],
                 ]);
 
@@ -1613,7 +1613,7 @@ class ProcessM3uImport implements ShouldQueue
                 }
 
                 event(new SyncCompleted($playlist));
-            });
+            })->dispatch();
     }
 
     /**
