@@ -18,6 +18,7 @@ use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -1353,19 +1354,22 @@ class ProcessM3uImport implements ShouldQueue
             ->catch(function (Throwable $e) use ($playlist) {
                 $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                 Log::error($error);
+
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
+
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
                     ->sendToDatabase($playlist->user);
+
                 $playlist->update([
                     'status' => Status::Failed,
-                    'channels' => 0, // not using...
+                    'channels' => 0,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -1373,8 +1377,23 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
+                        'series_processing' => false,
                     ],
                 ]);
+
+                // Auto retry on HTTP 503
+                if (self::isHttp503($e)) {
+                    $playlist->update([
+                        'processing' => [
+                            ...$playlist->processing ?? [],
+                            'live_processing' => false,
+                            'vod_processing' => false,
+                            'series_processing' => false,
+                        ],
+                    ]);
+                    self::scheduleRetry503($playlist);
+                }
+
                 event(new SyncCompleted($playlist));
             })->dispatch();
     }
@@ -1567,19 +1586,22 @@ class ProcessM3uImport implements ShouldQueue
             ->catch(function (Throwable $e) use ($playlist) {
                 $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                 Log::error($error);
+
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
+
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
                     ->sendToDatabase($playlist->user);
+
                 $playlist->update([
                     'status' => Status::Failed,
-                    'channels' => 0, // not using...
+                    'channels' => 0,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -1587,8 +1609,23 @@ class ProcessM3uImport implements ShouldQueue
                         ...$playlist->processing ?? [],
                         'live_processing' => false,
                         'vod_processing' => false,
+                        'series_processing' => false,
                     ],
                 ]);
+
+                // Auto retry on HTTP 503
+                if (self::isHttp503($e)) {
+                    $playlist->update([
+                        'processing' => [
+                            ...$playlist->processing ?? [],
+                            'live_processing' => false,
+                            'vod_processing' => false,
+                            'series_processing' => false,
+                        ],
+                    ]);
+                    self::scheduleRetry503($playlist);
+                }
+
                 event(new SyncCompleted($playlist));
             })->dispatch();
     }
@@ -1705,5 +1742,52 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         return false;
+    }
+
+    private static function isHttp503(Throwable $e): bool
+    {
+        if ($e instanceof RequestException) {
+            $response = $e->response;
+            if ($response) {
+                return $response->status() === 503;
+            }
+        }
+
+        return Str::contains($e->getMessage(), [
+            'status code 503',
+            'HTTP request returned status code 503',
+            '503 Service Temporarily Unavailable',
+            ' 503:',
+        ]);
+    }
+
+    private static function scheduleRetry503(Playlist $playlist): void
+    {
+        if (! (bool) config('dev.auto_retry_503_enabled', true)) {
+            return;
+        }
+
+        $max = (int) config('dev.auto_retry_503_max', 3);
+        $cooldown = (int) config('dev.auto_retry_503_cooldown_minutes', 10);
+
+        if (($playlist->auto_retry_503_count ?? 0) >= $max) {
+            return;
+        }
+
+        if ($playlist->auto_retry_503_last_at && $playlist->auto_retry_503_last_at->diffInMinutes(now()) < $cooldown) {
+            return;
+        }
+
+        $playlist->update([
+            'auto_retry_503_count' => ($playlist->auto_retry_503_count ?? 0) + 1,
+            'auto_retry_503_last_at' => now(),
+        ]);
+
+        $min = (int) config('dev.auto_retry_503_delay_min_seconds', 300);
+        $max = (int) config('dev.auto_retry_503_delay_max_seconds', 900);
+        $delay = random_int($min, $max);
+
+        dispatch(new self($playlist))
+            ->delay(now()->addSeconds($delay));
     }
 }
